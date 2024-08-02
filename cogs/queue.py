@@ -11,7 +11,7 @@ class Queue(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @slash_command(name='queue', description='Shows songs in queue.', guild_only=True)
+    @slash_command(name='queue', description='Shows songs in queue.', context={discord.InteractionContextType.guild})
     async def queue(self, ctx) -> None:
 
         if not ctx.author.voice:
@@ -31,7 +31,7 @@ class Queue(commands.Cog):
             embed = discord.Embed(title="", description="**Queue is empty**", color=discord.Color.blue())
             await ctx.respond(embed=embed)
 
-    @slash_command(name='playing', description='What song is currently playing.', guild_only=True)
+    @slash_command(name='playing', description='What song is currently playing.', context={discord.InteractionContextType.guild})
     async def playing_command(self, ctx) -> None:
 
         if not ctx.author.voice:
@@ -54,7 +54,7 @@ class Queue(commands.Cog):
         else:
             await ctx.respond(embed=await self.get_playing_embed(ctx))
 
-    @slash_command(name='remove', description='Clears position in queue.', guild_only=True)
+    @slash_command(name='remove', description='Clears position in queue.', context={discord.InteractionContextType.guild})
     @option('pos', description='Value 1 Removes the first one.', min_value=1, required=False)
     async def remove(self, ctx, pos: int):
 
@@ -85,7 +85,7 @@ class Queue(commands.Cog):
                                       color=discord.Color.blue())
                 await ctx.respond(embed=embed, ephemeral=True)
 
-    @slash_command(name='shuffle', description='Shuffles you queue, queue must contain more than 2 songs.', guild_only=True)
+    @slash_command(name='shuffle', description='Shuffles you queue, queue must contain more than 2 songs.', context={discord.InteractionContextType.guild})
     async def shuffle(self, ctx):
 
         if not ctx.author.voice:
@@ -113,7 +113,7 @@ class Queue(commands.Cog):
             await ctx.respond(embed=embed, ephemeral=True)
 
     @slash_command(name='loop-queue', description='Loops queue, run command again to disable queue loop',
-                   guild_only=True)
+                   context={discord.InteractionContextType.guild})
     async def loop_queue(self, ctx) -> None:
 
         if not ctx.author.voice:
@@ -146,7 +146,7 @@ class Queue(commands.Cog):
             return await ctx.respond(embed=embed)
 
     @slash_command(name='loop', description='Loops currently playing song, run command again to disable loop.',
-                   guild_only=True)
+                   context={discord.InteractionContextType.guild})
     async def loop(self, ctx) -> None:
 
         if not ctx.author.voice:
@@ -174,7 +174,7 @@ class Queue(commands.Cog):
                                   color=discord.Color.blue())
             await ctx.respond(embed=embed)
 
-    @slash_command(name='clear-queue', description='Clears queue', guild_only=True)
+    @slash_command(name='clear-queue', description='Clears queue', context={discord.InteractionContextType.guild})
     async def clear_(self, ctx):
 
         if not ctx.author.voice:
@@ -228,7 +228,7 @@ class Queue(commands.Cog):
         )
         embed.set_author(name="Playback Information")
         embed.set_footer(
-            text=f"Requested by {vc.current.ctx.author.name}",
+            text=f"Requested by {vc.current.requester.name}",
             icon_url=ctx.author.display_avatar.url,
         )
         embed.add_field(name="Track title", value=f"**[{vc.current.title}]({vc.current.uri})**", inline=False)

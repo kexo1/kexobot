@@ -10,7 +10,7 @@ class Lyrics(commands.Cog):
         self.bot = bot
         self.genius = GeniusBuilder(client_access_token='TQTApd5TKlHCCaYhhD9te_j-Hl9CS47VMFx5vNyW_5TRmwVNsjQ8V71b-2CeUN0z')
 
-    @slash_command(name='lyrics', description='Searches lyrics for current song.', guild_only=True)
+    @slash_command(name='lyrics', description='Searches lyrics for current song.', context={discord.InteractionContextType.guild})
     async def lyrics(self, ctx):
 
         if not ctx.author.voice:

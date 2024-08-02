@@ -12,7 +12,7 @@ class Audio(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @slash_command(name='volume', description='Sets volume.', guild_only=True)
+    @slash_command(name='volume', description='Sets volume.', context={discord.InteractionContextType.guild})
     @option(
         'vol',
         description='Max is 100.',
@@ -42,13 +42,13 @@ class Audio(commands.Cog):
                                   color=discord.Color.blue())
             return await ctx.respond(embed=embed)
 
-        await vc.set_volume(value=vol)
+        await vc.set_volume(vol)
 
         embed = discord.Embed(title="", description=f'**🔊 Volume set to `{int(vol)}%`**',
                               color=discord.Color.blue())
         await ctx.respond(embed=embed)
 
-    @slash_command(name='speed', description='Speeds up music.', guild_only=True)
+    @slash_command(name='speed', description='Speeds up music.', context={discord.InteractionContextType.guild})
     @option(
         'multiplier',
         description='It might take 3-5 seconds to start speeding up, no value sets it to normal speed',
@@ -81,7 +81,7 @@ class Audio(commands.Cog):
             embed = discord.Embed(title="", description=f"**⏩ Sped up by `{int(multiplier)}x`.**", color=discord.Color.blue())
             await ctx.respond(embed=embed)
 
-    @slash_command(name='clear-effects', description='Clears all effects on player.', guild_only=True)
+    @slash_command(name='clear-effects', description='Clears all effects on player.', context={discord.InteractionContextType.guild})
     async def clear_effects(self, ctx):
 
         if not ctx.author.voice:

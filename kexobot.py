@@ -10,7 +10,6 @@ import imgflip
 import requests
 import aiohttp
 import asyncio
-import logging
 
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
@@ -54,7 +53,9 @@ class Bot(commands.Bot):
 
     # noinspection PyAttributeOutsideInit
     async def setup_bot(self):
-        nodes = [wavelink.Node(uri='http://kexo.duckdns.org:2333/', password="kexopexo", retries=3, resume_timeout=0)]
+        # http://192.168.1.3:2333
+        # http://kexo.duckdns.org:2333
+        nodes = [wavelink.Node(uri='http://192.168.1.3:2333', password="kexopexo", retries=2, resume_timeout=0)]
 
         await wavelink.Pool.connect(nodes=nodes, client=self)
 
@@ -68,8 +69,6 @@ class Bot(commands.Bot):
 
 bot = Bot(intents=intents)
 bot.remove_command("help")
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 activity = ('Valheim', 'Counter-Strike: Global Offensive', 'Minecraft', 'Doom Eternal', 'Red Dead Redemption 2',
             'Cyberbug 2077', 'Python', 'Gears of War 5',
@@ -370,7 +369,7 @@ class HostView(discord.ui.View):
 
 
 @bot.slash_command(name='host', description='Creates hosting embed, you can also choose some optional info.',
-                   guild_only=True, guild_ids=[723197287861583885, 692810367851692032])
+                   context={discord.InteractionContextType.guild}, guild_ids=[723197287861583885, 692810367851692032])
 @option('server_name', description='Your server name.')
 @option('duration', description='How long are you going to be hositng.',
         choices=['As long as I want/Before any crash.', 'Less than 15 minutes.', '15 minutes', '30 minutes',
@@ -430,13 +429,18 @@ async def host(ctx, server_name, duration, password, region, category_maps, scri
             ephemeral=True)
 
 
-@bot.slash_command(name='recconnect_node', description='Retry connecting to node', guild_ids=[692810367851692032])
-@option('uri', description='Lavalink server URL (if not working, try adding http:// at start).')
+@bot.slash_command(name='recconnect_node', description='Retry connecting to node')
+@option('uri', description='Lavalink server URL (without http:// at start).')
 @option('port', description='Lavalink server port.')
 @option('password', description='Lavalink server password.')
 async def retry_node(ctx, uri, port, password):
 
-    nodes = [wavelink.Node(uri=f"{uri}:{port}", password=password, retries=1, resume_timeout=0)]
+    embed = discord.Embed(title="",
+                          description=f'**🔄 Connecting to `{uri}`**',
+                          color=discord.Color.blue())
+    message = await ctx.respond(embed=embed)
+
+    nodes = [wavelink.Node(uri=f"http://{uri}:{port}", password=password, retries=1, resume_timeout=0)]
     await wavelink.Pool.connect(nodes=nodes, client=bot)
     bot.node = nodes
 
@@ -449,16 +453,16 @@ async def retry_node(ctx, uri, port, password):
         embed = discord.Embed(title="",
                               description=f'**✅ Connected to node `{uri}`**',
                               color=discord.Color.blue())
-        await ctx.respond(embed=embed)
+        await message.edit(embed=embed)
 
     except aiohttp.client_exceptions.ClientConnectorError:
         embed = discord.Embed(title="",
                               description=f":x: Failed to connect to `{uri}`",
                               color=discord.Color.from_rgb(r=255, g=0, b=0))
-        return await ctx.respond(embed=embed)
+        await message.edit(embed=embed)
 
 
-@bot.slash_command(name='spam', description='Spams words, max is 50.  (Admin)', guild_only=True)
+@bot.slash_command(name='spam', description='Spams words, max is 50.  (Admin)', context={discord.InteractionContextType.guild})
 @discord.default_permissions(administrator=True)
 @commands.cooldown(1, 50, commands.BucketType.user)
 @option(
@@ -474,7 +478,7 @@ async def spam(ctx, word, integer: int):
 
 
 @bot.slash_command(name='kys', description='Keď niekoho nemáš rád.',
-                   guild_ids=[692810367851692032, 765262686908186654], guild_only=True)  # 831092366634385429
+                   guild_ids=[692810367851692032, 765262686908186654], context={discord.InteractionContextType.guild})  # 831092366634385429
 @commands.cooldown(1, 30, commands.BucketType.user)
 async def kys(ctx, member: discord.Member):
     await bot.main_class.imflip_api(ctx, member)
@@ -511,7 +515,7 @@ async def pick(ctx, words: str):
     await ctx.respond("I chose " + "`" + str(random.choice(words)) + "`")
 
 
-@bot.slash_command(name='c', description='Clears messages, max 50 (Admin)', guild_only=True)
+@bot.slash_command(name='c', description='Clears messages, max 50 (Admin)', context={discord.InteractionContextType.guild})
 @discord.default_permissions(administrator=True)
 @option(
     'integer',

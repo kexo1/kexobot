@@ -15,6 +15,7 @@ class Play(commands.Cog):
     # noinspection RegExpRedundantEscape,RegExpSimplifiable
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.lavalink_servers_site = "https://lavainfo.netlify.app/"
 
     @staticmethod
     def queue_embed(track):
@@ -59,7 +60,7 @@ class Play(commands.Cog):
         if not payload.player.queue.is_empty and not payload.player.first:
             await payload.player.text_channel.send(embed=self.playing_embed(None, payload))
 
-    @slash_command(name='play', description='Plays song.', guild_only=True)
+    @slash_command(name='play', description='Plays song.', context={discord.InteractionContextType.guild})
     @commands.cooldown(1, 4, commands.BucketType.user)
     @option('search', description='Links and words for youtube, playlists soundcloud urls,  work too are supported.')
     async def play(self, ctx, search: str):
@@ -82,13 +83,12 @@ class Play(commands.Cog):
                     vc: wavelink.Player = await ctx.author.voice.channel.connect(cls=wavelink.Player)
                 except wavelink.exceptions.InvalidNodeException:
                     embed = discord.Embed(title="",
-                                          description=f":x: No nodes are currently assigned to the bot. To fix this, go to this site: https://lavainfo.moebot.pro/ and search for online nodes with version v4, then use command `recconnect_node` and input parameters from the site.",
+                                          description=f":x: No nodes are currently assigned to the bot. To fix this, go to this site: {self.lavalink_servers_site} and search for online nodes with version v4 and with Youtube plugin, then use command `recconnect_node` and input parameters from the site.",
                                           color=discord.Color.from_rgb(r=255, g=0, b=0))
                     return await ctx.respond(embed=embed)
 
-                await ctx.defer()
-            except wavelink.InvalidChannelPermissions:
-
+                # await ctx.defer()
+            except wavelink.InvalidChannelStateException:
                 embed = discord.Embed(title="",
                                       description=f":x: I don't have permissions to join your channel.",
                                       color=discord.Color.from_rgb(r=255, g=0, b=0))
@@ -106,7 +106,14 @@ class Play(commands.Cog):
             vc: wavelink.Player = ctx.voice_client
 
         await ctx.trigger_typing()
-        tracks: wavelink.Search = await wavelink.Playable.search(search)
+
+        try:
+            tracks: wavelink.Search = await wavelink.Playable.search(search)
+        except wavelink.exceptions.LavalinkLoadException:
+            embed = discord.Embed(title="",
+                                  description=f":x: Failed to load tracks, this Lavalink server doesn't have Youtube plugin. To fix this, go to this site: {self.lavalink_servers_site} and search for online nodes with version v4 and with Youtube plugin, then use command `recconnect_node` and input parameters from the site.",
+                                  color=discord.Color.from_rgb(r=255, g=0, b=0))
+            return await ctx.respond(embed=embed)
 
         if isinstance(tracks, wavelink.Playlist):
             added: int = vc.queue.put(tracks)
@@ -132,11 +139,11 @@ class Play(commands.Cog):
             vc.queue.put(track)
         else:
             vc.first = True
-            await vc.play(track)
             await ctx.respond(embed=self.playing_embed(ctx.author, track))
+            await vc.play(track)
             vc.queue.remove(track)  # Due to autoplay the first song does not remove itself after skipping
 
-    @slash_command(name='play-next', description='Put this song next in queue, bypassing others.', guild_only=True)
+    @slash_command(name='play-next', description='Put this song next in queue, bypassing others.', context={discord.InteractionContextType.guild})
     @commands.cooldown(1, 4, commands.BucketType.user)
     @option('search',
             description='Links and words for youtube are supported, playlists work too.')
@@ -159,8 +166,8 @@ class Play(commands.Cog):
         if not ctx.voice_client:
             try:
                 vc: wavelink.Player = await ctx.author.voice.channel.connect(cls=wavelink.Player)
-                await ctx.defer()
-            except wavelink.InvalidChannelPermissions:
+                # await ctx.defer()
+            except wavelink.InvalidChannelStateException:
                 embed = discord.Embed(title="",
                                       description=f":x: I don't have permissions to join your channel.",
                                       color=discord.Color.from_rgb(r=255, g=0, b=0))
@@ -209,7 +216,7 @@ class Play(commands.Cog):
             await ctx.respond(embed=self.playing_embed(ctx.author, track))
             vc.queue.remove(track)  # Due to autoplay the first song does not remove itself after skipping
 
-    @slash_command(name='skip', description='Skip playing song.', guild_only=True)
+    @slash_command(name='skip', description='Skip playing song.', context={discord.InteractionContextType.guild})
     async def skip_command(self, ctx):
 
         try:
@@ -238,7 +245,7 @@ class Play(commands.Cog):
 
         await ctx.response.send_message(embed=embed)
 
-    @slash_command(name='skip-to', description='Skips to selected song in queue.', guild_only=True)
+    @slash_command(name='skip-to', description='Skips to selected song in queue.', context={discord.InteractionContextType.guild})
     @option('pos', description='Value 2 skips to second song in queue.', min_value=1, required=True)
     async def skip_to_command(self, ctx, pos: int):
 
@@ -276,7 +283,7 @@ class Play(commands.Cog):
                                   color=discord.Color.blue())
         await ctx.respond(embed=embed)
 
-    @slash_command(name='pause', description='Pauses song that is currently playing.', guild_only=True)
+    @slash_command(name='pause', description='Pauses song that is currently playing.', context={discord.InteractionContextType.guild})
     async def pause_command(self, ctx):
 
         try:
@@ -301,7 +308,7 @@ class Play(commands.Cog):
         embed.set_footer(text=f'Deleting in 10s.')
         await ctx.response.send_message(embed=embed, delete_after=10)
 
-    @slash_command(name='resume', description='Resumes paused song.', guild_only=True)
+    @slash_command(name='resume', description='Resumes paused song.', context={discord.InteractionContextType.guild})
     async def resume_command(self, ctx):
 
         try:

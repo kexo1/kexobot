@@ -1,3 +1,4 @@
+py-cord
 dnspython
 pymongo
 PyNaCl
@@ -8,5 +9,4 @@ requests
 imgflip.py
 bs4
 asyncpraw
-py-cord
 fake-useragent

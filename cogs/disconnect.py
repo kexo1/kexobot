@@ -9,7 +9,7 @@ class Disconnect(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @slash_command(name='leave', description='Leaves voice channel.', guild_only=True)
+    @slash_command(name='leave', description='Leaves voice channel.', context={discord.InteractionContextType.guild})
     @commands.cooldown(1, 4, commands.BucketType.user)
     async def disconnect_command(self, ctx):
         """Disconnect bot
