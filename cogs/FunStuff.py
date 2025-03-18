@@ -78,7 +78,7 @@ class FunStuff(commands.Cog):
         await ctx.send('https://media.discordapp.net/attachments/796453724713123870/1042486203842306159/image.png')
         self.idk_count = 0
 
-    async def process_shitpost(self, ctx):
+    async def process_shitpost(self, ctx) -> None:
         guild_id = str(ctx.guild.id) if ctx.guild else str(ctx.user.id)
 
         if guild_id not in self.bot.subbredit_cache:

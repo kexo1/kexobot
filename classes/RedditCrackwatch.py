@@ -15,7 +15,7 @@ class RedditCrackwatch:
         self.reddit = reddit
         self.bot = bot
 
-    async def run(self):
+    async def run(self) -> None:
         try:
             crack_cache = self.database.find_one({'_id': ObjectId('617958fae4043ee4a3f073f2')})
         except pymongo.errors.ServerSelectionTimeoutError as e:

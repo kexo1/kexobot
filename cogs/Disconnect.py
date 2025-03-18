@@ -11,12 +11,7 @@ class Disconnect(commands.Cog):
 
     @slash_command(name='leave', description='Leaves voice channel.')
     @commands.cooldown(1, 4, commands.BucketType.user)
-    async def disconnect_command(self, ctx):
-        """Disconnect bot
-        Args:
-            ctx (commands.Context): _description_
-        """
-
+    async def disconnect_command(self, ctx) -> None:
         if not ctx.author.voice or ctx.voice_client is None:
             embed = discord.Embed(title="",
                                   description=str(
@@ -46,7 +41,7 @@ class Disconnect(commands.Cog):
         await Disconnect.disconnect_player(ctx.guild)
 
     @staticmethod
-    async def disconnect_player(guild: discord.Guild):
+    async def disconnect_player(guild: discord.Guild) -> None:
         vc: wavelink.Player = guild.voice_client
         await vc.disconnect()
 

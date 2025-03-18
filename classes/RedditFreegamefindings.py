@@ -9,6 +9,7 @@ from bson.objectid import ObjectId
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from constants import REDDIT_FREEGAME_EMBEDS, REDDIT_FREEGAME_POSTS
+from asyncprawcore.exceptions import AsyncPrawcoreException, ResponseException, RequestException
 
 
 class RedditFreegamefindings:
@@ -16,7 +17,7 @@ class RedditFreegamefindings:
         self.database = database
         self.reddit = reddit
 
-    async def run(self):
+    async def run(self) -> None:
         try:
             freegame_url_cache = self.database.find_one({'_id': ObjectId('617958fae4043ee4a3f073f2')})
         except pymongo.errors.ServerSelectionTimeoutError as e:
@@ -51,8 +52,7 @@ class RedditFreegamefindings:
                 _freegame_url_cache = [_freegame_url_cache[-1]] + _freegame_url_cache[:-1]
                 _freegame_url_cache[0] = submission.url
                 pending_link_list.append(submission.url)
-        except (asyncprawcore.exceptions.AsyncPrawcoreException, asyncprawcore.exceptions.RequestException,
-                asyncprawcore.exceptions.ResponseException, AssertionError):
+        except (AsyncPrawcoreException, RequestException, ResponseException):
             pass
 
         # If nothing found, return
@@ -93,7 +93,7 @@ class RedditFreegamefindings:
         await asyncio.gather(*tasks)
 
 
-async def key_hub(url, session):
+async def key_hub(url, session) -> None:
     source = session.get(url).text
     if 'nsfw' in source.lower():
         return
@@ -123,7 +123,7 @@ async def key_hub(url, session):
                                match.group(1)))
 
 
-async def fanatical(url, session):
+async def fanatical(url, session) -> None:
     source = session.get(url).text
     pattern = re.compile(r'product-name">(.*?)<', re.DOTALL)
     match = pattern.search(source)
@@ -142,7 +142,7 @@ async def fanatical(url, session):
                                match.group()))
 
 
-async def send_freegame_embed(info):
+async def send_freegame_embed(info) -> None:
     embed = discord.Embed(title=info[0], description=info[1], color=discord.Color.dark_theme())
     url_obj = urlparse(info[2])
     domain = url_obj.netloc

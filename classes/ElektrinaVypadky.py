@@ -14,7 +14,7 @@ class ElektrinaVypadky:
         self.database = database
         self.user_kexo = user_kexo
 
-    async def run(self):
+    async def run(self) -> None:
 
         try:
             post_link_doc = self.database.find_one({'_id': ObjectId('618945c8221f18d804636965')})

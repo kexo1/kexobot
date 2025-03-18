@@ -18,7 +18,7 @@ class Listeners(commands.Cog):
             self,
             member: discord.member.Member,
             before: discord.VoiceState,
-            after: discord.VoiceState):
+            after: discord.VoiceState) -> None:
 
         voice_state = member.guild.voice_client
         if voice_state is None:

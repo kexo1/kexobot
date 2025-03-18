@@ -36,6 +36,8 @@ bot = commands.Bot(command_prefix='+', case_insensitive=True, intents=intents)
 # TODO: MongoDB constants instead of hardcoded values
 # TODO: Make classes in /classes/ more modular
 # TODO: Auto fetch lavalink server at startup
+# TODO: Rewrite RedditFreegamefindings
+# TODO: Use enums instead of strings in DatabaseManager
 
 class KexoBOT:
     def __init__(self) -> None:
@@ -64,7 +66,7 @@ class KexoBOT:
         self.esutaze = None
         self.main_loop_counter = 0
 
-    async def initialize(self, bot):
+    async def initialize(self, bot) -> None:
         await self.fetch_users()
         await self.create_session()
 
@@ -75,7 +77,7 @@ class KexoBOT:
         self.elektrina_vypadky = ElektrinaVypadky(self.session, self.database, self.user_kexo)
         self.esutaze = Esutaze(self.session, self.database, bot)
 
-    async def create_session(self):
+    async def create_session(self) -> None:
         self.session = httpx.AsyncClient()
         self.session.verify = True
         self.session.headers = {'User-Agent': UserAgent().random}
@@ -89,7 +91,7 @@ class KexoBOT:
         await wavelink.Pool.connect(nodes=nodes, client=bot)
         bot.node = nodes
 
-    async def set_joke(self):
+    async def set_joke(self) -> None:
         # insults, dark
         joke_categroy = random.choice(('jewish', 'racist'))
         joke = await self.session.get(
@@ -97,11 +99,11 @@ class KexoBOT:
             f"{joke_categroy}&api-key={HUMOR_SECRET}").json().get('joke')
         await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=joke))
 
-    async def fetch_users(self):
+    async def fetch_users(self) -> None:
         self.user_kexo = await bot.fetch_user(402221830930432000)
         print(f'User {self.user_kexo.name} fetched.')
 
-    async def update_reddit_cache(self, now):
+    async def update_reddit_cache(self, now) -> None:
         update = {}
         for guild_id, cache in bot.subbredit_cache.items():
             # If midnight, set search_level to 0
@@ -118,7 +120,7 @@ class KexoBOT:
         self.database.update_many({'_id': ObjectId('61795a8950149bebf7666e55')}, {"$set": update})
         bot.subbredit_cache = return_dict(update)
 
-    async def main_loop(self):
+    async def main_loop(self) -> None:
         if self.main_loop_counter == 0:
             self.main_loop_counter = 1
             await self.reddit_freegamefindings.run()
@@ -139,7 +141,7 @@ class KexoBOT:
             self.main_loop_counter = 0
             await self.esutaze.run()
 
-    async def hourly_loop(self):
+    async def hourly_loop(self) -> None:
         now = datetime.now()
 
         if now.hour == 0:
@@ -152,13 +154,13 @@ class KexoBOT:
 kexobot = KexoBOT()
 
 
-def create_cog_session():
+def create_cog_session() -> None:
     bot.session = httpx.AsyncClient()
     bot.session.verify = True
     bot.session.headers = {'User-Agent': UserAgent().random}
 
 
-def setup_cogs():
+def setup_cogs() -> None:
     create_cog_session()
     bot.load_extension("cogs.Play")
     bot.load_extension("cogs.Listeners")
@@ -175,27 +177,27 @@ setup_cogs()
 
 
 @tasks.loop(minutes=5)
-async def main_loop_task():
+async def main_loop_task() -> None:
     await kexobot.main_loop()
 
 
 @tasks.loop(hours=1)
-async def hourly_loop_task():
+async def hourly_loop_task() -> None:
     await kexobot.hourly_loop()
 
 
 @main_loop_task.before_loop
-async def before_main_loop():
+async def before_main_loop() -> None:
     await bot.wait_until_ready()
 
 
 @hourly_loop_task.before_loop
-async def before_hourly_loop():
+async def before_hourly_loop() -> None:
     await bot.wait_until_ready()
 
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     print(f'Logged in as {bot.user}')
     await kexobot.initialize(bot)
     main_loop_task.start()
@@ -204,7 +206,7 @@ async def on_ready():
 
 
 @bot.event
-async def on_command_error(ctx, error):
+async def on_command_error(ctx, error) -> None:
     if isinstance(error, commands.errors.CommandNotFound):
         embed = discord.Embed(title="",
                               description=f"🚫 This command doesn't exist.",
@@ -214,7 +216,7 @@ async def on_command_error(ctx, error):
 
 
 @bot.event
-async def on_application_command_error(ctx, error):
+async def on_application_command_error(ctx, error) -> None:
     if isinstance(error, commands.CommandOnCooldown):
         error_str = str(error).split()
         embed = discord.Embed(title="",

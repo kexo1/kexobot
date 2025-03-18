@@ -3,9 +3,11 @@ import re
 
 import discord
 import wavelink
+
 from discord import option
 from discord.ext import commands
 from discord.commands import slash_command
+from wavelink import TrackStartEventPayload, Playable
 
 
 class Play(commands.Cog):
@@ -15,18 +17,17 @@ class Play(commands.Cog):
         self.lavalink_servers_site = "https://lavainfo.netlify.app/"
 
     @staticmethod
-    def queue_embed(track):
+    def queue_embed(track) -> discord.Embed:
         return discord.Embed(title="", description=f"**Added to queue:\n [{track.title}]({track.uri})**",
                              color=discord.Color.blue())
 
     @staticmethod
-    def queue_embed_list(playlist, count):
+    def queue_embed_list(playlist, count) -> discord.Embed:
         return discord.Embed(title="", description=f"Added the playlist **`{playlist}`** ({count} songs) to the queue.",
                              color=discord.Color.blue())
 
     @staticmethod
-    def playing_embed(requester: None, payload: None):
-
+    def playing_embed(requester: None, payload: None) -> discord.Embed:
         if not requester:
 
             if hasattr(payload.player.current.requester.avatar, "url"):
@@ -52,7 +53,7 @@ class Play(commands.Cog):
         return embed
 
     @commands.Cog.listener()
-    async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
+    async def on_wavelink_track_start(self, payload: TrackStartEventPayload) -> None:
 
         if not payload.player.first:
             await payload.player.text_channel.send(embed=self.playing_embed(None, payload))
@@ -60,7 +61,7 @@ class Play(commands.Cog):
     @slash_command(name='play', description='Plays song.')
     @commands.cooldown(1, 4, commands.BucketType.user)
     @option('search', description='Links and words for youtube, playlists soundcloud urls,  work too are supported.')
-    async def play(self, ctx, search: str):
+    async def play(self, ctx, search: str) -> None:
 
         if not await self.is_playable():
             return
@@ -127,7 +128,7 @@ class Play(commands.Cog):
     @commands.cooldown(1, 4, commands.BucketType.user)
     @option('search',
             description='Links and words for youtube are supported, playlists work too.')
-    async def play_next(self, ctx, search: str):
+    async def play_next(self, ctx, search: str) -> None:
 
         if not await self.is_playable() is False:
             return
@@ -170,7 +171,7 @@ class Play(commands.Cog):
             vc.queue.remove(track)  # Due to autoplay the first song does not remove itself after skipping
 
     @slash_command(name='skip', description='Skip playing song.')
-    async def skip_command(self, ctx):
+    async def skip_command(self, ctx) -> None:
 
         try:
             vc = ctx.voice_client
@@ -200,7 +201,7 @@ class Play(commands.Cog):
 
     @slash_command(name='skip-to', description='Skips to selected song in queue.')
     @option('pos', description='Value 2 skips to second song in queue.', min_value=1, required=True)
-    async def skip_to_command(self, ctx, pos: int):
+    async def skip_to_command(self, ctx, pos: int) -> None:
 
         if not ctx.author.voice:
             embed = discord.Embed(title="",
@@ -238,7 +239,7 @@ class Play(commands.Cog):
         await ctx.respond(embed=embed)
 
     @slash_command(name='pause', description='Pauses song that is currently playing.')
-    async def pause_command(self, ctx):
+    async def pause_command(self, ctx) -> None:
 
         try:
             vc = ctx.voice_client
@@ -263,7 +264,7 @@ class Play(commands.Cog):
         await ctx.response.send_message(embed=embed, delete_after=10)
 
     @slash_command(name='resume', description='Resumes paused song.')
-    async def resume_command(self, ctx):
+    async def resume_command(self, ctx) -> None:
 
         try:
             vc = ctx.voice_client
@@ -287,7 +288,7 @@ class Play(commands.Cog):
         embed.set_footer(text=f'Deleting in 10s.')
         await ctx.response.send_message(embed=embed, delete_after=10)
 
-    async def fetch_first_track(self, tracks: Union[wavelink.Playable, wavelink.TrackStartEventPayload], ctx)\
+    async def fetch_first_track(self, tracks: Union[Playable, TrackStartEventPayload], ctx)\
             -> wavelink.Playable:
         vc: wavelink.Player = ctx.voice_client
 

@@ -10,7 +10,7 @@ class DatabaseManager(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    async def manage_list(self, collection, manage):
+    async def manage_list(self, collection, manage) -> list:
         # If manage is False (showing database), else editing database
         if manage is False:
             listing = self.bot.database.find_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')})
@@ -47,7 +47,7 @@ class DatabaseManager(commands.Cog):
     @discord.ext.commands.is_owner()
     @option('collection', description='Choose database',
             choices=['Games', 'r/Free Game Findings exceptions', 'r/Crackwatch exceptions', 'eSutaze exceptions'])
-    async def add_to(self, ctx, collection: str, string: str):
+    async def add_to(self, ctx, collection: str, string: str) -> None:
         listing = await self.manage_list(collection, False)
 
         if string in listing:
@@ -64,7 +64,7 @@ class DatabaseManager(commands.Cog):
     @discord.ext.commands.is_owner()
     @option('collection', description='Choose database',
             choices=['Games', 'r/Free Game Findings exceptions', 'r/Crackwatch exceptions', 'eSutaze exceptions'])
-    async def remove(self, ctx, collection: str, string: str):
+    async def remove(self, ctx, collection: str, string: str) -> None:
         listing = await self.manage_list(collection, False)
 
         if string not in listing:
@@ -81,7 +81,7 @@ class DatabaseManager(commands.Cog):
     @discord.ext.commands.is_owner()
     @option('collection', description='Choose database',
             choices=['Games', 'Site exceptions', 'Crackwatch exceptions', 'Esutaze exceptions'])
-    async def show_data(self, ctx, collection: str):
+    async def show_data(self, ctx, collection: str) -> None:
         listing = await self.manage_list(collection, False)
 
         embed = discord.Embed(title=collection, color=discord.Color.blue())

@@ -9,7 +9,10 @@
 
 # KexoBOT
 
-Private discord python bot which is used for automation, music play, testing and mostly for fun.
+Discord python bot which is used for:
+* Automation - Manages MongoDB, SFD Hosting messages, scrapes and sends info from various websites
+* Music - With wavelink library, bot can play both spotify and youtube music using Lavalink server
+* Fun - Bot has many fun commands you can use to troll friends or get some memes from Reddit
 
 ## Built With
 

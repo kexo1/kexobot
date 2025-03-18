@@ -16,7 +16,7 @@ class Esutaze:
         self.database = database
         self.bot = bot
 
-    async def run(self):
+    async def run(self) -> None:
         try:
             title_exceptions = self.database.find_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')})
         except pymongo.errors.ServerSelectionTimeoutError as e:
