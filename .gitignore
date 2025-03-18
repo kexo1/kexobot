@@ -1,0 +1,7 @@
+.idea/
+__pycache__/
+text_files/
+video/
+
+desktop.ini
+fly.toml
