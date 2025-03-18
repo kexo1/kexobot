@@ -3,42 +3,39 @@ import discord
 from discord.ext import commands
 from discord.commands import slash_command
 from discord.commands import option
-from bson.objectid import ObjectId
+from constants import DB_LISTS
 
 
 class DatabaseManager(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        self.database = self.bot.database
 
     async def manage_list(self, collection, manage) -> list:
         # If manage is False (showing database), else editing database
         if manage is False:
-            listing = self.bot.database.find_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')})
+            listing = await self.database.find_one(DB_LISTS)
 
         if collection == 'Games':
             if manage is False:
                 listing = listing['games']
             else:
-                self.bot.database.update_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')},
-                                             {'$set': {'games': manage}})
+                await self.database.update_one(DB_LISTS, {'$set': {'games': manage}})
         elif collection == 'r/Free Game Findings exceptions':
             if manage is False:
-                listing = listing['freegame_exceptions']
+                listing = listing['freegamefindings_exceptions']
             else:
-                self.bot.database.update_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')},
-                                             {'$set': {'freegame_exceptions': manage}})
+                await self.database.update_one(DB_LISTS, {'$set': {'freegamefindings_exceptions': manage}})
         elif collection == 'r/Crackwatch exceptions':
             if manage is False:
                 listing = listing['crackwatch_exceptions']
             else:
-                self.bot.database.update_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')},
-                                             {'$set': {'crackwatch_exceptions': manage}})
+                await self.database.update_one(DB_LISTS, {'$set': {'crackwatch_exceptions': manage}})
         elif collection == 'eSutaze exceptions':
             if manage is False:
                 listing = listing['esutaze_exceptions']
             else:
-                self.bot.database.update_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')},
-                                             {'$set': {'esutaze_exceptions': manage}})
+                await self.database.update_one(DB_LISTS, {'$set': {'esutaze_exceptions': manage}})
 
         if manage is False:
             return listing

@@ -6,8 +6,7 @@ import discord
 
 from deep_translator import GoogleTranslator
 from datetime import datetime
-from bson.objectid import ObjectId
-from constants import ONLINEFIX_MAX_GAMES
+from constants import ONLINEFIX_MAX_GAMES, DB_CACHE, DB_LISTS
 
 
 class OnlineFix:
@@ -17,15 +16,11 @@ class OnlineFix:
         self.bot = bot
 
     async def run(self) -> None:
-        try:
-            games_doc = self.database.find_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')},
-                                               {'onlinefix_cache': 1, 'games': 1})
-        except pymongo.errors.ServerSelectionTimeoutError as e:
-            logging.error(f'OnlineFix: Database error: \n{e}')
-            return
+        onlinefix_cache = await self.database.find_one(DB_CACHE)
+        onlinefix_cache = onlinefix_cache['onlinefix_cache']
 
-        onlinefix_cache = games_doc['onlinefix_cache']
-        games = games_doc['games']
+        game_list = await self.database.find_one(DB_LISTS)
+        game_list = game_list['games']
 
         source = await self.session.get('https://online-fix.me/chat.php')
         source = source.text.replace(' по сети', '')
@@ -38,7 +33,7 @@ class OnlineFix:
             if not match:
                 break
 
-            if match.group(1) in games:
+            if match.group(1) in game_list:
                 title = html.unescape(match.group(1))
                 pattern = re.compile(r'@0xdeadc0de</b> обновил:.*?href="(.*?)"', re.DOTALL)
                 match = pattern.search(source)
@@ -55,14 +50,15 @@ class OnlineFix:
             if game['title'] in onlinefix_cache:
                 continue
 
-            game_source = await self.session.get(game['link']).text
+            onlinefix_article = await self.session.get(game['link'])
+            onlinefix_article = onlinefix_article.text
 
             pattern = re.compile(r'<meta property="og:image" content="(.*?)"')
-            match = pattern.search(game_source)
+            match = pattern.search(onlinefix_article)
             image_link = match.group(1)
 
             pattern = re.compile(r'Причина: (.*?)\n')
-            match = pattern.search(game_source)
+            match = pattern.search(onlinefix_article)
             description = GoogleTranslator(source='ru').translate(text=match.group(1))
 
             pattern = re.compile(r'version\s*(\d+(\.\d+)*)')
@@ -80,5 +76,4 @@ class OnlineFix:
             game_updates = self.bot.get_channel(882185054174994462)
             await game_updates.send(embed=embed)
 
-        self.database.update_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')},
-                                 {'$set': {'onlinefix_cache': to_upload}})
+        await self.database.update_one(DB_CACHE, {'$set': {'onlinefix_cache': to_upload}})

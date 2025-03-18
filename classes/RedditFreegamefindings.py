@@ -8,7 +8,7 @@ import discord
 from bson.objectid import ObjectId
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
-from constants import REDDIT_FREEGAME_EMBEDS, REDDIT_FREEGAME_POSTS
+from constants import REDDIT_FREEGAME_EMBEDS, REDDIT_FREEGAME_POSTS, DB_CACHE, DB_LISTS
 from asyncprawcore.exceptions import AsyncPrawcoreException, ResponseException, RequestException
 
 
@@ -18,23 +18,19 @@ class RedditFreegamefindings:
         self.reddit = reddit
 
     async def run(self) -> None:
-        try:
-            freegame_url_cache = self.database.find_one({'_id': ObjectId('617958fae4043ee4a3f073f2')})
-        except pymongo.errors.ServerSelectionTimeoutError as e:
-            logging.error(f'RedditFreegamefindings: Error while connecting to database: {e}')
-            return
+        freegamefindings_cache = await self.database.find_one(DB_CACHE)
+        freegamefindings_cache = freegamefindings_cache['freegamefindings_cache']
+        freegamefindings_cache_upload = freegamefindings_cache
 
-        _freegame_url_cache = freegame_url_cache['free_game_link']
-        freegame_url_cache = _freegame_url_cache
-        ignore_list = self.database.find_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')})
-        ignore_list = ignore_list['freegame_exceptions']
+        freegamefindings_exceptions = await self.database.find_one(DB_LISTS)
+        freegamefindings_exceptions = freegamefindings_exceptions['freegamefindings_exceptions']
         pending_link_list = []
         subreddit = await self.reddit.subreddit("FreeGameFindings")
 
         try:
             async for submission in subreddit.new(limit=REDDIT_FREEGAME_POSTS):
                 # If it was already posted in disord
-                if submission.url in freegame_url_cache:
+                if submission.url in freegamefindings_cache:
                     continue
                 # If it's free game
                 if '(game)' not in submission.title.lower():
@@ -44,13 +40,13 @@ class RedditFreegamefindings:
                         or 'virtual' in submission.title.lower()
                         or 'trivia' in submission.title.lower()):
                     continue
-                number = [k for k in ignore_list if k in submission.url]
+                number = [k for k in freegamefindings_exceptions if k in submission.url]
                 # Check if is not in blacklisted sites and database
                 if number:
                     continue
                 # Move url positions, new url on first position, last one is removed
-                _freegame_url_cache = [_freegame_url_cache[-1]] + _freegame_url_cache[:-1]
-                _freegame_url_cache[0] = submission.url
+                freegamefindings_cache_upload = [freegamefindings_cache_upload[-1]] + freegamefindings_cache_upload[:-1]
+                freegamefindings_cache_upload[0] = submission.url
                 pending_link_list.append(submission.url)
         except (AsyncPrawcoreException, RequestException, ResponseException):
             pass
@@ -60,8 +56,7 @@ class RedditFreegamefindings:
             return
 
         tasks = []
-        self.database.update_one({'_id': ObjectId('617958fae4043ee4a3f073f2')},
-                                 {'$set': {'free_game_link': _freegame_url_cache}})
+        await self.database.update_one(DB_CACHE, {'$set': {'freegamefindings_cache': freegamefindings_cache_upload}})
         # alienwarearena
         task_funcs = {
             'key-hub': key_hub,

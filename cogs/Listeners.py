@@ -18,7 +18,7 @@ class Listeners(commands.Cog):
     async def on_wavelink_node_disconnected(self, payload: NodeDisconnectedEventPayload) -> None:
         print(f"Node {payload.node.uri} is disconnected!")
         await self.bot.get_lavalink_server()
-        await self.bot.connect_node(switch_node=True)
+        await self.bot.connect_node(switch_node=False)
 
     @commands.Cog.listener()
     async def on_voice_state_update(

@@ -5,8 +5,8 @@ import pymongo
 import logging
 
 from datetime import datetime
-from bson.objectid import ObjectId
-from constants import REDDIT_CRACKWATCH_POSTS, REDDIT_STRIP
+from asyncprawcore.exceptions import AsyncPrawcoreException, ResponseException, RequestException
+from constants import REDDIT_CRACKWATCH_POSTS, REDDIT_STRIP, DB_CACHE, DB_LISTS
 
 
 class RedditCrackwatch:
@@ -16,27 +16,22 @@ class RedditCrackwatch:
         self.bot = bot
 
     async def run(self) -> None:
-        try:
-            crack_cache = self.database.find_one({'_id': ObjectId('617958fae4043ee4a3f073f2')})
-        except pymongo.errors.ServerSelectionTimeoutError as e:
-            logging.error(f'RedditCrackwatch: Database error when loading: \n{e}')
-            return
+        crackwatch_cache = await self.database.find_one(DB_CACHE)
+        crackwatch_cache = crackwatch_cache['crackwatch_cache']
+        crackwatch_cache_upload = crackwatch_cache
 
-        crack_cache_link = crack_cache['crack_game_link']
-        crack_cache = crack_cache_link
-
-        ignore_list = self.database.find_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')})
-        ignore_list = ignore_list['crackwatch_exceptions']
+        crackwatch_exceptions = await self.database.find_one(DB_LISTS)
+        crackwatch_exceptions = crackwatch_exceptions['crackwatch_exceptions']
 
         subreddit = await self.reddit.subreddit('CrackWatch')
 
         try:
             async for submission in subreddit.new(limit=REDDIT_CRACKWATCH_POSTS):
                 # If already checked
-                if submission.permalink in crack_cache:
+                if submission.permalink in crackwatch_cache:
                     continue
 
-                number = [k for k in ignore_list if k.lower() in submission.title.lower()]
+                number = [k for k in crackwatch_exceptions if k.lower() in submission.title.lower()]
                 # If in exceptions
                 if number:
                     continue
@@ -71,8 +66,8 @@ class RedditCrackwatch:
                             else:
                                 description.append(f'• {string}\n')
 
-                    crack_cache_link = [crack_cache_link[-1]] + crack_cache_link[:-1]
-                    crack_cache_link[0] = submission.permalink
+                    crackwatch_cache_upload = [crackwatch_cache_upload[-1]] + crackwatch_cache_upload[:-1]
+                    crackwatch_cache_upload[0] = submission.permalink
 
                     embed = discord.Embed(title=submission.title[:256],
                                           url=f'https://www.reddit.com{submission.permalink}',
@@ -94,9 +89,7 @@ class RedditCrackwatch:
                                                                        f"\n```css\n[{e}]```"
                                                                        f"\nImage url: {image_url}"
                                                                        f"\nDescription: {post_description}")
-            if crack_cache != crack_cache_link:
-                self.database.update_one({'_id': ObjectId('617958fae4043ee4a3f073f2')},
-                                         {'$set': {'crack_game_link': crack_cache_link}})
-        except (asyncprawcore.exceptions.AsyncPrawcoreException, asyncprawcore.exceptions.RequestException,
-                asyncprawcore.exceptions.ResponseException, AssertionError):
-            pass
+            if crackwatch_cache != crackwatch_cache_upload:
+                await self.database.update_one(DB_CACHE, {'$set': {'crackwatch_cache': crackwatch_cache_upload}})
+        except (AsyncPrawcoreException, RequestException, ResponseException) as e:
+            print('Error when accessing crackwatch:', e)

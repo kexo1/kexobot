@@ -6,8 +6,7 @@ import logging
 
 from datetime import datetime
 from bs4 import BeautifulSoup
-from bson.objectid import ObjectId
-from constants import ESUTAZE_MAX_ARTICLES
+from constants import ESUTAZE_MAX_ARTICLES, DB_CACHE, DB_LISTS
 
 
 class Esutaze:
@@ -17,15 +16,12 @@ class Esutaze:
         self.bot = bot
 
     async def run(self) -> None:
-        try:
-            title_exceptions = self.database.find_one({'_id': ObjectId('6178211ec5f5c08c699b8fd3')})
-        except pymongo.errors.ServerSelectionTimeoutError as e:
-            logging.error(f'Esutaze: Database error when loading: \n{e}')
-            return
+        esutaze_exceptions = await self.database.find_one(DB_LISTS)
+        esutaze_exceptions = esutaze_exceptions['esutaze_exceptions']
 
-        title_exceptions = title_exceptions['esutaze_exceptions']
-        post_title = self.database.find_one({'_id': ObjectId('618945c8221f18d804636965')})
-        post_title = post_title['esutaze_link_cache']
+        esutaze_cache = await self.database.find_one(DB_CACHE)
+        esutaze_cache = esutaze_cache['esutaze_cache']
+
         source = await self.session.get("https://www.esutaze.sk/feed/")
         soup = BeautifulSoup(source.content, 'xml')
         article = soup.find('channel')
@@ -37,19 +33,19 @@ class Esutaze:
             article = article.find_next('item')
             title = article.find('title').text
 
-            if title in post_title:
+            if title in esutaze_cache:
                 return
 
             category = article.find('category').text
             if not (category == 'Internetové súťaže' or 'TOP SÚŤAŽ' in category):
                 continue
 
-            number = [k for k in title_exceptions if k.lower() in title]
+            number = [k for k in esutaze_exceptions if k.lower() in title]
             if number:
                 continue
 
-            post_title = [post_title[-1]] + post_title[:-1]
-            post_title[0] = title
+            esutaze_cache = [esutaze_cache[-1]] + esutaze_cache[:-1]
+            esutaze_cache[0] = title
             esutaze_link = article.find('link').text
 
             description = html.unescape(article.find('description').text)
@@ -76,5 +72,4 @@ class Esutaze:
                              icon_url='https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg')
             esutaze_channel = self.bot.get_channel(1302271245919981638)
             await esutaze_channel.send(embed=embed)
-            self.database.update_one({'_id': ObjectId('618945c8221f18d804636965')},
-                                     {'$set': {'esutaze_link_cache': post_title}})
+            await self.database.update_one(DB_CACHE, {'$set': {'esutaze_cache': esutaze_cache}})

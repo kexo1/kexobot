@@ -7,18 +7,17 @@ from datetime import datetime, timedelta
 from discord.ext import commands
 from discord.commands import slash_command
 from discord import option
-from bson.objectid import ObjectId
 from asyncprawcore.exceptions import AsyncPrawcoreException, ResponseException, RequestException
 from constants import (ROAST_COMMANDS_MSG, IMGFLIP_PASSWORD, IMGFLIP_USERNAME, SHITPOST_SUBREDDITS, REDDIT_VIDEO_STRIP,
-                       KYS_MESSAGES)
+                       KYS_MESSAGES, DB_REDDIT_CACHE)
 from utils import load_text_file, VideoDownloader
 
 
 class FunStuff(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.school_images = bot.database.find_one({'_id': ObjectId('618945c8221f18d804636965')})['topstrop'].split(
-            '\n')
+        self.database = self.bot.database
+        self.topstropscreenshot = load_text_file("topstropscreenshot")
         self.kotrmelce = load_text_file("kotrmelec")
         self.imgflip_client = imgflip.Imgflip(username=IMGFLIP_USERNAME, password=IMGFLIP_PASSWORD,
                                               session=requests.Session())
@@ -32,7 +31,7 @@ class FunStuff(commands.Cog):
     @slash_command(name="topstropscreenshot", description="Topové fotečky z online hodín",
                    guild_ids=[692810367851692032, 765262686908186654])
     async def top_strop_screenshot(self, ctx) -> None:
-        await ctx.respond(random.choice(self.school_images))
+        await ctx.respond(random.choice(self.topstropscreenshot))
 
     @slash_command(name="roast", description="Lamar roast", guild_ids=[692810367851692032, 765262686908186654])
     async def roast(self, ctx) -> None:
@@ -195,8 +194,7 @@ class FunStuff(commands.Cog):
         return embed
 
     async def create_guild_dataset(self, guild_id) -> None:
-        self.bot.database.update_one({'_id': ObjectId('61795a8950149bebf7666e55')},
-                                     {"$set": {guild_id: '1,False,,0'}})
+        await self.database.update_one(DB_REDDIT_CACHE, {"$set": {guild_id: '1,False,,0'}})
         self.bot.subbredit_cache[guild_id] = {'search_level': 0, 'nsfw': False, 'links': '', 'which_subreddit': 0}
 
     @staticmethod

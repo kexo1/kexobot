@@ -4,15 +4,15 @@ import httpx
 import dns.resolver
 import random
 import wavelink
+import asyncio
 
 from fake_useragent import UserAgent
 from discord.ext import tasks, commands
-from pymongo import MongoClient
 from datetime import datetime
-from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from constants import DISCORD_TOKEN, MONGO_DB_URL, REDDIT_PASSWORD, REDDIT_SECRET, REDDIT_USER_AGENT, REDDIT_USERNAME, \
-    REDDIT_CLIENT_ID, HUMOR_SECRET, CLEAR_CACHE_HOUR
+    REDDIT_CLIENT_ID, HUMOR_SECRET, CLEAR_CACHE_HOUR, DB_REDDIT_CACHE
 from utils import return_dict
 
 from classes.Esutaze import Esutaze
@@ -28,9 +28,8 @@ dns.resolver.default_resolver.nameservers = ['8.8.8.8']
 bot = discord.Bot()
 
 
-# TODO: Reorganize MongoDB database
+# TODO: In listener check if Player exists
 # TODO: Automatically disconnect from voice channel after 30 minutes of inactivity
-# TODO: MongoDB constants instead of hardcoded values
 # TODO: Make classes in /classes/ more modular
 # TODO: Rewrite RedditFreegamefindings
 # TODO: Use enums instead of strings in DatabaseManager
@@ -41,7 +40,7 @@ class KexoBOT:
         self.session = None
         self.lavalink_server = str
         self.lavalink_server_password = str
-        self.database = MongoClient(MONGO_DB_URL)["KexoBOTDatabase"]["KexoBOTCollection"]
+        self.database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]["KexoBOTCollection"]
 
         self.reddit = asyncpraw.Reddit(
             client_id=REDDIT_CLIENT_ID,
@@ -50,11 +49,10 @@ class KexoBOT:
             username=REDDIT_USERNAME,
             password=REDDIT_PASSWORD,
         )
-        # Attach to bot, so we can use it in cogs
+
+        # Attach bot, so we can use it in cogs
         bot.database = self.database
         bot.reddit = self.reddit
-        bot.subbredit_cache = return_dict(
-            self.database.find_one({'_id': ObjectId('61795a8950149bebf7666e55')}, {'_id': False}))
         bot.get_lavalink_server = self.get_lavalink_server
         bot.connect_node = self.connect_node
 
@@ -70,6 +68,9 @@ class KexoBOT:
         await self.fetch_users()
         await self.create_session()
         await self.get_lavalink_server()
+
+        bot.subbredit_cache = return_dict(
+            await self.database.find_one(DB_REDDIT_CACHE, {'_id': False}))
 
         self.onlinefix = OnlineFix(self.session, self.database, bot)
         self.game3rb = Game3rb(self.session, self.database, bot)
@@ -119,7 +120,7 @@ class KexoBOT:
             to_upload[2] = '\n'.join(reddit_links)
             update[guild_id] = ','.join(to_upload)
 
-        self.database.update_many({'_id': ObjectId('61795a8950149bebf7666e55')}, {"$set": update})
+        await self.database.update_many(DB_REDDIT_CACHE, {"$set": update})
         bot.subbredit_cache = return_dict(update)
 
     async def get_lavalink_server(self) -> None:
@@ -205,7 +206,7 @@ def setup_cogs() -> None:
 setup_cogs()
 
 
-@tasks.loop(minutes=5)
+@tasks.loop(minutes=1)
 async def main_loop_task() -> None:
     await kexobot.main_loop()
 

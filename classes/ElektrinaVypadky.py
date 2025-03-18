@@ -2,10 +2,9 @@ import discord
 import pymongo
 import logging
 
-from bson.objectid import ObjectId
 from datetime import datetime
 from bs4 import BeautifulSoup
-from constants import ELEKTRINA_MAX_ARTICLES
+from constants import ELEKTRINA_MAX_ARTICLES, DB_CACHE
 
 
 class ElektrinaVypadky:
@@ -15,14 +14,9 @@ class ElektrinaVypadky:
         self.user_kexo = user_kexo
 
     async def run(self) -> None:
+        elektrinavypadky_cache = await self.database.find_one(DB_CACHE)
+        elektrinavypadky_cache = elektrinavypadky_cache['elektrinavypadky_cache']
 
-        try:
-            post_link_doc = self.database.find_one({'_id': ObjectId('618945c8221f18d804636965')})
-        except pymongo.errors.ServerSelectionTimeoutError as e:
-            logging.error(f"ElektrinaVypadky: Database error when loading: \n{e}")
-            return
-
-        post_link = post_link_doc['hlinik_post_link_cache']
         source = await self.session.get("https://www.hliniknadhronom.sk/mid/492460/ma0/all/.html")
         soup = BeautifulSoup(source.content, 'html.parser')
         article = soup.find(class_='oznamy-new-columns-all-list-default oznamy-new-columns-all-list')
@@ -44,7 +38,7 @@ class ElektrinaVypadky:
             else:
                 continue
 
-            if "link" in post_link:
+            if "link" in elektrinavypadky_cache:
                 continue
 
             link = f"https://www.hliniknadhronom.sk{article.find('a')['href']}"
@@ -70,5 +64,5 @@ class ElektrinaVypadky:
 
             if above_limit:
                 await self.user_kexo.send(post)
-            self.database.update_one({'_id': ObjectId('618945c8221f18d804636965')},
-                                     {'$set': {'hlinik_post_link_cache': to_upload}})
+            await self.database.update_one(DB_CACHE,
+                                           {'$set': {'elektrinavypadky_cache': to_upload}})

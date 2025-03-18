@@ -5,9 +5,8 @@ import pymongo
 import logging
 
 from datetime import datetime
-from bson.objectid import ObjectId
 from bs4 import BeautifulSoup
-from constants import GAME3RB_MUST_BE_ONLINE, GAME3RB_STRIP
+from constants import GAME3RB_MUST_BE_ONLINE, GAME3RB_STRIP, DB_CACHE, DB_LISTS
 
 
 class Game3rb:
@@ -17,17 +16,11 @@ class Game3rb:
         self.bot = bot
 
     async def run(self) -> None:
-        try:
-            games_doc = self.database.find_one(
-                {'_id': ObjectId('6178211ec5f5c08c699b8fd3')},
-                {'game3rb_cache': 1, 'games': 1}
-            )
-        except pymongo.errors.ServerSelectionTimeoutError as e:
-            logging.error(f'Game3rb: Database error: {e}')
-            return
+        game3rb_cache = await self.database.find_one(DB_CACHE)
+        game3rb_cache = game3rb_cache['game3rb_cache']
 
-        game3rb_cache = games_doc['game3rb_cache']
-        games = '\n'.join(games_doc['games'])
+        game_list = await self.database.find_one(DB_LISTS)
+        game_list = '\n'.join(game_list['games'])
 
         source = await self.session.get('https://www.game3rb.com/')
         game_info = []
@@ -76,10 +69,7 @@ class Game3rb:
                         game_title.pop(game_title.index(to_remove))
                     except ValueError:
                         if full_title not in game3rb_cache not in to_upload:
-                            self.database.update_one(
-                                {'_id': ObjectId('6178211ec5f5c08c699b8fd3')},
-                                {'$set': {'game3rb_cache': to_upload}}
-                            )
+                            await self.database.update_one(DB_CACHE, {'$set': {'game3rb_cache': to_upload}})
                             await self.user_kexo.send(f'Game3rb: Broken name - {full_title}')
                             to_upload.append(full_title)
                         continue
@@ -93,7 +83,7 @@ class Game3rb:
                 else:
                     break
 
-            if game_title.lower() in games.lower():
+            if game_title.lower() in game_list.lower():
                 if any(game in game_title.lower() for game in GAME3RB_MUST_BE_ONLINE):
                     if has_online is False:
                         article = article.find_next('article')
@@ -168,7 +158,4 @@ class Game3rb:
             await game_updates.send(embed=embed)
 
         if to_upload:
-            self.database.update_one(
-                {'_id': ObjectId('6178211ec5f5c08c699b8fd3')},
-                {'$set': {'game3rb_cache': to_upload}}
-            )
+            await self.database.update_one(DB_CACHE, {'$set': {'game3rb_cache': to_upload}})

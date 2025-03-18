@@ -52,16 +52,15 @@ class Commands(commands.Cog):
 
     @slash_command(name='recconnect_node', description='Automatically reconnect to avaiable node')
     async def recconect_node(self, ctx) -> None:
+        await ctx.trigger_typing()
         await self.bot.get_lavalink_server()
+
         embed = discord.Embed(title="",
                               description=f'**🔄 Getting lavalink server from `https://lavainfo.netlify.app/`**',
                               color=discord.Color.blue())
         await ctx.respond(embed=embed)
 
         await self.bot.connect_node(switch_node=True)
-        await ctx.trigger_typing()
-        await asyncio.sleep(2)
-
         try:
             await self.bot.node[0].fetch_info()
             embed = discord.Embed(title="",

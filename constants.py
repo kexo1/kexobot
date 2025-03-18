@@ -1,4 +1,5 @@
 import os
+from bson.objectid import ObjectId
 
 # Discord
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
@@ -6,6 +7,9 @@ DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 # MongoDB
 MONGO_DB_URL = (f"mongodb+srv://{os.getenv('MONGO_KEY')}@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
                 f"=majority")
+DB_CACHE = {'_id': ObjectId('617958fae4043ee4a3f073f2')}
+DB_LISTS = {'_id': ObjectId('6178211ec5f5c08c699b8fd3')}
+DB_REDDIT_CACHE = {'_id': ObjectId('61795a8950149bebf7666e55')}
 
 # Reddit
 REDDIT_CLIENT_ID = os.getenv('REDDIT_CLIENT_ID')
