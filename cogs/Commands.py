@@ -1,12 +1,12 @@
 import asyncio
-
 import discord
 import random
 import aiohttp
 import wavelink
 import time
-from datetime import datetime, timedelta
+import sys
 
+from datetime import datetime, timedelta
 from discord.ext import commands
 from discord.commands import slash_command
 from discord.commands import option
@@ -66,10 +66,7 @@ class Commands(commands.Cog):
     @option('image', description='Add custom image url for embed, needs to end with .png, .gif and etc.',
             required=False)
     @commands.cooldown(1, 300, commands.BucketType.user)
-    async def host(self, ctx, server_name: str, duration, password: str, region: str, category_maps: str, scripts: str,
-            slots: int = 8,
-            ping: bool = True,
-            image: str = None) -> None:
+    async def host(self, ctx, server_name: str, duration, password: str, region: str, category_maps: str, scripts: str, slots: int = 8, ping: bool = True, image: str = None) -> None:
         author = ctx.author
 
         if author in host_authors:
@@ -128,9 +125,9 @@ class Commands(commands.Cog):
                         value=f"{str(timedelta(seconds=round(int(time.time()) - self.run_time)))}")
         embed.add_field(name="Ping:ㅤㅤㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
         embed.add_field(name="Version:", value="2.0")
-        embed.add_field(name="Prefix:", value='`/` or `+`')
-        embed.add_field(name="Py-cord version:ㅤ", value='2.6.1')
-        embed.add_field(name="Python version:", value='3.12')
+        embed.add_field(name="Py-cord version:ㅤ", value=discord.__version__)
+        embed.add_field(name="Python version:",
+                        value=f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')
         embed.set_footer(text="Bot owner: _kexo")
         await ctx.respond(embed=embed)
 

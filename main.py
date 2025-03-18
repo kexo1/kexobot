@@ -3,8 +3,6 @@ import asyncpraw
 import httpx
 import dns.resolver
 import random
-import asyncpraw
-import discord
 import wavelink
 
 from fake_useragent import UserAgent
@@ -27,9 +25,7 @@ from classes.RedditFreegamefindings import RedditFreegamefindings
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ['8.8.8.8']
 
-intents = discord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix='+', case_insensitive=True, intents=intents)
+bot = discord.Bot()
 
 
 # TODO: Reorganize MongoDB database
@@ -103,7 +99,7 @@ class KexoBOT:
         self.user_kexo = await bot.fetch_user(402221830930432000)
         print(f'User {self.user_kexo.name} fetched.')
 
-    async def update_reddit_cache(self, now) -> None:
+    async def update_reddit_cache(self, now: datetime) -> None:
         update = {}
         for guild_id, cache in bot.subbredit_cache.items():
             # If midnight, set search_level to 0
@@ -206,7 +202,7 @@ async def on_ready() -> None:
 
 
 @bot.event
-async def on_command_error(ctx, error) -> None:
+async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
     if isinstance(error, commands.errors.CommandNotFound):
         embed = discord.Embed(title="",
                               description=f"🚫 This command doesn't exist.",
@@ -216,7 +212,7 @@ async def on_command_error(ctx, error) -> None:
 
 
 @bot.event
-async def on_application_command_error(ctx, error) -> None:
+async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
     if isinstance(error, commands.CommandOnCooldown):
         error_str = str(error).split()
         embed = discord.Embed(title="",

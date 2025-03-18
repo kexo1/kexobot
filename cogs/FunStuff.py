@@ -34,10 +34,6 @@ class FunStuff(commands.Cog):
     async def top_strop_screenshot(self, ctx) -> None:
         await ctx.respond(random.choice(self.school_images))
 
-    @commands.command()
-    async def ottesen(self, ctx) -> None:
-        await ctx.send("Smrdí")
-
     @slash_command(name="roast", description="Lamar roast", guild_ids=[692810367851692032, 765262686908186654])
     async def roast(self, ctx) -> None:
         await ctx.respond(ROAST_COMMANDS_MSG)
@@ -70,12 +66,13 @@ class FunStuff(commands.Cog):
                 f"**{random.choice(KYS_MESSAGES)}** {member.mention}")
         await ctx.send(meme_img)
 
-    @commands.command()
+    @slash_command(name='idk', description='Idk.',
+                   guild_ids=[692810367851692032, 765262686908186654])
     async def idk(self, ctx) -> None:
         self.idk_count += 1
         if self.idk_count < 5:
-            return await ctx.send("idk")
-        await ctx.send('https://media.discordapp.net/attachments/796453724713123870/1042486203842306159/image.png')
+            return await ctx.respond("idk")
+        await ctx.respond('https://media.discordapp.net/attachments/796453724713123870/1042486203842306159/image.png')
         self.idk_count = 0
 
     async def process_shitpost(self, ctx) -> None:
