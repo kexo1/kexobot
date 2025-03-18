@@ -29,9 +29,9 @@ bot = discord.Bot()
 
 
 # TODO: Reorganize MongoDB database
+# TODO: Automatically disconnect from voice channel after 30 minutes of inactivity
 # TODO: MongoDB constants instead of hardcoded values
 # TODO: Make classes in /classes/ more modular
-# TODO: Auto fetch lavalink server at startup
 # TODO: Rewrite RedditFreegamefindings
 # TODO: Use enums instead of strings in DatabaseManager
 
@@ -39,6 +39,8 @@ class KexoBOT:
     def __init__(self) -> None:
         self.user_kexo = None
         self.session = None
+        self.lavalink_server = str
+        self.lavalink_server_password = str
         self.database = MongoClient(MONGO_DB_URL)["KexoBOTDatabase"]["KexoBOTCollection"]
 
         self.reddit = asyncpraw.Reddit(
@@ -53,6 +55,8 @@ class KexoBOT:
         bot.reddit = self.reddit
         bot.subbredit_cache = return_dict(
             self.database.find_one({'_id': ObjectId('61795a8950149bebf7666e55')}, {'_id': False}))
+        bot.get_lavalink_server = self.get_lavalink_server
+        bot.connect_node = self.connect_node
 
         self.onlinefix = None
         self.game3rb = None
@@ -65,6 +69,7 @@ class KexoBOT:
     async def initialize(self, bot) -> None:
         await self.fetch_users()
         await self.create_session()
+        await self.get_lavalink_server()
 
         self.onlinefix = OnlineFix(self.session, self.database, bot)
         self.game3rb = Game3rb(self.session, self.database, bot)
@@ -79,13 +84,14 @@ class KexoBOT:
         self.session.headers = {'User-Agent': UserAgent().random}
         print('Httpx session initialized.')
 
-    @staticmethod
-    async def connect_node() -> None:
-        nodes = [
-            wavelink.Node(uri='http://sk.kexoservers.online:2333', password="kexopexo", retries=2, resume_timeout=0)]
-
-        await wavelink.Pool.connect(nodes=nodes, client=bot)
-        bot.node = nodes
+    async def connect_node(self, switch_node: False) -> None:
+        node = [
+            wavelink.Node(uri=self.lavalink_server, password=self.lavalink_server_password, retries=1,
+                          resume_timeout=0)]
+        bot.node = node
+        if switch_node:
+            return await wavelink.player.switch_node(node)
+        return await wavelink.Pool.connect(nodes=node, client=bot)
 
     async def set_joke(self) -> None:
         # insults, dark
@@ -115,6 +121,33 @@ class KexoBOT:
 
         self.database.update_many({'_id': ObjectId('61795a8950149bebf7666e55')}, {"$set": update})
         bot.subbredit_cache = return_dict(update)
+
+    async def get_lavalink_server(self) -> None:
+        source = await self.session.get('https://lavainfo.netlify.app/api/non-ssl')
+        for server in source.json():
+            if server.get('isConnected') is False:
+                continue
+
+            if server.get('restVersion') != 'v4':
+                continue
+
+            connections = server.get('connections').split('/')
+            # If noone is connected, skip
+            if int(connections[0]) == 0:
+                continue
+            # If full, skip
+            if int(connections[0]) == int(connections[1]):
+                continue
+
+            if not server.get('info')['plugins']:
+                continue
+
+            for plugin in server.get('info')['plugins']:
+                if plugin.get('name') == 'youtube-plugin':
+                    print(f'Server {server["host"]} fetched.')
+                    self.lavalink_server = f'http://{server["host"]}:{server["port"]}'
+                    self.lavalink_server_password = server["password"]
+                    return
 
     async def main_loop(self) -> None:
         if self.main_loop_counter == 0:
@@ -198,7 +231,7 @@ async def on_ready() -> None:
     await kexobot.initialize(bot)
     main_loop_task.start()
     hourly_loop_task.start()
-    await kexobot.connect_node()
+    await kexobot.connect_node(switch_node=False)
 
 
 @bot.event

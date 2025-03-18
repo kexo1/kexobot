@@ -1,9 +1,8 @@
-from typing import Union
 import re
-
 import discord
 import wavelink
 
+from typing import Union
 from discord import option
 from discord.ext import commands
 from discord.commands import slash_command
@@ -63,7 +62,7 @@ class Play(commands.Cog):
     @option('search', description='Links and words for youtube, playlists soundcloud urls,  work too are supported.')
     async def play(self, ctx, search: str) -> None:
 
-        if not await self.is_playable():
+        if not await self.is_playable(ctx):
             return
 
         if not ctx.voice_client:
@@ -72,11 +71,8 @@ class Play(commands.Cog):
                     vc: wavelink.Player = await ctx.author.voice.channel.connect(cls=wavelink.Player)
                 except wavelink.exceptions.InvalidNodeException:
                     embed = discord.Embed(title="",
-                                          description=f":x: No nodes are currently assigned to the bot. To fix this, "
-                                                      f"go to this site: {self.lavalink_servers_site} and search for "
-                                                      f"online nodes with version v4 and with Youtube plugin, "
-                                                      f"then use command `recconnect_node` and input parameters from "
-                                                      f"the site.",
+                                          description=f":x: No nodes are currently assigned to the bot."
+                                                      f"\nTo fix this, use command `recconnect_node`",
                                           color=discord.Color.from_rgb(r=255, g=0, b=0))
                     return await ctx.respond(embed=embed)
 
@@ -103,12 +99,10 @@ class Play(commands.Cog):
 
         try:
             tracks: wavelink.Search = await wavelink.Playable.search(search)
-        except wavelink.exceptions.LavalinkLoadException:
+        except (wavelink.exceptions.LavalinkLoadException, aiohttp.client_exceptions.ClientConnectorError):
             embed = discord.Embed(title="",
                                   description=f":x: Failed to load tracks, this Lavalink server doesn't have Youtube "
-                                              f"plugin. To fix this, go to this site: {self.lavalink_servers_site} "
-                                              f"and search for online nodes with version v4 and with Youtube plugin, "
-                                              f"then use command `recconnect_node` and input parameters from the site.",
+                                              f"plugin. To fix this, use command `recconnect_node`.",
                                   color=discord.Color.from_rgb(r=255, g=0, b=0))
             return await ctx.respond(embed=embed)
 
@@ -130,7 +124,7 @@ class Play(commands.Cog):
             description='Links and words for youtube are supported, playlists work too.')
     async def play_next(self, ctx, search: str) -> None:
 
-        if not await self.is_playable() is False:
+        if not await self.is_playable(ctx) is False:
             return
 
         if not ctx.voice_client:
@@ -313,7 +307,7 @@ class Play(commands.Cog):
         return track
 
     @staticmethod
-    async def is_playable() -> bool:
+    async def is_playable(ctx: discord.ApplicationContext) -> bool:
         if not ctx.author.voice:
             embed = discord.Embed(title="",
                                   description=str(ctx.author.mention) + ", you're not in vc, type `/p` from vc.",

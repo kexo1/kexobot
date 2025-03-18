@@ -19,25 +19,25 @@ class Commands(commands.Cog):
         self.bot = bot
         self.run_time = time.time()
 
-    @slash_command(name='recconnect_node', description='Retry connecting to node')
+    @slash_command(name='manual_recconnect_node', description='Manually input server info')
     @option('uri', description='Lavalink server URL (without http:// at start)', required=True)
     @option('port', description='Lavalink server port.', required=True)
     @option('password', description='Lavalink server password.', required=True)
-    async def recconect_node(self, ctx, uri: str, port: int, password: str) -> None:
+    async def manual_recconect_node(self, ctx, uri: str, port: int, password: str) -> None:
         embed = discord.Embed(title="",
                               description=f'**🔄 Connecting to `{uri}`**',
                               color=discord.Color.blue())
         message = await ctx.respond(embed=embed)
 
-        nodes = [wavelink.Node(uri=f"http://{uri}:{str(port)}", password=password, retries=1, resume_timeout=0)]
-        await wavelink.Pool.connect(nodes=nodes, client=self.bot)
-        self.bot.node = nodes
+        node = [wavelink.Node(uri=f"http://{uri}:{str(port)}", password=password, retries=1, resume_timeout=0)]
+        await wavelink.Pool.connect(nodes=node, client=self.bot)
+        self.bot.node = node
 
         await ctx.trigger_typing()
         await asyncio.sleep(2)
 
         try:
-            await nodes[0].fetch_info()
+            await node[0].fetch_info()
 
             embed = discord.Embed(title="",
                                   description=f'**✅ Connected to node `{uri}`**',
@@ -49,6 +49,31 @@ class Commands(commands.Cog):
                                   description=f":x: Failed to connect to `{uri}`",
                                   color=discord.Color.from_rgb(r=255, g=0, b=0))
             await message.edit(embed=embed)
+
+    @slash_command(name='recconnect_node', description='Automatically reconnect to avaiable node')
+    async def recconect_node(self, ctx) -> None:
+        await self.bot.get_lavalink_server()
+        embed = discord.Embed(title="",
+                              description=f'**🔄 Getting lavalink server from `https://lavainfo.netlify.app/`**',
+                              color=discord.Color.blue())
+        await ctx.respond(embed=embed)
+
+        await self.bot.connect_node(switch_node=True)
+        await ctx.trigger_typing()
+        await asyncio.sleep(2)
+
+        try:
+            await self.bot.node[0].fetch_info()
+            embed = discord.Embed(title="",
+                                  description=f'**✅ Connected to node `{self.bot.node[0].uri}`**',
+                                  color=discord.Color.blue())
+            await ctx.send(embed=embed)
+
+        except (aiohttp.client_exceptions.ClientConnectorError, aiohttp.ConnectionTimeoutError):
+            embed = discord.Embed(title="",
+                                  description=f":x: Failed to connect to `{uri}`",
+                                  color=discord.Color.from_rgb(r=255, g=0, b=0))
+            await ctx.send(embed=embed)
 
     @slash_command(name='host', description='Creates hosting embed, you can also choose some optional info.',
                    guild_ids=[723197287861583885, 692810367851692032])

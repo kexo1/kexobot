@@ -3,6 +3,7 @@ import wavelink
 
 from discord.ext import commands
 from cogs.Disconnect import Disconnect
+from wavelink import NodeDisconnectedEventPayload, NodeReadyEventPayload
 
 
 class Listeners(commands.Cog):
@@ -10,8 +11,14 @@ class Listeners(commands.Cog):
         self.bot = bot
 
     @commands.Cog.listener()
-    async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload) -> None:
+    async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
         print(f"Node {payload.node.uri} is ready!")
+
+    @commands.Cog.listener()
+    async def on_wavelink_node_disconnected(self, payload: NodeDisconnectedEventPayload) -> None:
+        print(f"Node {payload.node.uri} is disconnected!")
+        await self.bot.get_lavalink_server()
+        await self.bot.connect_node(switch_node=True)
 
     @commands.Cog.listener()
     async def on_voice_state_update(

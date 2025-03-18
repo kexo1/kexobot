@@ -124,8 +124,7 @@ class FunStuff(commands.Cog):
         except (AsyncPrawcoreException, RequestException, ResponseException):
             await self.reddit_unresponsive_msg(ctx)
 
-    @slash_command(name='shitpost', description='Random post from various shitposting subreddits.',
-                   guild_ids=[692810367851692032])
+    @slash_command(name='shitpost', description='Random post from various shitposting subreddits.')
     @option("nsfw", bool, description='Turn on/off NSFW posts.', required=False)
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def shitpost(self, ctx, nsfw: False) -> None:
