@@ -1,0 +1,19 @@
+py-cord
+asyncpraw
+asyncprawcore
+httpx
+dnspython
+pymongo
+fake-useragent
+websockets
+beautifulsoup4
+imgflip.py
+requests
+deep_translator
+unidecode
+aiohttp
+
+# Wavelink depencies
+yarl>=1.9.2
+async_timeout
+typing_extensions
