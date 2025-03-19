@@ -37,20 +37,31 @@ GAME3RB_MUST_BE_ONLINE = (
 # OnlineFix
 ONLINEFIX_MAX_GAMES = 10
 
-# RedditFreegamefindings
+# Reddit
 REDDIT_FREEGAME_EMBEDS = {
-    "gleam": (
-        "Gleam",
-        "**Gleam** - keys from this site __disappear really fast__ so you should go and get it fast!",
-        "https://media.discordapp.net/attachments/796453724713123870/1038118297914318878/favicon.png"),
-    "alienwarearena": (
-        "Alienwarearena",
-        "**Alienwarearena** - keys from this site __disappear really fast__ so you should go and get it fast!",
-        "https://media.discordapp.net/attachments/796453724713123870/1009896932929441874/unknown.png")}
-REDDIT_FREEGAME_POSTS = 5
+    "Default":
+        {"title": "Free Game - unknown site",
+         "description": None,
+         "icon": "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png"},
 
-# Crackwatch
+    "Gleam":
+        {"title": "Gleam",
+         "description": "**Gleam** - keys from this site __disappear really fast__ so you should get it fast!",
+         "icon": "https://static-00.iconduck.com/assets.00/gleam-icon-512x512-vxvvbmg8.png"},
+
+    "AlienwareArena":
+        {"title": "AlienwareArena",
+         "description": "**AlienwareArena** - "
+                        "keys from this site __disappear really fast__ so you should get it fast!",
+         "icon": "https://play-lh.googleusercontent.com"
+                 "/X3K4HfYdxmascX5mRFikhuv8w8BYvg1Ny_R4ndNhF1C7GgjPeIKfROvbcOcjhafFmLdl"}}
+
+REDDIT_FREEGAME_MAX_POSTS = 5
 REDDIT_CRACKWATCH_POSTS = 5
+
+# AlienwareArena
+ALIENWAREARENA_MAX_POSTS = 3
+ALIENWAREARENA_STRIP = ("Key", "Giveaway", "Steam Game")
 
 # ElektrinaVypadky
 ELEKTRINA_MAX_ARTICLES = 3

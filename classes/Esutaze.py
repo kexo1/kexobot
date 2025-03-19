@@ -7,13 +7,13 @@ from constants import DB_CACHE, DB_LISTS
 
 
 class Esutaze:
-    def __init__(self, session, database, bot):
+    def __init__(self, session, database, channel):
         self.session = session
         self.database = database
-        self.bot = bot
+        self.channel = channel
 
     async def run(self) -> None:
-        esutaze_exceptions, esutaze_cache = await self._load_database()
+        to_filter, esutaze_cache = await self._load_database()
         articles = await self._get_articles()
 
         for article in articles:
@@ -25,7 +25,7 @@ class Esutaze:
                 return  # If first link is already in cache, all the rest are too
 
             title = a_tag.get("title")
-            is_filtered = [k for k in esutaze_exceptions if k.lower() in title]
+            is_filtered = [k for k in to_filter if k.lower() in title]
             if is_filtered:
                 continue
 
@@ -58,7 +58,7 @@ class Esutaze:
         embed.timestamp = datetime.utcnow()
         embed.set_footer(text=link,
                          icon_url="https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg")
-        await self.esutaze_channel.send(embed=embed, file=discord.File(image, "image.png"))
+        await self.channel.send(embed=embed, file=discord.File(image, "image.png"))
 
     async def _get_articles(self):
         html_content = await self.session.get("https://www.esutaze.sk/category/internetove-sutaze/")
@@ -66,10 +66,6 @@ class Esutaze:
         return soup.find("div", id="content_box").find_all("article")
 
     async def _load_database(self) -> list:
-        esutaze_exceptions = await self.database.find_one(DB_LISTS)
-        esutaze_exceptions = esutaze_exceptions["esutaze_exceptions"]
-
+        to_filter = await self.database.find_one(DB_LISTS)
         esutaze_cache = await self.database.find_one(DB_CACHE)
-        esutaze_cache = esutaze_cache["esutaze_cache"]
-
-        return esutaze_exceptions, esutaze_cache
+        return to_filter["esutaze_exceptions"], esutaze_cache["esutaze_cache"]

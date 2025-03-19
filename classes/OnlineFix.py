@@ -8,10 +8,10 @@ from constants import ONLINEFIX_MAX_GAMES, DB_CACHE, DB_LISTS
 
 
 class OnlineFix:
-    def __init__(self, session, database, bot):
+    def __init__(self, session, database, channel):
         self.session = session
         self.database = database
-        self.bot = bot
+        self.channel = channel
 
     async def run(self) -> None:
         onlinefix_cache = await self.database.find_one(DB_CACHE)
@@ -71,6 +71,6 @@ class OnlineFix:
                              icon_url="https://media.discordapp.net/attachments/796453724713123870"
                                       "/1035951759505506364/favicon-1.png")
             embed.set_thumbnail(url=image_link)
-            await self.game_updates_channel.send(embed=embed)
+            await self.channel.send(embed=embed)
 
         await self.database.update_one(DB_CACHE, {"$set": {"onlinefix_cache": to_upload}})

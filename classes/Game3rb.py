@@ -9,10 +9,10 @@ from constants import GAME3RB_MUST_BE_ONLINE, GAME3RB_STRIP, DB_CACHE, DB_LISTS
 
 
 class Game3rb:
-    def __init__(self, session, database, bot):
+    def __init__(self, session, database, channel):
         self.session = session
         self.database = database
-        self.bot = bot
+        self.channel = channel
 
     async def run(self) -> None:
         game3rb_cache = await self.database.find_one(DB_CACHE)
@@ -153,7 +153,7 @@ class Game3rb:
                                       "/1162443171209433088/d95X3.png?ex=653bf491&is=65297f91&hm"
                                       "=c36058433d50580eeec7cd89ddfe60965ec297d6fc8054994fee5ae976bedfd3&=")
             embed.set_image(url=game["image"])
-            await self.game_updates_channel.send(embed=embed)
+            await self.channel.send(embed=embed)
 
         if to_upload:
             await self.database.update_one(DB_CACHE, {"$set": {"game3rb_cache": to_upload}})

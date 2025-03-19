@@ -19,9 +19,10 @@ from utils import return_dict
 from classes.Esutaze import Esutaze
 from classes.OnlineFix import OnlineFix
 from classes.Game3rb import Game3rb
+from classes.AlienwareArena import AlienwareArena
 from classes.ElektrinaVypadky import ElektrinaVypadky
-from classes.RedditCrackwatch import RedditCrackwatch
-from classes.RedditFreegamefindings import RedditFreegamefindings
+from classes.RedditCrackwatch import RedditCrackWatch
+from classes.RedditFreegamefindings import RedditFreeGameFindings
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
@@ -32,7 +33,6 @@ bot = discord.Bot()
 # TODO: In listener check if Player exists
 # TODO: Automatically disconnect from voice channel after 30 minutes of inactivity
 # TODO: Make classes in /classes/ more modular
-# TODO: Rewrite RedditFreegamefindings
 # TODO: Use enums instead of strings in DatabaseManager
 
 class KexoBOT:
@@ -83,12 +83,15 @@ class KexoBOT:
         print("Channels fetched.")
 
     async def _define_classes(self) -> None:
-        self.onlinefix = OnlineFix(self.session, self.database, bot)
-        self.game3rb = Game3rb(self.session, self.database, bot)
-        self.reddit_freegamefindings = RedditFreegamefindings(self.database, self.reddit)
-        self.reddit_crackwatch = RedditCrackwatch(self.database, self.reddit, bot)
+        self.onlinefix = OnlineFix(self.session, self.database, self.game_updates_channel)
+        self.game3rb = Game3rb(self.session, self.database, self.game_updates_channel)
+        self.alienwarearena = AlienwareArena(self.database, self.session, self.free_stuff_channel)
+        self.reddit_freegamefindings = RedditFreeGameFindings(self.database, self.reddit,
+                                                              self.session, self.free_stuff_channel)
+        self.reddit_crackwatch = RedditCrackWatch(self.database, self.reddit,
+                                                  self.game_updates_channel, self.user_kexo)
         self.elektrina_vypadky = ElektrinaVypadky(self.session, self.database, self.user_kexo)
-        self.esutaze = Esutaze(self.session, self.database, bot)
+        self.esutaze = Esutaze(self.session, self.database, self.esutaze_channel)
         print("Classes defined.")
 
     async def create_session(self) -> None:
@@ -169,17 +172,21 @@ class KexoBOT:
 
         elif self.main_loop_counter == 1:
             self.main_loop_counter = 2
-            await self.game3rb.run()
+            await self.alienwarearena.run()
 
         elif self.main_loop_counter == 2:
             self.main_loop_counter = 3
-            await self.onlinefix.run()
+            await self.game3rb.run()
 
         elif self.main_loop_counter == 3:
             self.main_loop_counter = 4
-            await self.reddit_crackwatch.run()
+            await self.onlinefix.run()
 
         elif self.main_loop_counter == 4:
+            self.main_loop_counter = 5
+            await self.reddit_crackwatch.run()
+
+        elif self.main_loop_counter == 5:
             self.main_loop_counter = 0
             await self.esutaze.run()
 
@@ -218,7 +225,7 @@ def setup_cogs() -> None:
 setup_cogs()
 
 
-@tasks.loop(minutes=5)
+@tasks.loop(minutes=4)
 async def main_loop_task() -> None:
     await kexobot.main_loop()
 

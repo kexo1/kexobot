@@ -6,11 +6,12 @@ from asyncprawcore.exceptions import AsyncPrawcoreException, ResponseException, 
 from constants import REDDIT_CRACKWATCH_POSTS, REDDIT_STRIP, DB_CACHE, DB_LISTS
 
 
-class RedditCrackwatch:
-    def __init__(self, database, reddit, bot):
+class RedditCrackWatch:
+    def __init__(self, database, reddit, channel, user_kexo):
         self.database = database
         self.reddit = reddit
-        self.bot = bot
+        self.channel = channel
+        self.user_kexo = user_kexo
 
     async def run(self) -> None:
         crackwatch_cache = await self.database.find_one(DB_CACHE)
@@ -79,9 +80,9 @@ class RedditCrackwatch:
                                      icon_url="https://b.thumbs.redditmedia.com"
                                               "/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png")
                     embed.timestamp = datetime.fromtimestamp(submission.created_utc)
-                    await self.game_updates_channel.send(embed=embed)
+                    await self.channel.send(embed=embed)
                 except Exception as e:
-                    await self.bot.fetch_user(402221830930432000).send(f"Incorrect embed: `{submission.permalink}`"
+                    await self.user_kexo.send(f"Incorrect embed: `{submission.permalink}`"
                                                                        f"\n```css\n[{e}]```"
                                                                        f"\nImage url: {image_url}"
                                                                        f"\nDescription: {post_description}")

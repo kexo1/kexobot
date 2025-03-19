@@ -21,17 +21,17 @@ class DatabaseManager(commands.Cog):
                 listing = listing["games"]
             else:
                 await self.database.update_one(DB_LISTS, {"$set": {"games": manage}})
-        elif collection == "r/Free Game Findings exceptions":
+        elif collection == "r/FreeGameFindings Exceptions":
             if manage is False:
                 listing = listing["freegamefindings_exceptions"]
             else:
                 await self.database.update_one(DB_LISTS, {"$set": {"freegamefindings_exceptions": manage}})
-        elif collection == "r/Crackwatch exceptions":
+        elif collection == "r/CrackWatch Exceptions":
             if manage is False:
                 listing = listing["crackwatch_exceptions"]
             else:
                 await self.database.update_one(DB_LISTS, {"$set": {"crackwatch_exceptions": manage}})
-        elif collection == "eSutaze exceptions":
+        elif collection == "Esutaze Exceptions":
             if manage is False:
                 listing = listing["esutaze_exceptions"]
             else:
@@ -43,7 +43,7 @@ class DatabaseManager(commands.Cog):
     @slash_command(name="add_to", description="Adds string to selected list.", guild_ids=[692810367851692032])
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database",
-            choices=["Games", "r/Free Game Findings exceptions", "r/Crackwatch exceptions", "eSutaze exceptions"])
+            choices=["Games", "r/FreeGameFindings Exceptions", "r/CrackWatch Exceptions", "Esutaze Exceptions"])
     async def add_to(self, ctx, collection: str, string: str) -> None:
         listing = await self.manage_list(collection, False)
 
@@ -53,31 +53,28 @@ class DatabaseManager(commands.Cog):
 
         listing.append(string)
         await self.manage_list(collection, listing)
-        await ctx.respond(
-            "String `" + string + "` was added :white_check_mark:")
+        await ctx.respond(f"String `" + string + f"` was added to `{collection}` :white_check_mark:")
 
     @slash_command(name="remove_from", description="Removes string from selected list.",
                    guild_ids=[692810367851692032])
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database",
-            choices=["Games", "r/Free Game Findings exceptions", "r/Crackwatch exceptions", "eSutaze exceptions"])
+            choices=["Games", "r/FreeGameFindings Exceptions", "r/CrackWatch Exceptions", "Esutaze Exceptions"])
     async def remove(self, ctx, collection: str, string: str) -> None:
         listing = await self.manage_list(collection, False)
 
         if string not in listing:
             return await ctx.respond(str(ctx.author.mention) + ", string `" + string + "` is not in the database, use "
                                                                                        "`/show_data`")
-
         listing.pop(listing.index(string))
 
         await self.manage_list(collection, listing)
-        await ctx.respond(
-            "String `" + string + "` was removed :white_check_mark:")
+        await ctx.respond(f"String `" + string + "` was removed from `{collection}` :white_check_mark:")
 
     @slash_command(name="show_data", description="Shows data from selected lists.", guild_ids=[692810367851692032])
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database",
-            choices=["Games", "Site exceptions", "Crackwatch exceptions", "Esutaze exceptions"])
+            choices=["Games", "r/FreeGameFindings Exceptions", "r/CrackWatch Exceptions", "Esutaze Exceptions"])
     async def show_data(self, ctx, collection: str) -> None:
         listing = await self.manage_list(collection, False)
 
