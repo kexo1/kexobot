@@ -9,7 +9,7 @@ class Disconnect(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @slash_command(name='leave', description='Leaves voice channel.')
+    @slash_command(name="leave", description="Leaves voice channel.")
     @commands.cooldown(1, 4, commands.BucketType.user)
     async def disconnect_command(self, ctx) -> None:
         if not ctx.author.voice or ctx.voice_client is None:
@@ -35,7 +35,7 @@ class Disconnect(commands.Cog):
                                   color=discord.Color.blue())
             await ctx.respond(embed=embed, ephemeral=True)
 
-        embed = discord.Embed(title="", description=f'**✅ Left <#{ctx.voice_client.channel.id}>**',
+        embed = discord.Embed(title="", description=f"**✅ Left <#{ctx.voice_client.channel.id}>**",
                               color=discord.Color.blue())
         await ctx.respond(embed=embed)
         await Disconnect.disconnect_player(ctx.guild)

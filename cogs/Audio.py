@@ -10,10 +10,10 @@ class Audio(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @slash_command(name='volume', description='Sets volume.')
+    @slash_command(name="volume", description="Sets volume.")
     @option(
-        'vol',
-        description='Max is 100.',
+        "vol",
+        description="Max is 100.",
         min_value=1,
         max_value=200
     )
@@ -42,14 +42,14 @@ class Audio(commands.Cog):
 
         await vc.set_volume(vol)
 
-        embed = discord.Embed(title="", description=f'**🔊 Volume set to `{int(vol)}%`**',
+        embed = discord.Embed(title="", description=f"**🔊 Volume set to `{int(vol)}%`**",
                               color=discord.Color.blue())
         await ctx.respond(embed=embed)
 
-    @slash_command(name='speed', description='Speeds up music.')
+    @slash_command(name="speed", description="Speeds up music.")
     @option(
-        'multiplier',
-        description='It might take 3-5 seconds to start speeding up, no value sets it to normal speed',
+        "multiplier",
+        description="It might take 3-5 seconds to start speeding up, no value sets it to normal speed",
         min_value=1,
         max_value=8
     )
@@ -80,7 +80,7 @@ class Audio(commands.Cog):
                                   color=discord.Color.blue())
             await ctx.respond(embed=embed)
 
-    @slash_command(name='clear-effects', description='Clears all effects on player.')
+    @slash_command(name="clear-effects", description="Clears all effects on player.")
     async def clear_effects(self, ctx) -> None:
 
         if not ctx.author.voice:

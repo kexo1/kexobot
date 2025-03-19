@@ -70,7 +70,7 @@ class Commands(commands.Cog):
 
         except (aiohttp.client_exceptions.ClientConnectorError, aiohttp.ConnectionTimeoutError):
             embed = discord.Embed(title="",
-                                  description=f":x: Failed to connect to `{uri}`",
+                                  description=f":x: Failed to connect to `{self.bot.node[0].uri}`",
                                   color=discord.Color.from_rgb(r=255, g=0, b=0))
             await ctx.send(embed=embed)
 

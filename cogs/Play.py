@@ -1,4 +1,3 @@
-import re
 import discord
 import wavelink
 
@@ -6,7 +5,9 @@ from typing import Union
 from discord import option
 from discord.ext import commands
 from discord.commands import slash_command
+from aiohttp.client_exceptions import ClientConnectorError
 from wavelink import TrackStartEventPayload, Playable
+from wavelink.exceptions import LavalinkLoadException
 
 
 class Play(commands.Cog):
@@ -99,7 +100,7 @@ class Play(commands.Cog):
 
         try:
             tracks: wavelink.Search = await wavelink.Playable.search(search)
-        except (wavelink.exceptions.LavalinkLoadException, aiohttp.client_exceptions.ClientConnectorError):
+        except (LavalinkLoadException, ClientConnectorError):
             embed = discord.Embed(title="",
                                   description=f":x: Failed to load tracks, this Lavalink server doesn't have Youtube "
                                               f"plugin. To fix this, use command `recconnect_node`.",

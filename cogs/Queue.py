@@ -11,7 +11,7 @@ class Queue(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @slash_command(name='queue', description='Shows songs in queue.')
+    @slash_command(name="queue", description="Shows songs in queue.")
     async def queue(self, ctx) -> None:
 
         is_joined = await self.is_joined(ctx)
@@ -26,7 +26,7 @@ class Queue(commands.Cog):
             embed = discord.Embed(title="", description="**Queue is empty**", color=discord.Color.blue())
             await ctx.respond(embed=embed)
 
-    @slash_command(name='playing', description='What song is currently playing.')
+    @slash_command(name="playing", description="What song is currently playing.")
     async def playing_command(self, ctx) -> None:
 
         is_playing = await self.is_playing(ctx)
@@ -35,8 +35,8 @@ class Queue(commands.Cog):
 
         await ctx.respond(embed=await self.get_playing_embed(ctx))
 
-    @slash_command(name='remove', description='Clears position in queue.')
-    @option('pos', description='Value 1 Removes the first one.', min_value=1, required=False)
+    @slash_command(name="remove", description="Clears position in queue.")
+    @option("pos", description="Value 1 Removes the first one.", min_value=1, required=False)
     async def remove(self, ctx, pos: int):
 
         is_joined = await self.is_joined(ctx)
@@ -62,7 +62,7 @@ class Queue(commands.Cog):
                                       color=discord.Color.blue())
                 await ctx.respond(embed=embed, ephemeral=True)
 
-    @slash_command(name='shuffle', description='Shuffles you queue, queue must contain more than 2 songs.')
+    @slash_command(name="shuffle", description="Shuffles you queue, queue must contain more than 2 songs.")
     async def shuffle(self, ctx):
 
         is_joined = await self.is_joined(ctx)
@@ -85,7 +85,7 @@ class Queue(commands.Cog):
             embed = discord.Embed(title="", description="**Queue is empty.**", color=discord.Color.blue())
             await ctx.respond(embed=embed, ephemeral=True)
 
-    @slash_command(name='loop-queue', description='Loops queue, run command again to disable queue loop')
+    @slash_command(name="loop-queue", description="Loops queue, run command again to disable queue loop")
     async def loop_queue(self, ctx) -> None:
 
         is_playing = await self.is_playing(ctx)
@@ -112,7 +112,7 @@ class Queue(commands.Cog):
                                   color=discord.Color.blue())
             return await ctx.respond(embed=embed)
 
-    @slash_command(name='loop', description='Loops currently playing song, run command again to disable loop.')
+    @slash_command(name="loop", description="Loops currently playing song, run command again to disable loop.")
     async def loop(self, ctx) -> None:
 
         is_playing = await self.is_playing(ctx)
@@ -135,7 +135,7 @@ class Queue(commands.Cog):
                                   color=discord.Color.blue())
             await ctx.respond(embed=embed)
 
-    @slash_command(name='clear-queue', description='Clears queue')
+    @slash_command(name="clear-queue", description="Clears queue")
     async def clear_(self, ctx):
 
         is_joined = await self.is_joined(ctx)
@@ -152,27 +152,27 @@ class Queue(commands.Cog):
     async def get_queue_embed(ctx, vc):
 
         if vc.queue.mode == wavelink.QueueMode.loop_all:
-            status = 'Looping queue'
-            footer = '🔁 '
+            status = "Looping queue"
+            footer = "🔁 "
         elif vc.queue.mode == wavelink.QueueMode.loop:
-            status = 'Looping currently playing song'
-            footer = '🔁 '
+            status = "Looping currently playing song"
+            footer = "🔁 "
         else:
-            status = 'Now Playing'
-            footer = ''
+            status = "Now Playing"
+            footer = ""
 
         fmt = []
         for pos, track in enumerate(vc.queue):
             fmt.append(f"`{pos + 1}.` **[{track.title[:1023]}]({track.uri})**"
                        f" \n `{int(divmod(track.length, 60000)[0])}:"
                        f"{round(divmod(track.length, 60000)[1] / 1000):02} | Requested by: {track.requester.name}`\n")
-        fmt = '\n'.join(fmt)
+        fmt = "\n".join(fmt)
 
         fmt = (f"\n***__{status}:__***\n **[{vc.current.title[:1023]}]({vc.current.uri})**"
                f" \n `{int(divmod(vc.current.length, 60000)[0])}:"
                f"{round(divmod(vc.current.length, 60000)[1] / 1000):02} | Requested by:"
                f" {vc.current.requester.name}`\n\n ***__Next:__***\n") + fmt[:3800]
-        embed = discord.Embed(title=f'Queue for {ctx.guild.name}', description=fmt, color=discord.Color.blue())
+        embed = discord.Embed(title=f"Queue for {ctx.guild.name}", description=fmt, color=discord.Color.blue())
         embed.set_footer(text=f"\n{footer}{vc.queue.count} songs in queue")
         return embed
 
@@ -194,7 +194,7 @@ class Queue(commands.Cog):
         embed.add_field(name="Track title", value=f"**[{vc.current.title}]({vc.current.uri})**", inline=False)
         embed.add_field(
             name="Artist",
-            value=f"_{vc.current.author if vc.current.author else 'None'}_",
+            value=f"_{vc.current.author if vc.current.author else "None"}_",
             inline=False,
         )
 

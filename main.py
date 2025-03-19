@@ -12,7 +12,8 @@ from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from constants import DISCORD_TOKEN, MONGO_DB_URL, REDDIT_PASSWORD, REDDIT_SECRET, REDDIT_USER_AGENT, REDDIT_USERNAME, \
-    REDDIT_CLIENT_ID, HUMOR_SECRET, CLEAR_CACHE_HOUR, DB_REDDIT_CACHE
+    REDDIT_CLIENT_ID, HUMOR_SECRET, CLEAR_CACHE_HOUR, DB_REDDIT_CACHE, ESUTAZE_CHANNEL, GAME_UPDATES_CHANNEL, \
+    FREE_STUFF_CHANNEL
 from utils import return_dict
 
 from classes.Esutaze import Esutaze
@@ -23,7 +24,7 @@ from classes.RedditCrackwatch import RedditCrackwatch
 from classes.RedditFreegamefindings import RedditFreegamefindings
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
-dns.resolver.default_resolver.nameservers = ['8.8.8.8']
+dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
 
 bot = discord.Bot()
 
@@ -64,26 +65,37 @@ class KexoBOT:
         self.esutaze = None
         self.main_loop_counter = 0
 
-    async def initialize(self, bot) -> None:
-        await self.fetch_users()
+    async def initialize(self) -> None:
+        await self._fetch_users()
         await self.create_session()
         await self.get_lavalink_server()
+        await self._fetch_channels()
 
         bot.subbredit_cache = return_dict(
-            await self.database.find_one(DB_REDDIT_CACHE, {'_id': False}))
+            await self.database.find_one(DB_REDDIT_CACHE, {"_id": False}))
+        await self._define_classes()
+        await kexobot.connect_node(switch_node=False)
 
+    async def _fetch_channels(self) -> None:
+        self.esutaze_channel = await bot.fetch_channel(ESUTAZE_CHANNEL)
+        self.game_updates_channel = await bot.fetch_channel(GAME_UPDATES_CHANNEL)
+        self.free_stuff_channel = await bot.fetch_channel(FREE_STUFF_CHANNEL)
+        print("Channels fetched.")
+
+    async def _define_classes(self) -> None:
         self.onlinefix = OnlineFix(self.session, self.database, bot)
         self.game3rb = Game3rb(self.session, self.database, bot)
         self.reddit_freegamefindings = RedditFreegamefindings(self.database, self.reddit)
         self.reddit_crackwatch = RedditCrackwatch(self.database, self.reddit, bot)
         self.elektrina_vypadky = ElektrinaVypadky(self.session, self.database, self.user_kexo)
         self.esutaze = Esutaze(self.session, self.database, bot)
+        print("Classes defined.")
 
     async def create_session(self) -> None:
         self.session = httpx.AsyncClient()
         self.session.verify = True
-        self.session.headers = {'User-Agent': UserAgent().random}
-        print('Httpx session initialized.')
+        self.session.headers = {"User-Agent": UserAgent().random}
+        print("Httpx session initialized.")
 
     async def connect_node(self, switch_node: False) -> None:
         node = [
@@ -96,43 +108,43 @@ class KexoBOT:
 
     async def set_joke(self) -> None:
         # insults, dark
-        joke_categroy = random.choice(('jewish', 'racist'))
+        joke_categroy = random.choice(("jewish", "racist"))
         joke = await self.session.get(
             f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
-            f"{joke_categroy}&api-key={HUMOR_SECRET}").json().get('joke')
+            f"{joke_categroy}&api-key={HUMOR_SECRET}").json().get("joke")
         await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=joke))
 
-    async def fetch_users(self) -> None:
+    async def _fetch_users(self) -> None:
         self.user_kexo = await bot.fetch_user(402221830930432000)
-        print(f'User {self.user_kexo.name} fetched.')
+        print(f"User {self.user_kexo.name} fetched.")
 
     async def update_reddit_cache(self, now: datetime) -> None:
         update = {}
         for guild_id, cache in bot.subbredit_cache.items():
             # If midnight, set search_level to 0
-            to_upload = ['0' if now.hour == CLEAR_CACHE_HOUR else str(cache['search_level']),
-                         str(cache.get('nsfw')),
-                         cache.get('links'),
-                         str(cache.get('which_subreddit'))]
+            to_upload = ["0" if now.hour == CLEAR_CACHE_HOUR else str(cache["search_level"]),
+                         str(cache.get("nsfw")),
+                         cache.get("links"),
+                         str(cache.get("which_subreddit"))]
             # Remove links at midnight
-            reddit_links = [reddit_link for reddit_link in to_upload[2].split('\n') if
-                            not reddit_link or reddit_link.split('*')[1] != str(now.hour)]
-            to_upload[2] = '\n'.join(reddit_links)
-            update[guild_id] = ','.join(to_upload)
+            reddit_links = [reddit_link for reddit_link in to_upload[2].split("\n") if
+                            not reddit_link or reddit_link.split("*")[1] != str(now.hour)]
+            to_upload[2] = "\n".join(reddit_links)
+            update[guild_id] = ",".join(to_upload)
 
         await self.database.update_many(DB_REDDIT_CACHE, {"$set": update})
         bot.subbredit_cache = return_dict(update)
 
     async def get_lavalink_server(self) -> None:
-        source = await self.session.get('https://lavainfo.netlify.app/api/non-ssl')
+        source = await self.session.get("https://lavainfo.netlify.app/api/non-ssl")
         for server in source.json():
-            if server.get('isConnected') is False:
+            if server.get("isConnected") is False:
                 continue
 
-            if server.get('restVersion') != 'v4':
+            if server.get("restVersion") != "v4":
                 continue
 
-            connections = server.get('connections').split('/')
+            connections = server.get("connections").split("/")
             # If noone is connected, skip
             if int(connections[0]) == 0:
                 continue
@@ -140,13 +152,13 @@ class KexoBOT:
             if int(connections[0]) == int(connections[1]):
                 continue
 
-            if not server.get('info')['plugins']:
+            if not server.get("info")["plugins"]:
                 continue
 
-            for plugin in server.get('info')['plugins']:
-                if plugin.get('name') == 'youtube-plugin':
-                    print(f'Server {server["host"]} fetched.')
-                    self.lavalink_server = f'http://{server["host"]}:{server["port"]}'
+            for plugin in server.get("info")["plugins"]:
+                if plugin.get("name") == "youtube-plugin":
+                    print(f"Server {server["host"]} fetched.")
+                    self.lavalink_server = f"http://{server["host"]}:{server["port"]}"
                     self.lavalink_server_password = server["password"]
                     return
 
@@ -187,7 +199,7 @@ kexobot = KexoBOT()
 def create_cog_session() -> None:
     bot.session = httpx.AsyncClient()
     bot.session.verify = True
-    bot.session.headers = {'User-Agent': UserAgent().random}
+    bot.session.headers = {"User-Agent": UserAgent().random}
 
 
 def setup_cogs() -> None:
@@ -200,13 +212,13 @@ def setup_cogs() -> None:
     bot.load_extension("cogs.FunStuff")
     bot.load_extension("cogs.Commands")
     bot.load_extension("cogs.DatabaseManager")
-    print('Cogs loaded.')
+    print("Cogs loaded.")
 
 
 setup_cogs()
 
 
-@tasks.loop(minutes=1)
+@tasks.loop(minutes=5)
 async def main_loop_task() -> None:
     await kexobot.main_loop()
 
@@ -228,11 +240,10 @@ async def before_hourly_loop() -> None:
 
 @bot.event
 async def on_ready() -> None:
-    print(f'Logged in as {bot.user}')
-    await kexobot.initialize(bot)
+    print(f"Logged in as {bot.user}")
+    await kexobot.initialize()
     main_loop_task.start()
     hourly_loop_task.start()
-    await kexobot.connect_node(switch_node=False)
 
 
 @bot.event
@@ -241,7 +252,7 @@ async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
         embed = discord.Embed(title="",
                               description=f"🚫 This command doesn't exist.",
                               color=discord.Color.from_rgb(r=255, g=0, b=0))
-        embed.set_footer(text='Message will be deleted in 20 seconds.')
+        embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.send(embed=embed, delete_after=20)
 
 
@@ -252,7 +263,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(title="",
                               description=f"🚫 You're sending too much!, try again in `{error_str[7]}`.",
                               color=discord.Color.from_rgb(r=255, g=0, b=0))
-        embed.set_footer(text='Message will be deleted in 20 seconds.')
+        embed.set_footer(text="Message will be deleted in 20 seconds.")
         return await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
     raise error
 

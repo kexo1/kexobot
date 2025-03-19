@@ -1,12 +1,9 @@
-import re
 import discord
-import html
-import pymongo
-import logging
 
 from datetime import datetime
+from io import BytesIO
 from bs4 import BeautifulSoup
-from constants import ESUTAZE_MAX_ARTICLES, DB_CACHE, DB_LISTS
+from constants import DB_CACHE, DB_LISTS
 
 
 class Esutaze:
@@ -16,60 +13,63 @@ class Esutaze:
         self.bot = bot
 
     async def run(self) -> None:
-        esutaze_exceptions = await self.database.find_one(DB_LISTS)
-        esutaze_exceptions = esutaze_exceptions['esutaze_exceptions']
+        esutaze_exceptions, esutaze_cache = await self._load_database()
+        articles = await self._get_articles()
 
-        esutaze_cache = await self.database.find_one(DB_CACHE)
-        esutaze_cache = esutaze_cache['esutaze_cache']
+        for article in articles:
+            header = article.find("header")
+            a_tag = header.find("a")
+            link = a_tag.get("href")
 
-        source = await self.session.get("https://www.esutaze.sk/feed/")
-        soup = BeautifulSoup(source.content, 'xml')
-        article = soup.find('channel')
+            if link in esutaze_cache:
+                return  # If first link is already in cache, all the rest are too
 
-        if not article:
-            return
-
-        for _ in range(ESUTAZE_MAX_ARTICLES):
-            article = article.find_next('item')
-            title = article.find('title').text
-
-            if title in esutaze_cache:
-                return
-
-            category = article.find('category').text
-            if not (category == 'Internetové súťaže' or 'TOP SÚŤAŽ' in category):
-                continue
-
-            number = [k for k in esutaze_exceptions if k.lower() in title]
-            if number:
+            title = a_tag.get("title")
+            is_filtered = [k for k in esutaze_exceptions if k.lower() in title]
+            if is_filtered:
                 continue
 
             esutaze_cache = [esutaze_cache[-1]] + esutaze_cache[:-1]
-            esutaze_cache[0] = title
-            esutaze_link = article.find('link').text
+            esutaze_cache[0] = link
+            await self._send_article(link, title)
 
-            description = html.unescape(article.find('description').text)
-            pattern = re.compile(r'<p>(.*?)</p>', re.DOTALL)
-            match = pattern.search(description)
-            description = match.group(1)
-            description = description.replace('\xa0', '\n').replace('ilustračné foto:', '')
-            pos = description.find('Koniec súťaže')
-            description = description[:pos] + '\n**' + description[pos:] + '**'
+        await self.database.update_one(DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache}})
 
-            source_unescaped = html.unescape(article.text)
-            pattern = re.compile(r'" src="(.*?)"', re.DOTALL)
-            match = pattern.search(source_unescaped)
-            image_link = match.group(1)
-            pattern = re.compile(r'</h4>\n<a href="(.*?)"', re.DOTALL)
-            match = pattern.search(source_unescaped)
-            giveaway_link = match.group(1)
+    async def _send_article(self, link: str, title: str) -> None:
+        article_content = await self.session.get(link)
+        soup = BeautifulSoup(article_content.content, "html.parser")
+        article_body = soup.find("div", class_="thecontent")
 
-            embed = discord.Embed(title=title, url=giveaway_link, description=description,
-                                  colour=discord.Colour.brand_red())
-            embed.set_image(url=image_link)
-            embed.timestamp = datetime.utcnow()
-            embed.set_footer(text=esutaze_link,
-                             icon_url='https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg')
-            esutaze_channel = self.bot.get_channel(1302271245919981638)
-            await esutaze_channel.send(embed=embed)
-            await self.database.update_one(DB_CACHE, {'$set': {'esutaze_cache': esutaze_cache}})
+        article_description = article_body.find_all("p")
+        contest_description = article_description[0].text
+        contest_requirements = article_description[2].text
+        
+        contest_ending_time = article_body.find("h4").text
+        img_link = article_body.find("img").get("src")
+        image_response = await self.session.get(img_link)
+        image = BytesIO(image_response.content)
+
+        embed = discord.Embed(title=title, url=link,
+                              description=f"{contest_description}\n\n"
+                                          f"{contest_requirements}\n\n"
+                                          f"**{contest_ending_time}**",
+                              colour=discord.Colour.brand_red())
+        embed.set_image(url="attachment://image.png")
+        embed.timestamp = datetime.utcnow()
+        embed.set_footer(text=link,
+                         icon_url="https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg")
+        await self.esutaze_channel.send(embed=embed, file=discord.File(image, "image.png"))
+
+    async def _get_articles(self):
+        html_content = await self.session.get("https://www.esutaze.sk/category/internetove-sutaze/")
+        soup = BeautifulSoup(html_content.content, "html.parser")
+        return soup.find("div", id="content_box").find_all("article")
+
+    async def _load_database(self) -> list:
+        esutaze_exceptions = await self.database.find_one(DB_LISTS)
+        esutaze_exceptions = esutaze_exceptions["esutaze_exceptions"]
+
+        esutaze_cache = await self.database.find_one(DB_CACHE)
+        esutaze_cache = esutaze_cache["esutaze_cache"]
+
+        return esutaze_exceptions, esutaze_cache

@@ -1,6 +1,8 @@
 py-cord
 asyncpraw
 asyncprawcore
+asyncio
+motor
 httpx
 dnspython
 pymongo
