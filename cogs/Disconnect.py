@@ -11,7 +11,7 @@ class Disconnect(commands.Cog):
 
     @slash_command(name="leave", description="Leaves voice channel.")
     @commands.cooldown(1, 4, commands.BucketType.user)
-    async def disconnect_command(self, ctx) -> None:
+    async def disconnect_command(self, ctx: discord.ApplicationContext) -> None:
         if not ctx.author.voice or ctx.voice_client is None:
             embed = discord.Embed(title="",
                                   description=str(

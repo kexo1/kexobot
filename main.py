@@ -13,7 +13,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from constants import DISCORD_TOKEN, MONGO_DB_URL, REDDIT_PASSWORD, REDDIT_SECRET, REDDIT_USER_AGENT, REDDIT_USERNAME, \
     REDDIT_CLIENT_ID, HUMOR_SECRET, CLEAR_CACHE_HOUR, DB_REDDIT_CACHE, ESUTAZE_CHANNEL, GAME_UPDATES_CHANNEL, \
-    FREE_STUFF_CHANNEL
+    FREE_STUFF_CHANNEL, LAVALINK_API_URLS
 from utils import return_dict
 
 from classes.Esutaze import Esutaze
@@ -32,15 +32,17 @@ bot = discord.Bot()
 
 # TODO: In listener check if Player exists
 # TODO: Automatically disconnect from voice channel after 30 minutes of inactivity
-# TODO: Make classes in /classes/ more modular
+# TODO: Rewrite Game3rb
+# TODO: Refresh Music Cogs
 # TODO: Use enums instead of strings in DatabaseManager
 
 class KexoBOT:
-    def __init__(self) -> None:
+    def __init__(self):
         self.user_kexo = None
         self.session = None
-        self.lavalink_server = str
-        self.lavalink_server_password = str
+        self.which_lavalink_server = -1
+        self.lavalink_ip = str
+        self.lavalink_password = str
         self.database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]["KexoBOTCollection"]
 
         self.reddit = asyncpraw.Reddit(
@@ -54,7 +56,6 @@ class KexoBOT:
         # Attach bot, so we can use it in cogs
         bot.database = self.database
         bot.reddit = self.reddit
-        bot.get_lavalink_server = self.get_lavalink_server
         bot.connect_node = self.connect_node
 
         self.onlinefix = None
@@ -68,13 +69,12 @@ class KexoBOT:
     async def initialize(self) -> None:
         await self._fetch_users()
         await self.create_session()
-        await self.get_lavalink_server()
         await self._fetch_channels()
 
         bot.subbredit_cache = return_dict(
             await self.database.find_one(DB_REDDIT_CACHE, {"_id": False}))
         await self._define_classes()
-        await kexobot.connect_node(switch_node=False)
+        await kexobot.connect_node()
 
     async def _fetch_channels(self) -> None:
         self.esutaze_channel = await bot.fetch_channel(ESUTAZE_CHANNEL)
@@ -100,14 +100,21 @@ class KexoBOT:
         self.session.headers = {"User-Agent": UserAgent().random}
         print("Httpx session initialized.")
 
-    async def connect_node(self, switch_node: False) -> None:
+    async def connect_node(self) -> None:
+        lavalink_servers = await self.get_lavalink_server()
+        self.which_lavalink_server += 1
+        if self.which_lavalink_server >= len(lavalink_servers):
+            self.which_lavalink_server = 0
+
+        ip = lavalink_servers[self.which_lavalink_server]["ip"]
+        password = lavalink_servers[self.which_lavalink_server]["password"]
+        print(f"Server {ip} fetched.")
+
         node = [
-            wavelink.Node(uri=self.lavalink_server, password=self.lavalink_server_password, retries=1,
-                          resume_timeout=0)]
+            wavelink.Node(uri=ip, password=password, retries=1, resume_timeout=0)]
+
         bot.node = node
-        if switch_node:
-            return await wavelink.player.switch_node(node)
-        return await wavelink.Pool.connect(nodes=node, client=bot)
+        await wavelink.Pool.connect(nodes=node, client=bot)
 
     async def set_joke(self) -> None:
         # insults, dark
@@ -139,32 +146,35 @@ class KexoBOT:
         bot.subbredit_cache = return_dict(update)
 
     async def get_lavalink_server(self) -> None:
-        json_data = await self.session.get("https://lavainfo.netlify.app/api/non-ssl")
-        json_data = json_data.json()
-        for server in json_data:
-            if server.get("isConnected") is False:
-                continue
+        lavalink_servers = []
 
-            if server.get("restVersion") != "v4":
-                continue
+        for url in LAVALINK_API_URLS:
+            json_data = await self.session.get(url)
+            json_data = json_data.json()
 
-            connections = server.get("connections").split("/")
-            # If noone is connected, skip
-            if int(connections[0]) == 0:
-                continue
-            # If full, skip
-            if int(connections[0]) == int(connections[1]):
-                continue
+            for server in json_data:
+                if server.get("isConnected") is False:
+                    continue
 
-            if not server.get("info")["plugins"]:
-                continue
+                if server.get("restVersion") != "v4":
+                    continue
 
-            for plugin in server.get("info")["plugins"]:
-                if plugin.get("name") == "youtube-plugin":
-                    print(f"Server {server["host"]} fetched.")
-                    self.lavalink_server = f"http://{server["host"]}:{server["port"]}"
-                    self.lavalink_server_password = server["password"]
-                    return
+                connections = server.get("connections").split("/")
+                # If noone is connected, skip
+                if int(connections[0]) == 0:
+                    continue
+                # If full, skip
+                if int(connections[0]) == int(connections[1]):
+                    continue
+
+                if not server.get("info")["plugins"]:
+                    continue
+
+                for plugin in server.get("info")["plugins"]:
+                    if plugin.get("name") == "youtube-plugin" or plugin.get("name") == "lavasrc-plugin":
+                        lavalink_servers.append({"ip": f"http://{server["host"]}:{server["port"]}",
+                                                 "password": server["password"]})
+        return lavalink_servers
 
     async def main_loop(self) -> None:
         if self.main_loop_counter == 0:

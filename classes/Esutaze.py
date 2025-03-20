@@ -56,11 +56,11 @@ class Esutaze:
                               colour=discord.Colour.brand_red())
         embed.set_image(url="attachment://image.png")
         embed.timestamp = datetime.utcnow()
-        embed.set_footer(text=url,
+        embed.set_footer(text="www.esutaze.sk",
                          icon_url="https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg")
         await self.channel.send(embed=embed, file=discord.File(image, "image.png"))
 
-    async def _get_articles(self):
+    async def _get_articles(self) -> BeautifulSoup:
         html_content = await self.session.get("https://www.esutaze.sk/category/internetove-sutaze/")
         soup = BeautifulSoup(html_content.text, "html.parser")
         return soup.find("div", id="content_box").find_all("article")

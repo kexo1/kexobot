@@ -78,7 +78,7 @@ class RedditCrackWatch:
             print(f"Error when accessing crackwatch:\n{e}")
 
     @staticmethod
-    async def _get_image(line) -> str:
+    async def _get_image(line: str) -> str:
         image_url = re.findall(r"\((.*?)\)", line)
         if not image_url:
             return None

@@ -20,10 +20,11 @@ class OnlineFix:
         chat_messages = await self._get_messages(chat_log.text)
         await self._process_messages(chat_messages, onlinefix_cache, games)
 
-    async def _send_embed(self, url, game_title):
+    async def _send_embed(self, url: str, game_title: str) -> None:
         onlinefix_article = await self.session.get(url)
         soup = BeautifulSoup(onlinefix_article.text, "html.parser")
         img_url = soup.find("head").find("meta", attrs={"property": "og:image"})["content"]
+
         description = soup.find("article").find("div", class_="edited-block right").text
         description = GoogleTranslator(source="ru").translate(text=description)
         description = description.replace(". ", "\n")
@@ -37,7 +38,7 @@ class OnlineFix:
                               description=description,
                               color=discord.Color.blue())
         embed.timestamp = datetime.utcnow()
-        embed.set_footer(text="https://online-fix.me",
+        embed.set_footer(text="online-fix.me",
                          icon_url="https://media.discordapp.net/attachments/796453724713123870"
                                   "/1035951759505506364/favicon-1.png")
         embed.set_thumbnail(url=img_url)
@@ -55,9 +56,8 @@ class OnlineFix:
                 continue
 
             url = message.find_all("a")[1].get("href")
-            url_id = url + message_id
 
-            if url_id in onlinefix_cache:
+            if message_id in onlinefix_cache:
                 return
 
             game_title = message.find_all("a")[1].text.replace(" по сети", "")
@@ -65,7 +65,7 @@ class OnlineFix:
                 continue
 
             await self._send_embed(url, game_title)
-            to_upload.append(url_id)
+            to_upload.append(message_id)
 
             limit -= 1
             if limit == 0:

@@ -23,7 +23,8 @@ class Commands(commands.Cog):
     @option('uri', description='Lavalink server URL (without http:// at start)', required=True)
     @option('port', description='Lavalink server port.', required=True)
     @option('password', description='Lavalink server password.', required=True)
-    async def manual_recconect_node(self, ctx, uri: str, port: int, password: str) -> None:
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def manual_recconect_node(self, ctx: discord.ApplicationContext, uri: str, port: int, password: str) -> None:
         embed = discord.Embed(title="",
                               description=f'**🔄 Connecting to `{uri}`**',
                               color=discord.Color.blue())
@@ -51,28 +52,29 @@ class Commands(commands.Cog):
             await message.edit(embed=embed)
 
     @slash_command(name='recconnect_node', description='Automatically reconnect to avaiable node')
-    async def recconect_node(self, ctx) -> None:
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def recconect_node(self, ctx: discord.ApplicationContext) -> None:
         await ctx.trigger_typing()
-        await self.bot.get_lavalink_server()
-
         embed = discord.Embed(title="",
-                              description=f'**🔄 Getting lavalink server from `https://lavainfo.netlify.app/`**',
+                              description=f'**🔄 Getting Lavalink server.**',
                               color=discord.Color.blue())
         await ctx.respond(embed=embed)
 
-        await self.bot.connect_node(switch_node=True)
         try:
+            await self.bot.connect_node()
             await self.bot.node[0].fetch_info()
+        except (aiohttp.client_exceptions.ClientConnectorError, aiohttp.ConnectionTimeoutError,
+                wavelink.exceptions.NodeException):
             embed = discord.Embed(title="",
-                                  description=f'**✅ Connected to node `{self.bot.node[0].uri}`**',
-                                  color=discord.Color.blue())
-            await ctx.send(embed=embed)
-
-        except (aiohttp.client_exceptions.ClientConnectorError, aiohttp.ConnectionTimeoutError):
-            embed = discord.Embed(title="",
-                                  description=f":x: Failed to connect to `{self.bot.node[0].uri}`",
+                                  description=f":x: Failed to connect to `{self.bot.node[0].uri}`, "
+                                              f"rolling back to previous node.",
                                   color=discord.Color.from_rgb(r=255, g=0, b=0))
-            await ctx.send(embed=embed)
+            return await ctx.send(embed=embed)
+
+        embed = discord.Embed(title="",
+                              description=f'**✅ Connected to node `{self.bot.node[0].uri}`**',
+                              color=discord.Color.blue())
+        await ctx.send(embed=embed)
 
     @slash_command(name='host', description='Creates hosting embed, you can also choose some optional info.',
                    guild_ids=[723197287861583885, 692810367851692032])
@@ -90,7 +92,8 @@ class Commands(commands.Cog):
     @option('image', description='Add custom image url for embed, needs to end with .png, .gif and etc.',
             required=False)
     @commands.cooldown(1, 300, commands.BucketType.user)
-    async def host(self, ctx, server_name: str, duration, password: str, region: str, category_maps: str, scripts: str, slots: int = 8, ping: bool = True, image: str = None) -> None:
+    async def host(self, ctx, server_name: str, duration, password: str, region: str, category_maps: str, scripts: str,
+            slots: int = 8, ping: bool = True, image: str = None) -> None:
         author = ctx.author
 
         if author in host_authors:
@@ -143,7 +146,7 @@ class Commands(commands.Cog):
         view.message = await ctx.channel.fetch_message(interaction.id)
 
     @slash_command(name='info')
-    async def info(self, ctx) -> None:
+    async def info(self, ctx: discord.ApplicationContext) -> None:
         embed = discord.Embed(title="INFO", color=discord.Color.blue())
         embed.add_field(name="Run time:ㅤㅤ" + '\u200b',
                         value=f"{str(timedelta(seconds=round(int(time.time()) - self.run_time)))}")
@@ -156,7 +159,7 @@ class Commands(commands.Cog):
         await ctx.respond(embed=embed)
 
     @slash_command(name='random_number', description='Choose number between intervals.')
-    async def random_number(self, ctx, ineteger1: int, ineteger2: int) -> None:
+    async def random_number(self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int) -> None:
         if ineteger1 > ineteger2:
             ineteger2, ineteger1 = ineteger1, ineteger2
         await ctx.respond(f"I chose `{random.randint(ineteger1, ineteger2)}`")
@@ -175,19 +178,19 @@ class Commands(commands.Cog):
         min_value=1,
         max_value=50
     )
-    async def clear(self, ctx, integer: int) -> None:
+    async def clear(self, ctx: discord.ApplicationContext, integer: int) -> None:
         await ctx.respond(f'`{integer}` messages cleared ✅', delete_after=20, ephemeral=True)
         await ctx.channel.purge(limit=integer)
 
 
 class HostView(discord.ui.View):
-    def __init__(self, author):
+    def __init__(self, author: discord.Member):
         super().__init__(timeout=43200, disable_on_timeout=True)
         self.author = author
 
     # noinspection PyUnusedLocal
     @discord.ui.button(style=discord.ButtonStyle.gray, label="I stopped hosting.", emoji='📣')
-    async def button_callback(self, button, interaction) -> None:
+    async def button_callback(self, button: discord.Button, interaction: discord.Interaction) -> None:
         if interaction.user.name in host_authors:
             embed = await self.disable_embed()
             await interaction.response.edit_message(embed=embed, view=None)
@@ -207,7 +210,7 @@ class HostView(discord.ui.View):
         pos = host_authors.index(self.author.name)
         host_authors.pop(pos)
 
-    async def disable_embed(self) -> object:
+    async def disable_embed(self) -> discord.Embed:
         self.stop()
 
         embed = self.message.embeds[0]

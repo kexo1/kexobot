@@ -17,7 +17,7 @@ class Audio(commands.Cog):
         min_value=1,
         max_value=200
     )
-    async def change_volume(self, ctx, vol: float = None) -> None:
+    async def change_volume(self, ctx: discord.ApplicationContext, vol: float = None) -> None:
 
         if not ctx.author.voice:
             embed = discord.Embed(title="",
@@ -53,7 +53,7 @@ class Audio(commands.Cog):
         min_value=1,
         max_value=8
     )
-    async def speed(self, ctx, multiplier: float = None) -> None:
+    async def speed(self, ctx: discord.ApplicationContext, multiplier: float = None) -> None:
 
         if not ctx.author.voice:
             embed = discord.Embed(title="",
@@ -81,7 +81,7 @@ class Audio(commands.Cog):
             await ctx.respond(embed=embed)
 
     @slash_command(name="clear-effects", description="Clears all effects on player.")
-    async def clear_effects(self, ctx) -> None:
+    async def clear_effects(self, ctx: discord.ApplicationContext) -> None:
 
         if not ctx.author.voice:
             embed = discord.Embed(title="",

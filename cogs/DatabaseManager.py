@@ -11,7 +11,7 @@ class DatabaseManager(commands.Cog):
         self.bot = bot
         self.database = self.bot.database
 
-    async def manage_list(self, collection, manage) -> list:
+    async def manage_list(self, collection: str, manage: bool) -> list:
         # If manage is False (showing database), else editing database
         if manage is False:
             listing = await self.database.find_one(DB_LISTS)

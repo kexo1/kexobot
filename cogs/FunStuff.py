@@ -1,3 +1,4 @@
+import asyncpraw.reddit
 import discord
 import random
 import imgflip
@@ -25,16 +26,16 @@ class FunStuff(commands.Cog):
 
     @slash_command(name="kotrmelec", description="Legendárne školské kotrmelce",
                    guild_ids=[692810367851692032, 765262686908186654])
-    async def kotrmelec(self, ctx) -> None:
+    async def kotrmelec(self, ctx: discord.ApplicationContext) -> None:
         await ctx.respond(random.choice(self.kotrmelce))
 
     @slash_command(name="topstropscreenshot", description="Topové fotečky z online hodín",
                    guild_ids=[692810367851692032, 765262686908186654])
-    async def top_strop_screenshot(self, ctx) -> None:
+    async def top_strop_screenshot(self, ctx: discord.ApplicationContext) -> None:
         await ctx.respond(random.choice(self.topstropscreenshot))
 
     @slash_command(name="roast", description="Lamar roast", guild_ids=[692810367851692032, 765262686908186654])
-    async def roast(self, ctx) -> None:
+    async def roast(self, ctx: discord.ApplicationContext) -> None:
         await ctx.respond(ROAST_COMMANDS_MSG)
 
     @slash_command(name="spam", description="Spams words, max is 50.  (Admin)")
@@ -46,7 +47,7 @@ class FunStuff(commands.Cog):
         min_value=1,
         max_value=50
     )
-    async def spam(self, ctx, word: str, integer: int) -> None:
+    async def spam(self, ctx: discord.ApplicationContext, word: str, integer: int) -> None:
         await ctx.respond(word)
         for _ in range(integer - 1):
             await ctx.send(word)
@@ -54,7 +55,7 @@ class FunStuff(commands.Cog):
     @slash_command(name="kys", description="Keď niekoho nemáš rád.",
                    guild_ids=[692810367851692032, 765262686908186654])
     @commands.cooldown(1, 30, commands.BucketType.user)
-    async def kys(self, ctx, member: discord.Member) -> None:
+    async def kys(self, ctx: discord.ApplicationContext, member: discord.Member) -> None:
         meme_img = await self.generate_meme(ctx, member)
 
         await ctx.respond(
@@ -67,14 +68,14 @@ class FunStuff(commands.Cog):
 
     @slash_command(name="idk", description="Idk.",
                    guild_ids=[692810367851692032, 765262686908186654])
-    async def idk(self, ctx) -> None:
+    async def idk(self, ctx: discord.ApplicationContext) -> None:
         self.idk_count += 1
         if self.idk_count < 5:
             return await ctx.respond("idk")
         await ctx.respond("https://media.discordapp.net/attachments/796453724713123870/1042486203842306159/image.png")
         self.idk_count = 0
 
-    async def process_shitpost(self, ctx) -> None:
+    async def process_shitpost(self, ctx: discord.ApplicationContext) -> None:
         guild_id = str(ctx.guild.id) if ctx.guild else str(ctx.user.id)
 
         if guild_id not in self.bot.subbredit_cache:
@@ -126,7 +127,7 @@ class FunStuff(commands.Cog):
     @slash_command(name="shitpost", description="Random post from various shitposting subreddits.")
     @option("nsfw", bool, description="Turn on/off NSFW posts.", required=False)
     @commands.cooldown(1, 5, commands.BucketType.user)
-    async def shitpost(self, ctx, nsfw: False) -> None:
+    async def shitpost(self, ctx: discord.ApplicationContext, nsfw: False) -> None:
         if nsfw:
             if ctx.guild:
                 self.bot.subbredit_cache[str(ctx.guild.id)]["nsfw"] = nsfw
@@ -135,12 +136,12 @@ class FunStuff(commands.Cog):
             await ctx.respond(f"NSFW Tags were set to `{nsfw}`.")
         await self.process_shitpost(ctx)
 
-    async def cache_viewed_link(self, submission_url, guild_id) -> None:
+    async def cache_viewed_link(self, submission_url: str, guild_id: str) -> None:
         self.bot.subbredit_cache[guild_id]["urls"] += (f"{submission_url}*"
-                                                        f"{(datetime.now()
-                                                            + timedelta(hours=20)).strftime("%I").lstrip("0")}\n")
+                                                       f"{(datetime.now()
+                                                           + timedelta(hours=20)).strftime("%I").lstrip("0")}\n")
 
-    async def generate_meme(self, ctx, member: discord.Member) -> str:
+    async def generate_meme(self, ctx: discord.ApplicationContext, member: discord.Member) -> str:
         text = random.choice((f"72598094; ;{member.name};50",
                               f"91545132;tento typek je cisty retard;{member.name};50",
                               f"368961738;{ctx.author.name};{member.name};50",
@@ -154,7 +155,7 @@ class FunStuff(commands.Cog):
             max_font_size=text[3])
 
     @staticmethod
-    async def up_search_level(guild_subreddit_cache) -> None:
+    async def up_search_level(guild_subreddit_cache: dict) -> None:
         guild_subreddit_cache["which_subreddit"] = (guild_subreddit_cache["which_subreddit"] - 1) % len(
             SHITPOST_SUBREDDITS)
         # If it's the last subreddit, search more
@@ -162,12 +163,12 @@ class FunStuff(commands.Cog):
             guild_subreddit_cache["search_level"] += 1
 
     @staticmethod
-    async def send_multiple_images(ctx, submission) -> None:
+    async def send_multiple_images(ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission) -> None:
         for images in submission.gallery_data["items"]:
             await ctx.send(f"https://i.redd.it/{images["media_id"]}.jpg")
 
     @staticmethod
-    async def upload_video(ctx, submission) -> None:
+    async def upload_video(ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission) -> None:
         msg = await ctx.send("Downloading video, please wait...")
         url = submission.media.get("reddit_video")["fallback_url"]
 
@@ -182,7 +183,7 @@ class FunStuff(commands.Cog):
         await msg.edit(content=None, file=video)
 
     @staticmethod
-    async def create_reddit_embed(submission: object, subbreddit_name: str) -> discord.Embed:
+    async def create_reddit_embed(submission: asyncpraw.reddit.Submission, subbreddit_name: str) -> discord.Embed:
         embed = discord.Embed(title=f"{submission.title}", url=f"https://www.reddit.com{submission.permalink}",
                               color=discord.Color.orange())
         embed.set_footer(text=f"r/{subbreddit_name} ｜🔺{submission.score}｜💬 {submission.num_comments}",
@@ -193,12 +194,12 @@ class FunStuff(commands.Cog):
         embed.timestamp = datetime.fromtimestamp(submission.created_utc)
         return embed
 
-    async def create_guild_dataset(self, guild_id) -> None:
+    async def create_guild_dataset(self, guild_id: str) -> None:
         await self.database.update_one(DB_REDDIT_CACHE, {"$set": {guild_id: "1,False,,0"}})
         self.bot.subbredit_cache[guild_id] = {"search_level": 0, "nsfw": False, "urls": "", "which_subreddit": 0}
 
     @staticmethod
-    async def reddit_unresponsive_msg(ctx) -> None:
+    async def reddit_unresponsive_msg(ctx: discord.ApplicationContext) -> None:
         embed = discord.Embed(title="",
                               description=f"🚫 Reddit didn't respond, try again in a minute.\nWhat could cause "
                                           f"error? - Reddit is down, Subreddit is locked, API might be overloaded",

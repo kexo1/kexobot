@@ -7,6 +7,9 @@ ESUTAZE_CHANNEL = 1302271245919981638
 GAME_UPDATES_CHANNEL = 882185054174994462
 FREE_STUFF_CHANNEL = 1081883673902714953
 
+# Lavalink
+LAVALINK_API_URLS = ["https://lavainfo.netlify.app/api/non-ssl", "https://lavainfo.netlify.app/api/ssl"]
+
 # MongoDB
 MONGO_DB_URL = (f"mongodb+srv://{os.getenv("MONGO_KEY")}@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
                 f"=majority")

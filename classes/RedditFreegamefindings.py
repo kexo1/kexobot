@@ -52,7 +52,7 @@ class RedditFreeGameFindings:
             await self.database.update_one(DB_CACHE,
                                            {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}})
 
-    async def _process_submission(self, url):
+    async def _process_submission(self, url: str) -> None:
         self.upload = True
 
         if "gleam" in url:
@@ -77,7 +77,7 @@ class RedditFreeGameFindings:
                 return
         await self._create_embed(REDDIT_FREEGAME_EMBEDS["AlienwareArena"], url)
 
-    async def _create_embed(self, embed_dict, url) -> None:
+    async def _create_embed(self, embed_dict: dict, url: str) -> None:
         url_obj = urlparse(url)
         domain = url_obj.netloc
         embed = discord.Embed(title=embed_dict["title"],
