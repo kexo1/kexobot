@@ -10,8 +10,8 @@ def load_text_file(name: str) -> list:
 
 def return_dict(subbredit_cache) -> dict:
     for key in subbredit_cache:
-        search_level, nsfw, links, which_subreddit = subbredit_cache[key].split(",")
-        subbredit_cache[key] = {"search_level": int(search_level), "nsfw": bool(nsfw), "links": links,
+        search_level, nsfw, urls, which_subreddit = subbredit_cache[key].split(",")
+        subbredit_cache[key] = {"search_level": int(search_level), "nsfw": bool(nsfw), "urls": urls,
                                 "which_subreddit": int(which_subreddit)}
     return subbredit_cache
 

@@ -21,23 +21,6 @@ REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT")
 REDDIT_USERNAME = os.getenv("REDDIT_USERNAME")
 REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD")
 REDDIT_STRIP = (" *", "* ", "*", "---")
-
-# Game3rb
-GAME3RB_STRIP = (
-    "Download ", " + OnLine", "-P2P", " Build", " + Update Only", " + Update", " + Online",
-    " + 5 DLCs-FitGirl Repack",
-    " Hotfix 1", ")-FitGirl Repack", " + Bonus Content DLC",
-    " Hotfix 2" " Hotfix", " rc", "\u200b", "-GOG", "-Repack", " VR", "/Denuvoless", " (Build",
-    "-FitGirl Repack", "[Frankenpack]", ")")
-GAME3RB_MUST_BE_ONLINE = (
-    "barotrauma", "green hell", "ready or not", "generation zero", "evil west",
-    "devour", "minecraft legends", "the long drive", "stronghold definitive edition", "valheim", "no mans sky",
-    "warhammer 40,000: space marine 2", "abiotic factor", "core keeper")
-
-# OnlineFix
-ONLINEFIX_MAX_GAMES = 10
-
-# Reddit
 REDDIT_FREEGAME_EMBEDS = {
     "Default":
         {"title": "Free Game - unknown site",
@@ -59,12 +42,23 @@ REDDIT_FREEGAME_EMBEDS = {
 REDDIT_FREEGAME_MAX_POSTS = 5
 REDDIT_CRACKWATCH_POSTS = 5
 
+# Game3rb
+GAME3RB_STRIP = (
+    "Download ", " + OnLine", "-P2P", " Build", " + Update Only", " + Update", " + Online",
+    " + 5 DLCs-FitGirl Repack",
+    " Hotfix 1", ")-FitGirl Repack", " + Bonus Content DLC",
+    " Hotfix 2" " Hotfix", " rc", "\u200b", "-GOG", "-Repack", " VR", "/Denuvoless", " (Build",
+    "-FitGirl Repack", "[Frankenpack]", ")")
+
+# OnlineFix
+ONLINEFIX_MAX_GAMES = 10
+
 # AlienwareArena
 ALIENWAREARENA_MAX_POSTS = 3
 ALIENWAREARENA_STRIP = ("Key", "Giveaway", "Steam Game")
 
 # ElektrinaVypadky
-ELEKTRINA_MAX_ARTICLES = 3
+ELEKTRINA_MAX_ARTICLES = 5
 
 # FunStuff
 ROAST_COMMANDS_MSG = """Wassup, can a loc come up in your crib?

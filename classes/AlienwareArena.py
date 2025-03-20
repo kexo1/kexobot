@@ -18,9 +18,9 @@ class AlienwareArena:
 
     async def _send_embed(self, json_data: dict, alienwarearena_cache: list) -> None:
         for giveaway in json_data["data"][:ALIENWAREARENA_MAX_POSTS]:
-            link = "https://eu.alienwarearena.com" + giveaway["url"]
+            url = "https://eu.alienwarearena.com" + giveaway["url"]
 
-            if link in alienwarearena_cache:
+            if url in alienwarearena_cache:
                 return
 
             title = giveaway["title"].lower()
@@ -31,10 +31,10 @@ class AlienwareArena:
                 title = title.replace(part, "")
 
             alienwarearena_cache = [alienwarearena_cache[-1]] + alienwarearena_cache[:-1]
-            alienwarearena_cache[0] = link
+            alienwarearena_cache[0] = url
 
             soup = BeautifulSoup(giveaway["description"], "html.parser")
-            description = soup.find("strong").text + f"\n\n**[eu.alienwarearena.com]({link})**"
+            description = soup.find("strong").text + f"\n\n**[eu.alienwarearena.com]({url})**"
 
             embed = discord.Embed(title=title,
                                   description=description,

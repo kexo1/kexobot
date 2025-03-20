@@ -52,36 +52,36 @@ class RedditFreeGameFindings:
             await self.database.update_one(DB_CACHE,
                                            {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}})
 
-    async def _process_submission(self, link):
+    async def _process_submission(self, url):
         self.upload = True
 
-        if "gleam" in link:
-            await self._create_embed(REDDIT_FREEGAME_EMBEDS["Gleam"], link)
-        elif "alienwarearena" in link:
-            await self._alienwarearena(link)
-        elif "fanatical" in link:
-            await self._fanatical(link)
+        if "gleam" in url:
+            await self._create_embed(REDDIT_FREEGAME_EMBEDS["Gleam"], url)
+        elif "alienwarearena" in url:
+            await self._alienwarearena(url)
+        elif "fanatical" in url:
+            await self._fanatical(url)
         else:
-            await self._create_embed(REDDIT_FREEGAME_EMBEDS["Default"], link)
+            await self._create_embed(REDDIT_FREEGAME_EMBEDS["Default"], url)
 
-    async def _fanatical(self, link) -> None:
-        await self.user_kexo.send(f"Update function!: {link}")
+    async def _fanatical(self, url) -> None:
+        await self.user_kexo.send(f"Update function!: {url}")
         return
 
-    async def _alienwarearena(self, link) -> None:
+    async def _alienwarearena(self, url) -> None:
         # There might be an occurence where giveaway is not showing in alienwarearena.com
         alienwarearena_cache = await self.database.find_one(DB_CACHE)
-        uri = link[29:]
-        for cached_link in alienwarearena_cache["alienwarearena_cache"]:
-            if uri in cached_link:
+        reddit_path = url[29:]
+        for cached_url in alienwarearena_cache["alienwarearena_cache"]:
+            if reddit_path in cached_url:
                 return
-        await self._create_embed(REDDIT_FREEGAME_EMBEDS["AlienwareArena"], link)
+        await self._create_embed(REDDIT_FREEGAME_EMBEDS["AlienwareArena"], url)
 
-    async def _create_embed(self, embed_dict, link) -> None:
-        url_obj = urlparse(link)
+    async def _create_embed(self, embed_dict, url) -> None:
+        url_obj = urlparse(url)
         domain = url_obj.netloc
         embed = discord.Embed(title=embed_dict["title"],
-                              description=f"{embed_dict['description']}\n\n**[{domain}]({link})**",
+                              description=f"{embed_dict['description']}\n\n**[{domain}]({url})**",
                               color=discord.Color.dark_theme())
         embed.set_thumbnail(url=embed_dict["icon"])
         embed.set_footer(text="I took it from - r/FreeGameFindings",

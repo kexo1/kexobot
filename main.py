@@ -127,20 +127,21 @@ class KexoBOT:
             # If midnight, set search_level to 0
             to_upload = ["0" if now.hour == CLEAR_CACHE_HOUR else str(cache["search_level"]),
                          str(cache.get("nsfw")),
-                         cache.get("links"),
+                         cache.get("urls"),
                          str(cache.get("which_subreddit"))]
-            # Remove links at midnight
-            reddit_links = [reddit_link for reddit_link in to_upload[2].split("\n") if
-                            not reddit_link or reddit_link.split("*")[1] != str(now.hour)]
-            to_upload[2] = "\n".join(reddit_links)
+            # Remove urls at midnight
+            reddit_urls = [reddit_url for reddit_url in to_upload[2].split("\n") if
+                           not reddit_url or reddit_url.split("*")[1] != str(now.hour)]
+            to_upload[2] = "\n".join(reddit_urls)
             update[guild_id] = ",".join(to_upload)
 
         await self.database.update_many(DB_REDDIT_CACHE, {"$set": update})
         bot.subbredit_cache = return_dict(update)
 
     async def get_lavalink_server(self) -> None:
-        source = await self.session.get("https://lavainfo.netlify.app/api/non-ssl")
-        for server in source.json():
+        json_data = await self.session.get("https://lavainfo.netlify.app/api/non-ssl")
+        json_data = json_data.json()
+        for server in json_data:
             if server.get("isConnected") is False:
                 continue
 
@@ -225,7 +226,7 @@ def setup_cogs() -> None:
 setup_cogs()
 
 
-@tasks.loop(minutes=4)
+@tasks.loop(minutes=1)
 async def main_loop_task() -> None:
     await kexobot.main_loop()
 

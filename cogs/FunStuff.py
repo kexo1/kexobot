@@ -96,10 +96,10 @@ class FunStuff(commands.Cog):
                 if submission.is_self or submission.stickied:
                     continue
                 # If already sent
-                if submission.url in guild_subreddit_cache.get("links"):
+                if submission.url in guild_subreddit_cache.get("urls"):
                     continue
                 # If it's nsfw and setting wasn't set to nsfw
-                if submission.over_18 and not guild_subreddit_cache.get("links"):
+                if submission.over_18 and not guild_subreddit_cache.get("urls"):
                     continue
 
                 embed = await self.create_reddit_embed(submission,
@@ -136,7 +136,7 @@ class FunStuff(commands.Cog):
         await self.process_shitpost(ctx)
 
     async def cache_viewed_link(self, submission_url, guild_id) -> None:
-        self.bot.subbredit_cache[guild_id]["links"] += (f"{submission_url}*"
+        self.bot.subbredit_cache[guild_id]["urls"] += (f"{submission_url}*"
                                                         f"{(datetime.now()
                                                             + timedelta(hours=20)).strftime("%I").lstrip("0")}\n")
 
@@ -195,7 +195,7 @@ class FunStuff(commands.Cog):
 
     async def create_guild_dataset(self, guild_id) -> None:
         await self.database.update_one(DB_REDDIT_CACHE, {"$set": {guild_id: "1,False,,0"}})
-        self.bot.subbredit_cache[guild_id] = {"search_level": 0, "nsfw": False, "links": "", "which_subreddit": 0}
+        self.bot.subbredit_cache[guild_id] = {"search_level": 0, "nsfw": False, "urls": "", "which_subreddit": 0}
 
     @staticmethod
     async def reddit_unresponsive_msg(ctx) -> None:

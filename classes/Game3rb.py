@@ -5,7 +5,7 @@ import logging
 
 from datetime import datetime
 from bs4 import BeautifulSoup
-from constants import GAME3RB_MUST_BE_ONLINE, GAME3RB_STRIP, DB_CACHE, DB_LISTS
+from constants import GAME3RB_STRIP, DB_CACHE, DB_LISTS
 
 
 class Game3rb:
@@ -21,7 +21,7 @@ class Game3rb:
         game_list = await self.database.find_one(DB_LISTS)
         game_list = "\n".join(game_list["games"])
 
-        source = await self.session.get("https://www.game3rb.com/")
+        source = await self.session.get("https://game3rb.com/category/games-online/")
         game_info = []
         to_upload = []
 
@@ -29,7 +29,7 @@ class Game3rb:
             logging.info("Game3rb: Bad gateway")
             return
 
-        soup = BeautifulSoup(source.content, "html.parser")
+        soup = BeautifulSoup(source.text, "html.parser")
         article = soup.find("article")
 
         if not article:
@@ -46,7 +46,6 @@ class Game3rb:
 
             game_title = line.get("title")
             full_title = game_title
-            has_online = "online" in game_title.lower()
 
             for part in GAME3RB_STRIP:
                 game_title = game_title.replace(part, "")
@@ -76,26 +75,20 @@ class Game3rb:
             game_title = " ".join(game_title)
             carts = []
 
-            for cart in article.find_all(id="cart"):
-                if cart:
-                    carts.append(cart.text)
-                else:
-                    break
-
-            if game_title.lower() in game_list.lower():
-                if any(game in game_title.lower() for game in GAME3RB_MUST_BE_ONLINE):
-                    if has_online is False:
-                        article = article.find_next("article")
-                        continue
-            else:
+            if game_title.lower() not in game_list.lower():
                 article = article.find_next("article")
                 continue
+
+            for cart in article.find_all(id="cart"):
+                if not cart:
+                    break
+                carts.append(cart.text)
 
             game_info.append({
                 "title": game_title,
                 "full_title": full_title,
                 "version": version,
-                "link": line.get("href"),
+                "url": line.get("href"),
                 "image": article.find("img", {"class": "entry-image"})["src"],
                 "timestamp": article.find("time")["datetime"],
                 "carts": carts
@@ -111,41 +104,41 @@ class Game3rb:
                 continue
 
             description = []
-            source = await self.session.get(game["link"])
-            soup = BeautifulSoup(source.content, "html.parser")
+            source = await self.session.get(game["url"])
+            soup = BeautifulSoup(source.text, "html.parser")
 
-            torrent_link = soup.find("a", {"class": "torrent"})
-            if torrent_link:
-                description.append(f"[Torrent link]({torrent_link["href"]})")
-            direct_link = soup.find("a", {"class": "direct"})
-            if direct_link:
-                description.append(f"[Direct link]({direct_link["href"]})")
+            torrent_url = soup.find("a", {"class": "torrent"})
+            if torrent_url:
+                description.append(f"[Torrent url]({torrent_url["href"]})")
+            direct_url = soup.find("a", {"class": "direct"})
+            if direct_url:
+                description.append(f"[Direct url]({direct_url["href"]})")
 
             if "Fix already included" in str(soup) or "Crack online already added" in str(soup):
                 description.append("_Fix already included_")
             else:
                 crack_url = soup.find("a", {"class": "online"})
                 if crack_url:
-                    description.append(f"[Crack link]({crack_url["href"]})")
+                    description.append(f"[Crack url]({crack_url["href"]})")
                 else:
                     crack_url = soup.find("a", {"class": "crack"})
                     if crack_url:
-                        description.append(f"[Crack link]({crack_url["href"]})")
+                        description.append(f"[Crack url]({crack_url["href"]})")
 
-            game_update_link, game_update_name = [], []
+            game_update_url, game_update_name = [], []
             update_pattern = r'>Update (.*?)</strong>.*?<a\s+id="download-link"\s+class="update"\s+href="(.*?)"'
             for match in re.finditer(update_pattern, source.text, re.DOTALL):
                 update_name = re.sub(r"<.*?>", "", match.group(1)).strip()
                 game_update_name.append(unidecode.unidecode(update_name))
-                game_update_link.append(unidecode.unidecode(match.group(2).strip()))
+                game_update_url.append(unidecode.unidecode(match.group(2).strip()))
 
-            embed = discord.Embed(title=game["title"] + game["version"], url=game["link"])
+            embed = discord.Embed(title=game["title"] + game["version"], url=game["url"])
             embed.timestamp = datetime.fromisoformat(game["timestamp"])
             embed.add_field(name="Download links:", value="\n".join(description))
             if game_update_name:
                 game_update = "\n".join(
-                    f"{i + 1}. [{game_update_name[i]}]({game_update_link[i]})"
-                    for i in range(len(game_update_link))
+                    f"{i + 1}. [{game_update_name[i]}]({game_update_url[i]})"
+                    for i in range(len(game_update_url))
                 )
                 embed.add_field(name="Update links:", value=game_update, inline=False)
             embed.set_footer(text=", ".join(game["carts"]),

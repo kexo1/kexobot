@@ -60,7 +60,7 @@ class Play(commands.Cog):
 
     @slash_command(name='play', description='Plays song.')
     @commands.cooldown(1, 4, commands.BucketType.user)
-    @option('search', description='Links and words for youtube, playlists soundcloud urls,  work too are supported.')
+    @option('search', description='URLs and youtube video titles, playlists soundcloud urls,  work too are supported.')
     async def play(self, ctx, search: str) -> None:
 
         if not await self.is_playable(ctx):
