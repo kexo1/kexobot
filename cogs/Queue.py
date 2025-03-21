@@ -6,45 +6,30 @@ from discord import option
 from discord.ext import commands
 from discord.commands import slash_command
 
+from decorators import is_playing, is_joined
+
 
 class Queue(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
     @slash_command(name="queue", description="Shows songs in queue.")
+    @is_joined()
     async def queue(self, ctx: discord.ApplicationContext) -> None:
-
-        is_joined = await self.is_joined(ctx)
-        if not is_joined:
-            return
-
-        vc: wavelink.Player = ctx.voice_client
-
         if not vc.queue.is_empty:
-            await ctx.respond(embed=await self.get_queue_embed(ctx, vc))
-        else:
-            embed = discord.Embed(title="", description="**Queue is empty**", color=discord.Color.blue())
-            await ctx.respond(embed=embed)
+            return await ctx.respond(embed=await self._get_queue_embed(ctx, vc))
+        embed = discord.Embed(title="", description="**Queue is empty**", color=discord.Color.blue())
+        await ctx.respond(embed=embed)
 
     @slash_command(name="playing", description="What song is currently playing.")
+    @is_playing()
     async def playing_command(self, ctx: discord.ApplicationContext) -> None:
-
-        is_playing = await self.is_playing(ctx)
-        if not is_playing:
-            return
-
-        await ctx.respond(embed=await self.get_playing_embed(ctx))
+        await ctx.respond(embed=await self._get_playing_embed(ctx))
 
     @slash_command(name="remove", description="Clears position in queue.")
     @option("pos", description="Value 1 Removes the first one.", min_value=1, required=False)
+    @is_joined()
     async def remove(self, ctx: discord.ApplicationContext, pos: int):
-
-        is_joined = await self.is_joined(ctx)
-        if not is_joined:
-            return
-        
-        vc: wavelink.Player = ctx.voice_client
-
         if pos is None:
             vc.queue.pop()
         else:
@@ -63,13 +48,12 @@ class Queue(commands.Cog):
                 await ctx.respond(embed=embed, ephemeral=True)
 
     @slash_command(name="shuffle", description="Shuffles you queue, queue must contain more than 2 songs.")
+    @is_joined()
     async def shuffle(self, ctx: discord.ApplicationContext):
 
-        is_joined = await self.is_joined(ctx)
-        if not is_joined:
+        vc = await is_joined(ctx)
+        if not vc:
             return
-        
-        vc: wavelink.Player = ctx.voice_client
 
         if not vc.queue.is_empty:
             if len(vc.queue) < 2:
@@ -86,12 +70,8 @@ class Queue(commands.Cog):
             await ctx.respond(embed=embed, ephemeral=True)
 
     @slash_command(name="loop-queue", description="Loops queue, run command again to disable queue loop")
+    @is_joined()
     async def loop_queue(self, ctx: discord.ApplicationContext) -> None:
-
-        is_playing = await self.is_playing(ctx)
-        if not is_playing:
-            return
-        
         vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.is_empty:
@@ -99,7 +79,6 @@ class Queue(commands.Cog):
             return await ctx.respond(embed=embed)
 
         if vc.queue.mode == wavelink.QueueMode.loop_all:
-
             vc.queue.mode = wavelink.QueueMode.loop_all
             embed = discord.Embed(title="",
                                   description="**No longer looping queue.**",
@@ -113,12 +92,8 @@ class Queue(commands.Cog):
             return await ctx.respond(embed=embed)
 
     @slash_command(name="loop", description="Loops currently playing song, run command again to disable loop.")
+    @is_playing()
     async def loop(self, ctx: discord.ApplicationContext) -> None:
-
-        is_playing = await self.is_playing(ctx)
-        if not is_playing:
-            return
-        
         vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.mode == wavelink.QueueMode.loop:
@@ -136,20 +111,15 @@ class Queue(commands.Cog):
             await ctx.respond(embed=embed)
 
     @slash_command(name="clear-queue", description="Clears queue")
-    async def clear_(self, ctx: discord.ApplicationContext):
-
-        is_joined = await self.is_joined(ctx)
-        if not is_joined:
-            return
-        
-        vc: wavelink.Player = ctx.voice_client
+    @is_joined()
+    async def clear_queue(self, ctx: discord.ApplicationContext):
         vc.queue.clear()
 
         embed = discord.Embed(title="", description="🗑️ **Cleared**", color=discord.Color.blue())
         await ctx.respond(embed=embed)
 
     @staticmethod
-    async def get_queue_embed(ctx: discord.ApplicationContext, vc: wavelink.Player) -> discord.Embed:
+    async def _get_queue_embed(ctx: discord.ApplicationContext, vc: wavelink.Player) -> discord.Embed:
 
         if vc.queue.mode == wavelink.QueueMode.loop_all:
             status = "Looping queue"
@@ -177,12 +147,12 @@ class Queue(commands.Cog):
         return embed
 
     @staticmethod
-    async def get_playing_embed(ctx: discord.ApplicationContext) -> discord.Embed:
+    async def _get_playing_embed(ctx: discord.ApplicationContext) -> discord.Embed:
 
         vc: wavelink.Player = ctx.voice_client
 
         embed = discord.Embed(
-            title="Now playing",
+            title='Now playing',
             colour=discord.Colour.blue(),
             timestamp=datetime.utcnow(),
         )
@@ -209,43 +179,6 @@ class Queue(commands.Cog):
         )
 
         return embed
-
-    @staticmethod
-    async def check_join(ctx: discord.ApplicationContext) -> bool:
-        embed = discord.Embed(title="",
-                              description=ctx.mention + ", you're not joined into vc. Type `/p` from vc.",
-                              color=discord.Color.blue())
-        return embed
-
-    async def is_joined(self, ctx: discord.ApplicationContext) -> bool:
-        if not ctx.author.voice:
-            await ctx.respond(embed=self.check_join(ctx.author), ephemeral=True)
-            return False
-
-        vc: wavelink.Player = ctx.voice_client
-
-        if not vc or not vc.connected:
-            embed = discord.Embed(title="",
-                                  description=ctx.author.mention + ", I'm not joined to vc",
-                                  color=discord.Color.blue())
-            await ctx.respond(embed=embed, ephemeral=True)
-            return False
-        return True
-
-    async def is_playing(self, ctx: discord.ApplicationContext) -> bool:
-        if not ctx.author.voice:
-            await ctx.respond(embed=self.check_join(ctx.author), ephemeral=True)
-            return False
-
-        vc: wavelink.Player = ctx.voice_client
-
-        if not vc.playing or not vc.current or not vc:
-            embed = discord.Embed(title="",
-                                  description=ctx.author.mention + ", bot is not playing anything. Type `/p` from vc.",
-                                  color=discord.Color.blue())
-            await ctx.respond(embed=embed, ephemeral=True)
-            return False
-        return True
 
 
 def setup(bot: commands.Bot) -> None:

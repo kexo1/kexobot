@@ -19,7 +19,7 @@ class Commands(commands.Cog):
         self.bot = bot
         self.run_time = time.time()
 
-    @slash_command(name='manual_recconnect_node', description='Manually input server info')
+    @slash_command(name='manual_reconnect_node', description='Manually input server info')
     @option('uri', description='Lavalink server URL (without http:// at start)', required=True)
     @option('port', description='Lavalink server port.', required=True)
     @option('password', description='Lavalink server password.', required=True)
@@ -51,7 +51,7 @@ class Commands(commands.Cog):
                                   color=discord.Color.from_rgb(r=255, g=0, b=0))
             await message.edit(embed=embed)
 
-    @slash_command(name='recconnect_node', description='Automatically reconnect to avaiable node')
+    @slash_command(name='reconnect_node', description='Automatically reconnect to avaiable node')
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def recconect_node(self, ctx: discord.ApplicationContext) -> None:
         await ctx.trigger_typing()

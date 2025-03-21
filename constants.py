@@ -8,7 +8,8 @@ GAME_UPDATES_CHANNEL = 882185054174994462
 FREE_STUFF_CHANNEL = 1081883673902714953
 
 # Lavalink
-LAVALINK_API_URLS = ["https://lavainfo.netlify.app/api/non-ssl", "https://lavainfo.netlify.app/api/ssl"]
+LAVAINFO_API_URLS = ["https://lavainfo.netlify.app/api/non-ssl", "https://lavainfo.netlify.app/api/ssl"]
+LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
 
 # MongoDB
 MONGO_DB_URL = (f"mongodb+srv://{os.getenv("MONGO_KEY")}@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
@@ -65,10 +66,10 @@ ELEKTRINA_MAX_ARTICLES = 5
 
 # FunStuff
 ROAST_COMMANDS_MSG = """Wassup, can a loc come up in your crib?
-Man fuck you, I"ll see you at work
-Ah, nigga don"t hate me cause I"m beautiful nigga
+Man fuck you, I'll see you at work
+Ah, nigga don't hate me cause I"m beautiful nigga
 Maybe if you got rid of that yee yee ass hair cut you get some bitches on your dick.
-Oh, better yet, Maybe Tanisha"ll call your dog-ass if she ever stop fucking with that brain 
+Oh, better yet, Maybe Tanisha'll call your dog-ass if she ever stop fucking with that brain 
 surgeon or lawyer she fucking with,
 Niggaaa...
 What?!

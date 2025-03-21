@@ -30,11 +30,11 @@ class RedditCrackWatch:
                 if submission.url.endswith((".jpg", ".jpeg", ".png")):
                     img_url = submission.url
 
+                submission_text = submission.selftext
                 if not submission_text:
                     continue
                     
                 description = []
-                submission_text = submission.selftext
                 
                 for part in REDDIT_STRIP:
                     submission_text = submission_text.replace(part, "")
@@ -47,7 +47,7 @@ class RedditCrackWatch:
                         continue
 
                     if ".png" in line or ".jpeg" in line or ".jpg" in line:
-                        img_url = self._get_image(line)
+                        img_url = await self._get_image(line)
                         continue
                     description.append(f"• {line}\n")
 
@@ -79,10 +79,11 @@ class RedditCrackWatch:
 
     @staticmethod
     async def _get_image(line: str) -> str:
+        print(line)
         image_url = re.findall(r"\((.*?)\)", line)
         if not image_url:
             return None
-        print(image_url)
+
         if len(image_url) > 1:
             image_url = image_url[1]
         else:

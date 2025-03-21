@@ -13,13 +13,14 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from constants import DISCORD_TOKEN, MONGO_DB_URL, REDDIT_PASSWORD, REDDIT_SECRET, REDDIT_USER_AGENT, REDDIT_USERNAME, \
     REDDIT_CLIENT_ID, HUMOR_SECRET, CLEAR_CACHE_HOUR, DB_REDDIT_CACHE, ESUTAZE_CHANNEL, GAME_UPDATES_CHANNEL, \
-    FREE_STUFF_CHANNEL, LAVALINK_API_URLS
+    FREE_STUFF_CHANNEL
 from utils import return_dict
 
 from classes.Esutaze import Esutaze
 from classes.OnlineFix import OnlineFix
 from classes.Game3rb import Game3rb
 from classes.AlienwareArena import AlienwareArena
+from classes.LavalinkFetch import LavalinkFetch
 from classes.ElektrinaVypadky import ElektrinaVypadky
 from classes.RedditCrackwatch import RedditCrackWatch
 from classes.RedditFreegamefindings import RedditFreeGameFindings
@@ -30,10 +31,8 @@ dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
 bot = discord.Bot()
 
 
-# TODO: In listener check if Player exists
-# TODO: Automatically disconnect from voice channel after 30 minutes of inactivity
 # TODO: Rewrite Game3rb
-# TODO: Refresh Music Cogs
+# TODO: Rewrite Queue cog, fix queue length
 # TODO: Use enums instead of strings in DatabaseManager
 
 class KexoBOT:
@@ -92,6 +91,7 @@ class KexoBOT:
                                                   self.game_updates_channel, self.user_kexo)
         self.elektrina_vypadky = ElektrinaVypadky(self.session, self.database, self.user_kexo)
         self.esutaze = Esutaze(self.session, self.database, self.esutaze_channel)
+        self.lavalink_fetch = LavalinkFetch(bot, self.session)
         print("Classes defined.")
 
     async def create_session(self) -> None:
@@ -101,7 +101,11 @@ class KexoBOT:
         print("Httpx session initialized.")
 
     async def connect_node(self) -> None:
-        lavalink_servers = await self.get_lavalink_server()
+        lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
+        if not lavalink_servers:
+            print("No lavalink servers found.")
+            return
+
         self.which_lavalink_server += 1
         if self.which_lavalink_server >= len(lavalink_servers):
             self.which_lavalink_server = 0
@@ -111,7 +115,7 @@ class KexoBOT:
         print(f"Server {ip} fetched.")
 
         node = [
-            wavelink.Node(uri=ip, password=password, retries=1, resume_timeout=0)]
+            wavelink.Node(uri=ip, password=password, retries=1, resume_timeout=0, inactive_player_timeout=600)]
 
         bot.node = node
         await wavelink.Pool.connect(nodes=node, client=bot)
@@ -144,37 +148,6 @@ class KexoBOT:
 
         await self.database.update_many(DB_REDDIT_CACHE, {"$set": update})
         bot.subbredit_cache = return_dict(update)
-
-    async def get_lavalink_server(self) -> None:
-        lavalink_servers = []
-
-        for url in LAVALINK_API_URLS:
-            json_data = await self.session.get(url)
-            json_data = json_data.json()
-
-            for server in json_data:
-                if server.get("isConnected") is False:
-                    continue
-
-                if server.get("restVersion") != "v4":
-                    continue
-
-                connections = server.get("connections").split("/")
-                # If noone is connected, skip
-                if int(connections[0]) == 0:
-                    continue
-                # If full, skip
-                if int(connections[0]) == int(connections[1]):
-                    continue
-
-                if not server.get("info")["plugins"]:
-                    continue
-
-                for plugin in server.get("info")["plugins"]:
-                    if plugin.get("name") == "youtube-plugin" or plugin.get("name") == "lavasrc-plugin":
-                        lavalink_servers.append({"ip": f"http://{server["host"]}:{server["port"]}",
-                                                 "password": server["password"]})
-        return lavalink_servers
 
     async def main_loop(self) -> None:
         if self.main_loop_counter == 0:
