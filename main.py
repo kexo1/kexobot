@@ -5,6 +5,7 @@ import dns.resolver
 import random
 import wavelink
 import asyncio
+import signal
 
 from fake_useragent import UserAgent
 from discord.ext import tasks, commands
@@ -31,8 +32,7 @@ dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
 bot = discord.Bot()
 
 
-# TODO: Rewrite Game3rb
-# TODO: Rewrite Queue cog, fix queue length
+# TODO: Make Game3rb more readable
 
 class KexoBOT:
     def __init__(self):
@@ -268,6 +268,5 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         return await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
     raise error
-
 
 bot.run(DISCORD_TOKEN)

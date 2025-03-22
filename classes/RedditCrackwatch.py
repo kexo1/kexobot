@@ -33,12 +33,12 @@ class RedditCrackWatch:
                 submission_text = submission.selftext
                 if not submission_text:
                     continue
-                    
+
                 description = []
-                
+
                 for part in REDDIT_STRIP:
                     submission_text = submission_text.replace(part, "")
-                    
+
                 submission_text = submission_text.split("\n")
                 for line in submission_text:
                     line = line.strip()
@@ -55,9 +55,11 @@ class RedditCrackWatch:
                 crackwatch_cache_upload[0] = submission.permalink
 
                 description = "".join(description)[:4096]
-                embed = discord.Embed(title=submission.title[:256],
-                                      url=f"https://www.reddit.com{submission.permalink}",
-                                      description=description)
+                embed = discord.Embed(
+                    title=submission.title[:256],
+                    url=f"https://www.reddit.com{submission.permalink}",
+                    description=description
+                )
 
                 embed.color = discord.Color.orange()
                 if "denuvo removed" in submission.title.lower() or "denuvo removed" in description.lower():
@@ -66,9 +68,10 @@ class RedditCrackWatch:
                 if img_url:
                     embed.set_image(url=img_url)
 
-                embed.set_footer(text="I took it from - r/CrackWatch",
-                                 icon_url="https://b.thumbs.redditmedia.com"
-                                          "/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png")
+                embed.set_footer(
+                    text="I took it from - r/CrackWatch",
+                    icon_url="https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
+                )
                 embed.timestamp = datetime.fromtimestamp(submission.created_utc)
                 await self.channel.send(embed=embed)
 

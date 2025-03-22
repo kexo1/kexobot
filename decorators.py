@@ -1,4 +1,3 @@
-# python
 import discord
 from discord.ext import commands
 from functools import wraps
@@ -9,7 +8,7 @@ def is_joined():
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # In a Cog, args[0] is self and args[1] is ctx.
+            # args[0] is self and args[1] is ctx.
             ctx = args[1]
             if not ctx.author.voice or not ctx.author.voice.channel:
                 embed = discord.Embed(
@@ -51,7 +50,6 @@ def is_playing():
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # In a Cog, args[0] is self and args[1] is ctx.
             ctx = args[1]
             vc = ctx.voice_client
             if not vc or not vc.playing or not vc.current:
