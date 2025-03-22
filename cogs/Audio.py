@@ -19,16 +19,18 @@ class Audio(commands.Cog):
         required=False,
         description="Max is 100.",
         min_value=1,
-        max_value=200
+        max_value=200,
     )
     @is_joined()
-    async def change_volume(self, ctx: discord.ApplicationContext, vol: Optional[int] = None) -> None:
+    async def change_volume(
+        self, ctx: discord.ApplicationContext, vol: Optional[int] = None
+    ) -> None:
         vc = ctx.voice_client
         if vol is None:
             embed = discord.Embed(
                 title="",
                 description=f"🔊 **{int(vc.volume)}%**",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             return await ctx.respond(embed=embed)
 
@@ -36,7 +38,7 @@ class Audio(commands.Cog):
         embed = discord.Embed(
             title="",
             description=f"**🔊 Volume set to `{vol}%`**",
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
 
@@ -47,10 +49,12 @@ class Audio(commands.Cog):
         required=False,
         description="It might take 3-5 seconds to start speeding up, no value sets it to normal speed",
         min_value=1,
-        max_value=8
+        max_value=8,
     )
     @is_joined()
-    async def speed(self, ctx: discord.ApplicationContext, multiplier: Optional[int] = 2) -> None:
+    async def speed(
+        self, ctx: discord.ApplicationContext, multiplier: Optional[int] = 2
+    ) -> None:
         vc = ctx.voice_client
         filters: wavelink.Filters = vc.filters
         filters.timescale.set(speed=multiplier)
@@ -59,7 +63,7 @@ class Audio(commands.Cog):
         embed = discord.Embed(
             title="",
             description=f"**⏩ Sped up by `{multiplier}x`**",
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
 
@@ -73,7 +77,7 @@ class Audio(commands.Cog):
         embed = discord.Embed(
             title="",
             description="**✅ Effects were cleared.**",
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         embed.set_footer(text="takes 3 seconds to apply")
         await ctx.respond(embed=embed)

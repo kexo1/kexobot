@@ -2,7 +2,11 @@ import re
 import discord
 
 from datetime import datetime
-from asyncprawcore.exceptions import AsyncPrawcoreException, ResponseException, RequestException
+from asyncprawcore.exceptions import (
+    AsyncPrawcoreException,
+    ResponseException,
+    RequestException,
+)
 from constants import REDDIT_CRACKWATCH_POSTS, REDDIT_STRIP, DB_CACHE, DB_LISTS
 
 
@@ -22,7 +26,9 @@ class RedditCrackWatch:
                 if submission.permalink in crackwatch_cache:
                     continue
 
-                is_filtered = [k for k in to_filter if k.lower() in submission.title.lower()]
+                is_filtered = [
+                    k for k in to_filter if k.lower() in submission.title.lower()
+                ]
                 if is_filtered:
                     continue
 
@@ -51,18 +57,23 @@ class RedditCrackWatch:
                         continue
                     description.append(f"• {line}\n")
 
-                crackwatch_cache_upload = [crackwatch_cache_upload[-1]] + crackwatch_cache_upload[:-1]
+                crackwatch_cache_upload = [
+                    crackwatch_cache_upload[-1]
+                ] + crackwatch_cache_upload[:-1]
                 crackwatch_cache_upload[0] = submission.permalink
 
                 description = "".join(description)[:4096]
                 embed = discord.Embed(
                     title=submission.title[:256],
                     url=f"https://www.reddit.com{submission.permalink}",
-                    description=description
+                    description=description,
                 )
 
                 embed.color = discord.Color.orange()
-                if "denuvo removed" in submission.title.lower() or "denuvo removed" in description.lower():
+                if (
+                    "denuvo removed" in submission.title.lower()
+                    or "denuvo removed" in description.lower()
+                ):
                     embed.color = discord.Color.gold()
 
                 if img_url:
@@ -70,13 +81,15 @@ class RedditCrackWatch:
 
                 embed.set_footer(
                     text="I took it from - r/CrackWatch",
-                    icon_url="https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
+                    icon_url="https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png",
                 )
                 embed.timestamp = datetime.fromtimestamp(submission.created_utc)
                 await self.channel.send(embed=embed)
 
             if crackwatch_cache != crackwatch_cache_upload:
-                await self.database.update_one(DB_CACHE, {"$set": {"crackwatch_cache": crackwatch_cache_upload}})
+                await self.database.update_one(
+                    DB_CACHE, {"$set": {"crackwatch_cache": crackwatch_cache_upload}}
+                )
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:
             print(f"Error when accessing crackwatch:\n{e}")
 

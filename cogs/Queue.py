@@ -16,7 +16,9 @@ class QueuePaginator(discord.ui.View):
         self.current_page = 0
 
     async def update_message(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
+        await interaction.response.edit_message(
+            embed=self.embeds[self.current_page], view=self
+        )
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple)
     async def previous(self, interaction: discord.Interaction):
@@ -45,7 +47,9 @@ class Queue(commands.Cog):
         vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.is_empty:
-            embed = discord.Embed(title="", description="**Queue is empty**", color=discord.Color.blue())
+            embed = discord.Embed(
+                title="", description="**Queue is empty**", color=discord.Color.blue()
+            )
             return await ctx.respond(embed=embed)
 
         pages = await self._get_queue_embeds(ctx, vc)
@@ -62,7 +66,13 @@ class Queue(commands.Cog):
         await ctx.respond(embed=await self._get_playing_embed(ctx))
 
     @slash_command(name="remove", description="Clears position in queue.")
-    @option("pos", description="Value 1 Removes the first one.", min_value=1, required=False, type=int)
+    @option(
+        "pos",
+        description="Value 1 Removes the first one.",
+        min_value=1,
+        required=False,
+        type=int,
+    )
     @is_joined()
     async def remove(self, ctx: discord.ApplicationContext, pos: Optional[int] = None):
         vc: wavelink.Player = ctx.voice_client
@@ -71,7 +81,7 @@ class Queue(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"**Removed [{vc.queue[0].title}]({vc.queue[0].uri})**",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed)
             vc.queue.pop()
@@ -83,45 +93,57 @@ class Queue(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"**Removed [{track.title}]({track.uri})**",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed)
         except IndexError:
             embed = discord.Embed(
                 title="",
                 description=f"**:x: Song was not found on `{pos}`, to show what's in queue, type /q.**",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed, ephemeral=True)
 
-    @slash_command(name="shuffle", description="Shuffles you queue, queue must contain more than 2 songs.")
+    @slash_command(
+        name="shuffle",
+        description="Shuffles you queue, queue must contain more than 2 songs.",
+    )
     @is_joined()
     async def shuffle(self, ctx: discord.ApplicationContext):
         vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.is_empty:
-            embed = discord.Embed(title="", description="**Queue is empty.**", color=discord.Color.blue())
+            embed = discord.Embed(
+                title="", description="**Queue is empty.**", color=discord.Color.blue()
+            )
             await ctx.respond(embed=embed, ephemeral=True)
 
         if len(vc.queue) < 2:
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention}, can't shuffle 1 song in queue.",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             return await ctx.respond(embed=embed, ephemeral=True)
 
         vc.queue.shuffle()
-        embed = discord.Embed(title="", description="**🔀 Queue shuffled!**", color=discord.Color.blue())
+        embed = discord.Embed(
+            title="", description="**🔀 Queue shuffled!**", color=discord.Color.blue()
+        )
         await ctx.respond(embed=embed)
 
-    @slash_command(name="loop-queue", description="Loops queue, run command again to disable queue loop")
+    @slash_command(
+        name="loop-queue",
+        description="Loops queue, run command again to disable queue loop",
+    )
     @is_joined()
     async def loop_queue(self, ctx: discord.ApplicationContext) -> None:
         vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.is_empty:
-            embed = discord.Embed(title="", description="**Queue is empty**", color=discord.Color.blue())
+            embed = discord.Embed(
+                title="", description="**Queue is empty**", color=discord.Color.blue()
+            )
             return await ctx.respond(embed=embed)
 
         if vc.queue.mode == wavelink.QueueMode.loop_all:
@@ -129,7 +151,7 @@ class Queue(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description="**No longer looping queue.**",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             return await ctx.respond(embed=embed)
         else:
@@ -137,11 +159,14 @@ class Queue(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"🔁 **Looping current queue ({vc.queue.count} songs)**",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             return await ctx.respond(embed=embed)
 
-    @slash_command(name="loop", description="Loops currently playing song, run command again to disable loop.")
+    @slash_command(
+        name="loop",
+        description="Loops currently playing song, run command again to disable loop.",
+    )
     @is_playing()
     async def loop(self, ctx: discord.ApplicationContext) -> None:
         vc: wavelink.Player = ctx.voice_client
@@ -151,7 +176,7 @@ class Queue(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description="**No longer looping current song.**",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             return await ctx.respond(embed=embed)
 
@@ -159,7 +184,7 @@ class Queue(commands.Cog):
         embed = discord.Embed(
             title="",
             description=f"🔁 **Looping [{vc.current.title}]({vc.current.uri}).**",
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
 
@@ -169,10 +194,14 @@ class Queue(commands.Cog):
         vc: wavelink.Player = ctx.voice_client
         vc.queue.clear()
 
-        embed = discord.Embed(title="", description="🗑️ **Cleared**", color=discord.Color.blue())
+        embed = discord.Embed(
+            title="", description="🗑️ **Cleared**", color=discord.Color.blue()
+        )
         await ctx.respond(embed=embed)
 
-    async def _get_queue_embeds(self, ctx: discord.ApplicationContext, vc: wavelink.Player) -> list:
+    async def _get_queue_embeds(
+        self, ctx: discord.ApplicationContext, vc: wavelink.Player
+    ) -> list:
         queue_status, footer = await self._get_queue_status(vc.queue.mode)
 
         header = (
@@ -196,7 +225,7 @@ class Queue(commands.Cog):
                 embed = discord.Embed(
                     title=f"Queue for {ctx.guild.name}",
                     description=current_description,
-                    color=discord.Color.blue()
+                    color=discord.Color.blue(),
                 )
                 embed.set_footer(text=f"\n{footer}{vc.queue.count} songs in queue")
                 pages.append(embed)
@@ -207,7 +236,7 @@ class Queue(commands.Cog):
         embed = discord.Embed(
             title=f"Queue for {ctx.guild.name}",
             description=current_description,
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         embed.set_footer(text=f"\n{footer}{vc.queue.count} songs in queue")
         pages.append(embed)
@@ -227,7 +256,7 @@ class Queue(commands.Cog):
         vc: wavelink.Player = ctx.voice_client
 
         embed = discord.Embed(
-            title='Now playing',
+            title="Now playing",
             colour=discord.Colour.blue(),
             timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
@@ -236,7 +265,11 @@ class Queue(commands.Cog):
             text=f"Requested by {vc.current.requester.name}",
             icon_url=ctx.author.display_avatar.url,
         )
-        embed.add_field(name="Track title", value=f"**[{vc.current.title}]({vc.current.uri})**", inline=False)
+        embed.add_field(
+            name="Track title",
+            value=f"**[{vc.current.title}]({vc.current.uri})**",
+            inline=False,
+        )
         embed.add_field(
             name="Artist",
             value=f"_{vc.current.author if vc.current.author else 'None'}_",

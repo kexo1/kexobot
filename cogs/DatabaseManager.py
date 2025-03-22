@@ -36,55 +36,112 @@ class DatabaseManager(commands.Cog):
             await self.database.update_one(DB_LISTS, {"$set": {"games": updated_db}})
 
         elif collection == self.DataTypes.FREEGAMEFINDINGS_EXCEPTIONS:
-            await self.database.update_one(DB_LISTS, {"$set": {"freegamefindings_exceptions": updated_db}})
+            await self.database.update_one(
+                DB_LISTS, {"$set": {"freegamefindings_exceptions": updated_db}}
+            )
 
         elif collection == self.DataTypes.CRACKWATCH_EXCEPTIONS:
-            await self.database.update_one(DB_LISTS, {"$set": {"crackwatch_exceptions": updated_db}})
+            await self.database.update_one(
+                DB_LISTS, {"$set": {"crackwatch_exceptions": updated_db}}
+            )
 
         elif collection == self.DataTypes.ESUTAZE_EXCEPTIONS:
-            await self.database.update_one(DB_LISTS, {"$set": {"esutaze_exceptions": updated_db}})
+            await self.database.update_one(
+                DB_LISTS, {"$set": {"esutaze_exceptions": updated_db}}
+            )
 
-    @slash_command(name="add_to", description="Adds string to selected list.", guild_ids=[KEXO_SERVER])
+    @slash_command(
+        name="add_to",
+        description="Adds string to selected list.",
+        guild_ids=[KEXO_SERVER],
+    )
     @discord.ext.commands.is_owner()
-    @option("collection", description="Choose database",
-            choices=["Games", "r/FreeGameFindings Exceptions", "r/CrackWatch Exceptions", "Esutaze Exceptions"])
+    @option(
+        "collection",
+        description="Choose database",
+        choices=[
+            "Games",
+            "r/FreeGameFindings Exceptions",
+            "r/CrackWatch Exceptions",
+            "Esutaze Exceptions",
+        ],
+    )
     async def add_to(self, ctx, collection: str, to_upload: str) -> None:
         db_list = await self._get_database(collection)
 
         if to_upload in db_list:
-            return await ctx.respond(f"{ctx.author.mention} string `{to_upload}` "
-                                     f"is already in the database, use `/show_data`")
+            return await ctx.respond(
+                f"{ctx.author.mention} string `{to_upload}` "
+                f"is already in the database, use `/show_data`"
+            )
 
         db_list.append(to_upload)
         await self._update_database(collection, db_list)
-        await ctx.respond(f"String `" + to_upload + f"` was added to `{collection}` :white_check_mark:")
+        await ctx.respond(
+            f"String `"
+            + to_upload
+            + f"` was added to `{collection}` :white_check_mark:"
+        )
 
-    @slash_command(name="remove_from", description="Removes string from selected list.",
-                   guild_ids=[KEXO_SERVER])
+    @slash_command(
+        name="remove_from",
+        description="Removes string from selected list.",
+        guild_ids=[KEXO_SERVER],
+    )
     @discord.ext.commands.is_owner()
-    @option("collection", description="Choose database",
-            choices=["Games", "r/FreeGameFindings Exceptions", "r/CrackWatch Exceptions", "Esutaze Exceptions"])
+    @option(
+        "collection",
+        description="Choose database",
+        choices=[
+            "Games",
+            "r/FreeGameFindings Exceptions",
+            "r/CrackWatch Exceptions",
+            "Esutaze Exceptions",
+        ],
+    )
     async def remove(self, ctx, collection: str, to_remove: str) -> None:
         db_list = await self._get_database(collection)
 
         if to_remove not in db_list:
             return await ctx.respond(
-                str(ctx.author.mention) + ", string `" + to_remove + "` is not in the database, use `/show_data`")
+                str(ctx.author.mention)
+                + ", string `"
+                + to_remove
+                + "` is not in the database, use `/show_data`"
+            )
         db_list.pop(db_list.index(to_remove))
 
         await self._update_database(collection, db_list)
-        await ctx.respond(f"String `" + to_remove + "` was removed from `{collection}` :white_check_mark:")
+        await ctx.respond(
+            f"String `"
+            + to_remove
+            + "` was removed from `{collection}` :white_check_mark:"
+        )
 
-    @slash_command(name="show_data", description="Shows data from selected lists.", guild_ids=[KEXO_SERVER])
+    @slash_command(
+        name="show_data",
+        description="Shows data from selected lists.",
+        guild_ids=[KEXO_SERVER],
+    )
     @discord.ext.commands.is_owner()
-    @option("collection", description="Choose database",
-            choices=["Games", "r/FreeGameFindings Exceptions", "r/CrackWatch Exceptions", "Esutaze Exceptions"])
+    @option(
+        "collection",
+        description="Choose database",
+        choices=[
+            "Games",
+            "r/FreeGameFindings Exceptions",
+            "r/CrackWatch Exceptions",
+            "Esutaze Exceptions",
+        ],
+    )
     async def show_data(self, ctx, collection: str) -> None:
         listing = await self._get_database(collection)
 
         embed = discord.Embed(title=collection, color=discord.Color.blue())
-        embed.add_field(name=f"_{len(listing)} items_",
-                        value="\n".join(f"{i + 1}. {listing[i]}" for i in range(len(listing))))
+        embed.add_field(
+            name=f"_{len(listing)} items_",
+            value="\n".join(f"{i + 1}. {listing[i]}" for i in range(len(listing))),
+        )
         await ctx.respond(embed=embed)
 
 

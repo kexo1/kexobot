@@ -14,7 +14,7 @@ def is_joined():
                 embed = discord.Embed(
                     title="",
                     description=f"{ctx.author.mention}, you're not in a voice channel. Type `/p` to join.",
-                    color=discord.Color.blue()
+                    color=discord.Color.blue(),
                 )
                 return await ctx.respond(embed=embed, ephemeral=True)
 
@@ -24,7 +24,7 @@ def is_joined():
                 embed = discord.Embed(
                     title="",
                     description=f"{ctx.author.mention}, I'm not joined in a voice channel.",
-                    color=discord.Color.blue()
+                    color=discord.Color.blue(),
                 )
                 return await ctx.respond(embed=embed, ephemeral=True)
 
@@ -35,7 +35,7 @@ def is_joined():
                     embed = discord.Embed(
                         title="",
                         description=f":x: I don't have permissions to join your channel.",
-                        color=discord.Color.from_rgb(r=255, g=0, b=0)
+                        color=discord.Color.from_rgb(r=255, g=0, b=0),
                     )
                     return await ctx.respond(embed=embed)
 
@@ -53,16 +53,22 @@ def is_playing():
             ctx = args[1]
             vc = ctx.voice_client
             if not vc or not vc.playing or not vc.current:
-                embed = discord.Embed(title="",
-                                      description=ctx.author.mention + ", bot is not playing anything. "
-                                                                       "Type `/p` from vc.",
-                                      color=discord.Color.blue())
+                embed = discord.Embed(
+                    title="",
+                    description=ctx.author.mention + ", bot is not playing anything. "
+                    "Type `/p` from vc.",
+                    color=discord.Color.blue(),
+                )
                 await ctx.respond(embed=embed, ephemeral=True)
                 return
 
             if ctx.voice_client.channel.id != ctx.author.voice.channel.id:
-                embed = discord.Embed(title="", description=str(
-                    ctx.author.mention) + ", bot is playing in a different voice channel.", color=discord.Color.blue())
+                embed = discord.Embed(
+                    title="",
+                    description=str(ctx.author.mention)
+                    + ", bot is playing in a different voice channel.",
+                    color=discord.Color.blue(),
+                )
                 await ctx.respond(embed=embed)
 
             return await func(*args, **kwargs)

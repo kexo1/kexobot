@@ -13,7 +13,9 @@ class AlienwareArena:
 
     async def run(self) -> None:
         alienwarearena_cache = await self._load_database()
-        json_data = await self.session.get("https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway")
+        json_data = await self.session.get(
+            "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
+        )
         await self._send_embed(json_data.json(), alienwarearena_cache)
 
     async def _send_embed(self, json_data: dict, alienwarearena_cache: list) -> None:
@@ -30,21 +32,25 @@ class AlienwareArena:
             for part in ALIENWAREARENA_STRIP:
                 title = title.replace(part, "")
 
-            alienwarearena_cache = [alienwarearena_cache[-1]] + alienwarearena_cache[:-1]
+            alienwarearena_cache = [alienwarearena_cache[-1]] + alienwarearena_cache[
+                :-1
+            ]
             alienwarearena_cache[0] = url
 
             soup = BeautifulSoup(giveaway["description"], "html.parser")
-            description = soup.find("strong").text + f"\n\n**[eu.alienwarearena.com]({url})**"
+            description = (
+                soup.find("strong").text + f"\n\n**[eu.alienwarearena.com]({url})**"
+            )
 
             embed = discord.Embed(
-                title=title,
-                description=description,
-                colour=discord.Colour.dark_theme()
+                title=title, description=description, colour=discord.Colour.dark_theme()
             )
             embed.set_image(url=giveaway["image"])
             await self.channel.send(embed=embed)
 
-        await self.database.update_one(DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}})
+        await self.database.update_one(
+            DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
+        )
 
     async def _load_database(self) -> list:
         alienwarearena_cache = await self.database.find_one(DB_CACHE)

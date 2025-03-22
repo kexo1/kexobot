@@ -1,9 +1,18 @@
 import discord
 
 from urllib.parse import urlparse
-from asyncprawcore.exceptions import AsyncPrawcoreException, ResponseException, RequestException
+from asyncprawcore.exceptions import (
+    AsyncPrawcoreException,
+    ResponseException,
+    RequestException,
+)
 
-from constants import REDDIT_FREEGAME_EMBEDS, REDDIT_FREEGAME_MAX_POSTS, DB_CACHE, DB_LISTS
+from constants import (
+    REDDIT_FREEGAME_EMBEDS,
+    REDDIT_FREEGAME_MAX_POSTS,
+    DB_CACHE,
+    DB_LISTS,
+)
 
 
 class RedditFreeGameFindings:
@@ -42,15 +51,19 @@ class RedditFreeGameFindings:
                 if is_filtered:
                     continue
 
-                freegamefindings_cache_upload = [freegamefindings_cache_upload[-1]] + freegamefindings_cache_upload[:-1]
+                freegamefindings_cache_upload = [
+                    freegamefindings_cache_upload[-1]
+                ] + freegamefindings_cache_upload[:-1]
                 freegamefindings_cache_upload[0] = submission.url
                 await self._process_submission(submission.url)
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:
             print(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
 
         if self.upload:
-            await self.database.update_one(DB_CACHE,
-                                           {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}})
+            await self.database.update_one(
+                DB_CACHE,
+                {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}},
+            )
 
     async def _process_submission(self, url: str) -> None:
         self.upload = True
@@ -83,14 +96,19 @@ class RedditFreeGameFindings:
         embed = discord.Embed(
             title=embed_dict["title"],
             description=f"{embed_dict['description']}\n\n**[{domain}]({url})**",
-            color=discord.Color.dark_theme()
+            color=discord.Color.dark_theme(),
         )
         embed.set_thumbnail(url=embed_dict["icon"])
-        embed.set_footer(text="I took it from - r/FreeGameFindings",
-                         icon_url="https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png")
+        embed.set_footer(
+            text="I took it from - r/FreeGameFindings",
+            icon_url="https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png",
+        )
         await self.channel.send(embed=embed)
 
     async def _load_database(self) -> list:
         freegamefindings_cache = await self.database.find_one(DB_CACHE)
         to_filter = await self.database.find_one(DB_LISTS)
-        return freegamefindings_cache["freegamefindings_cache"], to_filter["freegamefindings_exceptions"]
+        return (
+            freegamefindings_cache["freegamefindings_cache"],
+            to_filter["freegamefindings_exceptions"],
+        )

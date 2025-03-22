@@ -33,7 +33,9 @@ class Esutaze:
             esutaze_cache[0] = url
             await self._send_article(url, title)
 
-        await self.database.update_one(DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache}})
+        await self.database.update_one(
+            DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache}}
+        )
 
     async def _send_article(self, url: str, title: str) -> None:
         article_content = await self.session.get(url)
@@ -53,18 +55,22 @@ class Esutaze:
             title=title,
             url=url,
             description=f"{contest_description}\n\n"
-                        f"{contest_requirements}\n\n"
-                        f"**{contest_ending_time}**",
-            colour=discord.Colour.brand_red()
+            f"{contest_requirements}\n\n"
+            f"**{contest_ending_time}**",
+            colour=discord.Colour.brand_red(),
         )
         embed.set_image(url="attachment://image.png")
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
-        embed.set_footer(text="www.esutaze.sk",
-                         icon_url="https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg")
+        embed.set_footer(
+            text="www.esutaze.sk",
+            icon_url="https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg",
+        )
         await self.channel.send(embed=embed, file=discord.File(image, "image.png"))
 
     async def _get_articles(self) -> BeautifulSoup:
-        html_content = await self.session.get("https://www.esutaze.sk/category/internetove-sutaze/")
+        html_content = await self.session.get(
+            "https://www.esutaze.sk/category/internetove-sutaze/"
+        )
         soup = BeautifulSoup(html_content.text, "html.parser")
         return soup.find("div", id="content_box").find_all("article")
 

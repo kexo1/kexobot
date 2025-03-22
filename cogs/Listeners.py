@@ -3,8 +3,13 @@ import wavelink
 
 from discord.ext import commands
 from cogs.Disconnect import Disconnect
-from wavelink import NodeDisconnectedEventPayload, NodeReadyEventPayload, TrackStartEventPayload, \
-    TrackExceptionEventPayload, TrackStuckEventPayload
+from wavelink import (
+    NodeDisconnectedEventPayload,
+    NodeReadyEventPayload,
+    TrackStartEventPayload,
+    TrackExceptionEventPayload,
+    TrackStuckEventPayload,
+)
 
 
 class Listeners(commands.Cog):
@@ -14,23 +19,29 @@ class Listeners(commands.Cog):
     @commands.Cog.listener()
     async def on_wavelink_track_start(self, payload: TrackStartEventPayload) -> None:
         if not payload.player.should_respond:
-            await payload.player.text_channel.send(embed=await self._playing_embed(payload))
+            await payload.player.text_channel.send(
+                embed=await self._playing_embed(payload)
+            )
 
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
         print(f"Node {payload.node.uri} is ready!")
 
     @commands.Cog.listener()
-    async def on_wavelink_node_disconnected(self, payload: NodeDisconnectedEventPayload) -> None:
+    async def on_wavelink_node_disconnected(
+        self, payload: NodeDisconnectedEventPayload
+    ) -> None:
         print(f"Node {payload.node.uri} is disconnected, fetching new node...")
         await self.bot.connect_node()
 
     @commands.Cog.listener()
-    async def on_wavelink_track_exception(self, payload: TrackExceptionEventPayload) -> None:
+    async def on_wavelink_track_exception(
+        self, payload: TrackExceptionEventPayload
+    ) -> None:
         embed = discord.Embed(
             title="",
             description=f":x: An error occured when playing song, skip song or re-join bot.",
-            color=discord.Color.from_rgb(r=255, g=0, b=0)
+            color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await payload.player.text_channel.send(embed=embed)
 
@@ -39,7 +50,7 @@ class Listeners(commands.Cog):
         embed = discord.Embed(
             title="",
             description=f":x: Song got stuck, skip song or re-join bot.",
-            color=discord.Color.from_rgb(r=255, g=0, b=0)
+            color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await payload.player.text_channel.send(embed=embed)
 
@@ -49,17 +60,18 @@ class Listeners(commands.Cog):
         embed = discord.Embed(
             title="",
             description=f"**Left <#{player.channel.id}> after 10 minutes of inactivity.**",
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         await player.text_channel.send(embed=embed)
 
     # noinspection PyUnusedLocal
     @commands.Cog.listener()
     async def on_voice_state_update(
-            self,
-            member: discord.member.Member,
-            before: discord.VoiceState,
-            after: discord.VoiceState) -> None:
+        self,
+        member: discord.member.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ) -> None:
 
         voice_state = member.guild.voice_client
         if voice_state is None:
@@ -71,12 +83,12 @@ class Listeners(commands.Cog):
     async def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
         embed = discord.Embed(
             color=discord.Colour.green(),
-            title='Now playing',
-            description='[**{}**]({})'.format(payload.track.title, payload.track.uri)
+            title="Now playing",
+            description="[**{}**]({})".format(payload.track.title, payload.track.uri),
         )
         embed.set_footer(
-            text=f'Requested by {payload.player.current.requester.name}',
-            icon_url=await self._has_pfp(payload.player.current.requester)
+            text=f"Requested by {payload.player.current.requester.name}",
+            icon_url=await self._has_pfp(payload.player.current.requester),
         )
         embed.set_thumbnail(url=payload.track.artwork)
         return embed

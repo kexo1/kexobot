@@ -36,8 +36,12 @@ class LavalinkServerFetch:
             if server.get("version") != "v4":
                 continue
 
-            lavalink_servers.append({"ip": f"http://{server["host"]}:{server["port"]}",
-                                     "password": server["password"]})
+            lavalink_servers.append(
+                {
+                    "ip": f"http://{server["host"]}:{server["port"]}",
+                    "password": server["password"],
+                }
+            )
         return lavalink_servers
 
     async def _lavainfo_fetch(self, json_data) -> None:
@@ -62,9 +66,16 @@ class LavalinkServerFetch:
                 continue
 
             for plugin in server["info"]["plugins"]:
-                if plugin["name"] == "youtube-plugin" or plugin["name"] == "lavasrc-plugin":
-                    lavalink_servers.append({"ip": f"http://{server["host"]}:{server["port"]}",
-                                             "password": server["password"]})
+                if (
+                    plugin["name"] == "youtube-plugin"
+                    or plugin["name"] == "lavasrc-plugin"
+                ):
+                    lavalink_servers.append(
+                        {
+                            "ip": f"http://{server["host"]}:{server["port"]}",
+                            "password": server["password"],
+                        }
+                    )
                     break
 
         self.repeated_hostnames = [server["host"] for server in json_data]

@@ -67,8 +67,12 @@ class Game3rb:
                         game_title.pop(game_title.index(to_remove))
                     except ValueError:
                         if full_title not in game3rb_cache not in to_upload:
-                            await self.database.update_one(DB_CACHE, {"$set": {"game3rb_cache": to_upload}})
-                            await self.user_kexo.send(f"Game3rb: Broken name - {full_title}")
+                            await self.database.update_one(
+                                DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
+                            )
+                            await self.user_kexo.send(
+                                f"Game3rb: Broken name - {full_title}"
+                            )
                             to_upload.append(full_title)
                         continue
 
@@ -84,15 +88,17 @@ class Game3rb:
                     break
                 carts.append(cart.text)
 
-            game_info.append({
-                "title": game_title,
-                "full_title": full_title,
-                "version": version,
-                "url": line.get("href"),
-                "image": article.find("img", {"class": "entry-image"})["src"],
-                "timestamp": article.find("time")["datetime"],
-                "carts": carts
-            })
+            game_info.append(
+                {
+                    "title": game_title,
+                    "full_title": full_title,
+                    "version": version,
+                    "url": line.get("href"),
+                    "image": article.find("img", {"class": "entry-image"})["src"],
+                    "timestamp": article.find("time")["datetime"],
+                    "carts": carts,
+                }
+            )
             article = article.find_next("article")
 
         if not game_info:
@@ -114,7 +120,9 @@ class Game3rb:
             if direct_url:
                 description.append(f"[Direct link]({direct_url["href"]})")
 
-            if "Fix already included" in str(soup) or "Crack online already added" in str(soup):
+            if "Fix already included" in str(
+                soup
+            ) or "Crack online already added" in str(soup):
                 description.append("_Fix already included_")
             else:
                 crack_url = soup.find("a", {"class": "online"})
@@ -132,7 +140,9 @@ class Game3rb:
                 game_update_name.append(unidecode.unidecode(update_name))
                 game_update_url.append(unidecode.unidecode(match.group(2).strip()))
 
-            embed = discord.Embed(title=game["title"] + game["version"], url=game["url"])
+            embed = discord.Embed(
+                title=game["title"] + game["version"], url=game["url"]
+            )
             embed.timestamp = datetime.fromisoformat(game["timestamp"])
             embed.add_field(name="Download links:", value="\n".join(description))
             if game_update_name:
@@ -141,12 +151,16 @@ class Game3rb:
                     for i in range(len(game_update_url))
                 )
                 embed.add_field(name="Update links:", value=game_update, inline=False)
-            embed.set_footer(text=", ".join(game["carts"]),
-                             icon_url="https://media.discordapp.net/attachments/796453724713123870"
-                                      "/1162443171209433088/d95X3.png?ex=653bf491&is=65297f91&hm"
-                                      "=c36058433d50580eeec7cd89ddfe60965ec297d6fc8054994fee5ae976bedfd3&=")
+            embed.set_footer(
+                text=", ".join(game["carts"]),
+                icon_url="https://media.discordapp.net/attachments/796453724713123870"
+                "/1162443171209433088/d95X3.png?ex=653bf491&is=65297f91&hm"
+                "=c36058433d50580eeec7cd89ddfe60965ec297d6fc8054994fee5ae976bedfd3&=",
+            )
             embed.set_image(url=game["image"])
             await self.channel.send(embed=embed)
 
         if to_upload:
-            await self.database.update_one(DB_CACHE, {"$set": {"game3rb_cache": to_upload}})
+            await self.database.update_one(
+                DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
+            )

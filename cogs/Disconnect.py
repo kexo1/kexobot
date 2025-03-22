@@ -19,12 +19,15 @@ class Disconnect(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention}, join the voice channel the bot is playing in to disconnect it.",
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             return await ctx.respond(embed=embed, ephemeral=True)
 
-        embed = discord.Embed(title="", description=f"**✅ Left <#{vc.channel.id}>**",
-                              color=discord.Color.blue())
+        embed = discord.Embed(
+            title="",
+            description=f"**✅ Left <#{vc.channel.id}>**",
+            color=discord.Color.blue(),
+        )
         await ctx.respond(embed=embed)
         await self.disconnect_player(ctx.guild)
 

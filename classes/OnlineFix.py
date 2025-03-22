@@ -23,7 +23,9 @@ class OnlineFix:
     async def _send_embed(self, url: str, game_title: str) -> None:
         onlinefix_article = await self.session.get(url)
         soup = BeautifulSoup(onlinefix_article.text, "html.parser")
-        img_url = soup.find("head").find("meta", attrs={"property": "og:image"})["content"]
+        img_url = soup.find("head").find("meta", attrs={"property": "og:image"})[
+            "content"
+        ]
 
         description = soup.find("article").find("div", class_="edited-block right").text
         description = GoogleTranslator(source="ru").translate(text=description)
@@ -37,16 +39,20 @@ class OnlineFix:
             title=game_title + version,
             url=url,
             description=description,
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
-        embed.set_footer(text="online-fix.me",
-                         icon_url="https://media.discordapp.net/attachments/796453724713123870"
-                                  "/1035951759505506364/favicon-1.png")
+        embed.set_footer(
+            text="online-fix.me",
+            icon_url="https://media.discordapp.net/attachments/796453724713123870"
+            "/1035951759505506364/favicon-1.png",
+        )
         embed.set_thumbnail(url=img_url)
         await self.channel.send(embed=embed)
 
-    async def _process_messages(self, messages: list, onlinefix_cache: list, games: list) -> None:
+    async def _process_messages(
+        self, messages: list, onlinefix_cache: list, games: list
+    ) -> None:
         limit = ONLINEFIX_MAX_GAMES
         to_upload = []
         for message in messages:
@@ -74,7 +80,9 @@ class OnlineFix:
                 break
 
         if to_upload:
-            await self.database.update_one(DB_CACHE, {"$set": {"onlinefix_cache": to_upload}})
+            await self.database.update_one(
+                DB_CACHE, {"$set": {"onlinefix_cache": to_upload}}
+            )
 
     @staticmethod
     async def _get_messages(chat_log: Response) -> list:

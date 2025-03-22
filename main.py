@@ -11,9 +11,21 @@ from discord.ext import tasks, commands
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from constants import DISCORD_TOKEN, MONGO_DB_URL, REDDIT_PASSWORD, REDDIT_SECRET, REDDIT_USER_AGENT, REDDIT_USERNAME, \
-    REDDIT_CLIENT_ID, HUMOR_SECRET, CLEAR_CACHE_HOUR, DB_REDDIT_CACHE, ESUTAZE_CHANNEL, GAME_UPDATES_CHANNEL, \
-    FREE_STUFF_CHANNEL
+from constants import (
+    DISCORD_TOKEN,
+    MONGO_DB_URL,
+    REDDIT_PASSWORD,
+    REDDIT_SECRET,
+    REDDIT_USER_AGENT,
+    REDDIT_USERNAME,
+    REDDIT_CLIENT_ID,
+    HUMOR_SECRET,
+    CLEAR_CACHE_HOUR,
+    DB_REDDIT_CACHE,
+    ESUTAZE_CHANNEL,
+    GAME_UPDATES_CHANNEL,
+    FREE_STUFF_CHANNEL,
+)
 from utils import return_dict
 
 from classes.Esutaze import Esutaze
@@ -33,6 +45,7 @@ bot = discord.Bot()
 
 # TODO: Make Game3rb more readable
 
+
 class KexoBOT:
     def __init__(self):
         self.user_kexo = None
@@ -40,7 +53,9 @@ class KexoBOT:
         self.which_lavalink_server = -1
         self.lavalink_servers = []
         self.main_loop_counter = 0
-        self.database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]["KexoBOTCollection"]
+        self.database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"][
+            "KexoBOTCollection"
+        ]
 
         self.reddit = asyncpraw.Reddit(
             client_id=REDDIT_CLIENT_ID,
@@ -68,7 +83,8 @@ class KexoBOT:
         await self._fetch_channels()
 
         bot.subbredit_cache = return_dict(
-            await self.database.find_one(DB_REDDIT_CACHE, {"_id": False}))
+            await self.database.find_one(DB_REDDIT_CACHE, {"_id": False})
+        )
         await self._define_classes()
 
     async def _fetch_channels(self) -> None:
@@ -78,14 +94,22 @@ class KexoBOT:
         print("Channels fetched.")
 
     async def _define_classes(self) -> None:
-        self.onlinefix = OnlineFix(self.session, self.database, self.game_updates_channel)
+        self.onlinefix = OnlineFix(
+            self.session, self.database, self.game_updates_channel
+        )
         self.game3rb = Game3rb(self.session, self.database, self.game_updates_channel)
-        self.alienwarearena = AlienwareArena(self.database, self.session, self.free_stuff_channel)
-        self.reddit_freegamefindings = RedditFreeGameFindings(self.database, self.reddit,
-                                                              self.session, self.free_stuff_channel)
-        self.reddit_crackwatch = RedditCrackWatch(self.database, self.reddit,
-                                                  self.game_updates_channel, self.user_kexo)
-        self.elektrina_vypadky = ElektrinaVypadky(self.session, self.database, self.user_kexo)
+        self.alienwarearena = AlienwareArena(
+            self.database, self.session, self.free_stuff_channel
+        )
+        self.reddit_freegamefindings = RedditFreeGameFindings(
+            self.database, self.reddit, self.session, self.free_stuff_channel
+        )
+        self.reddit_crackwatch = RedditCrackWatch(
+            self.database, self.reddit, self.game_updates_channel, self.user_kexo
+        )
+        self.elektrina_vypadky = ElektrinaVypadky(
+            self.session, self.database, self.user_kexo
+        )
         self.esutaze = Esutaze(self.session, self.database, self.esutaze_channel)
         self.lavalink_fetch = LavalinkServerFetch(bot, self.session)
         print("Classes defined.")
@@ -111,10 +135,19 @@ class KexoBOT:
             print(f"Server {ip} fetched, testing connection...")
 
             node = [
-                wavelink.Node(uri=ip, password=password, retries=1, resume_timeout=0, inactive_player_timeout=600)]
+                wavelink.Node(
+                    uri=ip,
+                    password=password,
+                    retries=1,
+                    resume_timeout=0,
+                    inactive_player_timeout=600,
+                )
+            ]
 
             try:
-                await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=5)
+                await asyncio.wait_for(
+                    wavelink.Pool.connect(nodes=node, client=bot), timeout=5
+                )
             except asyncio.TimeoutError:
                 print(f"Node {ip} is not ready, trying next...")
                 continue
@@ -125,10 +158,17 @@ class KexoBOT:
     async def set_joke(self) -> None:
         # insults, dark
         joke_categroy = random.choice(("jewish", "racist"))
-        joke = await self.session.get(
-            f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
-            f"{joke_categroy}&api-key={HUMOR_SECRET}").json().get("joke")
-        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=joke))
+        joke = (
+            await self.session.get(
+                f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
+                f"{joke_categroy}&api-key={HUMOR_SECRET}"
+            )
+            .json()
+            .get("joke")
+        )
+        await bot.change_presence(
+            activity=discord.Activity(type=discord.ActivityType.watching, name=joke)
+        )
 
     async def _fetch_users(self) -> None:
         self.user_kexo = await bot.fetch_user(402221830930432000)
@@ -138,13 +178,18 @@ class KexoBOT:
         update = {}
         for guild_id, cache in bot.subbredit_cache.items():
             # If midnight, set search_level to 0
-            to_upload = ["0" if now.hour == CLEAR_CACHE_HOUR else str(cache["search_level"]),
-                         str(cache.get("nsfw")),
-                         cache.get("urls"),
-                         str(cache.get("which_subreddit"))]
+            to_upload = [
+                "0" if now.hour == CLEAR_CACHE_HOUR else str(cache["search_level"]),
+                str(cache.get("nsfw")),
+                cache.get("urls"),
+                str(cache.get("which_subreddit")),
+            ]
             # Remove urls at midnight
-            reddit_urls = [reddit_url for reddit_url in to_upload[2].split("\n") if
-                           not reddit_url or reddit_url.split("*")[1] != str(now.hour)]
+            reddit_urls = [
+                reddit_url
+                for reddit_url in to_upload[2].split("\n")
+                if not reddit_url or reddit_url.split("*")[1] != str(now.hour)
+            ]
             to_upload[2] = "\n".join(reddit_urls)
             update[guild_id] = ",".join(to_upload)
 
@@ -249,7 +294,7 @@ async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
         embed = discord.Embed(
             title="",
             description=f"🚫 This command doesn't exist.",
-            color=discord.Color.from_rgb(r=255, g=0, b=0)
+            color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.send(embed=embed, delete_after=20)
@@ -262,10 +307,11 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You're sending too much!, try again in `{error_str[7]}`.",
-            color=discord.Color.from_rgb(r=255, g=0, b=0)
+            color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         return await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
     raise error
+
 
 bot.run(DISCORD_TOKEN)
