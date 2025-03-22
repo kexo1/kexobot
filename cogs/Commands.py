@@ -231,9 +231,7 @@ class Commands(commands.Cog):
             name="Run time:ㅤㅤ" + "\u200b",
             value=f"{str(datetime.timedelta(seconds=round(int(time.time()) - self.run_time)))}",
         )
-        embed.add_field(
-            name="Ping:ㅤㅤㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms"
-        )
+        embed.add_field(name="Ping:ㅤㅤㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
         embed.add_field(name="Version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤ", value=discord.__version__)
         embed.add_field(
@@ -299,9 +297,20 @@ class HostView(discord.ui.View):
         embed = await self.disable_embed()
         await self.message.edit(embed=embed, view=None)
         await self.author.send(
-            f'You forgot to click button in {self.message.jump_url} you {random.choice(
-                ("dumbass", "retard", "nitwit", "cockwomble", "prick",
-                 "cunt", "pillock", "twat"))}.'
+            f"You forgot to click button in {self.message.jump_url} you {
+                random.choice(
+                    (
+                        'dumbass',
+                        'retard',
+                        'nitwit',
+                        'cockwomble',
+                        'prick',
+                        'cunt',
+                        'pillock',
+                        'twat',
+                    )
+                )
+            }."
         )
         pos = host_authors.index(self.author.name)
         host_authors.pop(pos)

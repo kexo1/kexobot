@@ -19,7 +19,7 @@ LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
 
 # MongoDB
 MONGO_DB_URL = (
-    f"mongodb+srv://{os.getenv("MONGO_KEY")}@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
+    f"mongodb+srv://{os.getenv('MONGO_KEY')}@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
     f"=majority"
 )
 DB_CACHE = {"_id": ObjectId("617958fae4043ee4a3f073f2")}
@@ -69,7 +69,7 @@ GAME3RB_STRIP = (
     " Hotfix 1",
     ")-FitGirl Repack",
     " + Bonus Content DLC",
-    " Hotfix 2" " Hotfix",
+    " Hotfix 2 Hotfix",
     " rc",
     "\u200b",
     "-GOG",

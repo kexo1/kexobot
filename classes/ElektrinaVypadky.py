@@ -51,7 +51,7 @@ class ElektrinaVypadky:
             ):
                 continue
 
-            url = f"https://www.hliniknadhronom.sk{article.find("a")["href"]}"
+            url = f"https://www.hliniknadhronom.sk{article.find('a')['href']}"
 
             if url in elektrinavypadky_cache:
                 return

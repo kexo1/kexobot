@@ -38,7 +38,7 @@ class LavalinkServerFetch:
 
             lavalink_servers.append(
                 {
-                    "ip": f"http://{server["host"]}:{server["port"]}",
+                    "ip": f"http://{server['host']}:{server['port']}",
                     "password": server["password"],
                 }
             )
@@ -72,7 +72,7 @@ class LavalinkServerFetch:
                 ):
                     lavalink_servers.append(
                         {
-                            "ip": f"http://{server["host"]}:{server["port"]}",
+                            "ip": f"http://{server['host']}:{server['port']}",
                             "password": server["password"],
                         }
                     )

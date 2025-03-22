@@ -72,7 +72,6 @@ class Listeners(commands.Cog):
         before: discord.VoiceState,
         after: discord.VoiceState,
     ) -> None:
-
         voice_state = member.guild.voice_client
         if voice_state is None:
             return

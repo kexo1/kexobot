@@ -115,10 +115,10 @@ class Game3rb:
 
             torrent_url = soup.find("a", {"class": "torrent"})
             if torrent_url:
-                description.append(f"[Torrent link]({torrent_url["href"]})")
+                description.append(f"[Torrent link]({torrent_url['href']})")
             direct_url = soup.find("a", {"class": "direct"})
             if direct_url:
-                description.append(f"[Direct link]({direct_url["href"]})")
+                description.append(f"[Direct link]({direct_url['href']})")
 
             if "Fix already included" in str(
                 soup
@@ -127,11 +127,11 @@ class Game3rb:
             else:
                 crack_url = soup.find("a", {"class": "online"})
                 if crack_url:
-                    description.append(f"[Crack link]({crack_url["href"]})")
+                    description.append(f"[Crack link]({crack_url['href']})")
                 else:
                     crack_url = soup.find("a", {"class": "crack"})
                     if crack_url:
-                        description.append(f"[Crack link]({crack_url["href"]})")
+                        description.append(f"[Crack link]({crack_url['href']})")
 
             game_update_url, game_update_name = [], []
             update_pattern = r'>Update (.*?)</strong>.*?<a\s+id="download-link"\s+class="update"\s+href="(.*?)"'

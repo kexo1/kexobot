@@ -174,8 +174,7 @@ class FunStuff(commands.Cog):
     async def cache_viewed_link(self, submission_url: str, guild_id: str) -> None:
         self.bot.subbredit_cache[guild_id]["urls"] += (
             f"{submission_url}*"
-            f"{(datetime.now()
-                                                           + timedelta(hours=20)).strftime("%I").lstrip("0")}\n"
+            f"{(datetime.now() + timedelta(hours=20)).strftime('%I').lstrip('0')}\n"
         )
 
     async def generate_meme(
@@ -212,7 +211,7 @@ class FunStuff(commands.Cog):
         ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission
     ) -> None:
         for images in submission.gallery_data["items"]:
-            await ctx.send(f"https://i.redd.it/{images["media_id"]}.jpg")
+            await ctx.send(f"https://i.redd.it/{images['media_id']}.jpg")
 
     @staticmethod
     async def upload_video(
