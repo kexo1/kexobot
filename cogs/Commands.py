@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from discord.ext import commands
 from discord.commands import slash_command
 from discord.commands import option
+from constants import XTC_SERVER, KEXO_SERVER
+from __init__ import __version__
 
 host_authors = []
 
@@ -45,7 +47,8 @@ class Commands(commands.Cog):
                                   color=discord.Color.blue())
             await message.edit(embed=embed)
 
-        except (aiohttp.client_exceptions.ClientConnectorError, aiohttp.ConnectionTimeoutError):
+        except (aiohttp.client_exceptions.ClientConnectorError, aiohttp.ConnectionTimeoutError,
+                wavelink.exceptions.NodeException, AssertionError):
             embed = discord.Embed(title="",
                                   description=f":x: Failed to connect to `{uri}`",
                                   color=discord.Color.from_rgb(r=255, g=0, b=0))
@@ -64,7 +67,7 @@ class Commands(commands.Cog):
             await self.bot.connect_node()
             await self.bot.node[0].fetch_info()
         except (aiohttp.client_exceptions.ClientConnectorError, aiohttp.ConnectionTimeoutError,
-                wavelink.exceptions.NodeException):
+                wavelink.exceptions.NodeException, AssertionError):
             embed = discord.Embed(title="",
                                   description=f":x: Failed to connect to `{self.bot.node[0].uri}`, "
                                               f"rolling back to previous node.",
@@ -77,7 +80,7 @@ class Commands(commands.Cog):
         await ctx.send(embed=embed)
 
     @slash_command(name='host', description='Creates hosting embed, you can also choose some optional info.',
-                   guild_ids=[723197287861583885, 692810367851692032])
+                   guild_ids=[XTC_SERVER, KEXO_SERVER])
     @option('server_name', description='Your server name.')
     @option('duration', description='How long are you going to be hositng.',
             choices=['As long as I want/Before any crash.', '15 minutes', '30 minutes',
@@ -151,7 +154,7 @@ class Commands(commands.Cog):
         embed.add_field(name="Run time:ㅤㅤ" + '\u200b',
                         value=f"{str(timedelta(seconds=round(int(time.time()) - self.run_time)))}")
         embed.add_field(name="Ping:ㅤㅤㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
-        embed.add_field(name="Version:", value="2.0")
+        embed.add_field(name="Version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤ", value=discord.__version__)
         embed.add_field(name="Python version:",
                         value=f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')

@@ -9,8 +9,8 @@ from discord.ext import commands
 from discord.commands import slash_command
 from discord import option
 from asyncprawcore.exceptions import AsyncPrawcoreException, ResponseException, RequestException
-from constants import (ROAST_COMMANDS_MSG, IMGFLIP_PASSWORD, IMGFLIP_USERNAME, SHITPOST_SUBREDDITS, REDDIT_VIDEO_STRIP,
-                       KYS_MESSAGES, DB_REDDIT_CACHE)
+from constants import ROAST_COMMANDS_MSG, IMGFLIP_PASSWORD, IMGFLIP_USERNAME, SHITPOST_SUBREDDITS, REDDIT_VIDEO_STRIP,\
+                       KYS_MESSAGES, DB_REDDIT_CACHE, KEXO_SERVER, SISKA_GANG_SERVER
 from utils import load_text_file, VideoDownloader
 
 
@@ -25,16 +25,16 @@ class FunStuff(commands.Cog):
         self.idk_count = 0
 
     @slash_command(name="kotrmelec", description="Legendárne školské kotrmelce",
-                   guild_ids=[692810367851692032, 765262686908186654])
+                   guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER])
     async def kotrmelec(self, ctx: discord.ApplicationContext) -> None:
         await ctx.respond(random.choice(self.kotrmelce))
 
     @slash_command(name="topstropscreenshot", description="Topové fotečky z online hodín",
-                   guild_ids=[692810367851692032, 765262686908186654])
+                   guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER])
     async def top_strop_screenshot(self, ctx: discord.ApplicationContext) -> None:
         await ctx.respond(random.choice(self.topstropscreenshot))
 
-    @slash_command(name="roast", description="Lamar roast", guild_ids=[692810367851692032, 765262686908186654])
+    @slash_command(name="roast", description="Lamar roast", guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER])
     async def roast(self, ctx: discord.ApplicationContext) -> None:
         await ctx.respond(ROAST_COMMANDS_MSG)
 
@@ -53,7 +53,7 @@ class FunStuff(commands.Cog):
             await ctx.send(word)
 
     @slash_command(name="kys", description="Keď niekoho nemáš rád.",
-                   guild_ids=[692810367851692032, 765262686908186654])
+                   guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER])
     @commands.cooldown(1, 30, commands.BucketType.user)
     async def kys(self, ctx: discord.ApplicationContext, member: discord.Member) -> None:
         meme_img = await self.generate_meme(ctx, member)
@@ -67,7 +67,7 @@ class FunStuff(commands.Cog):
         await ctx.send(meme_img)
 
     @slash_command(name="idk", description="Idk.",
-                   guild_ids=[692810367851692032, 765262686908186654])
+                   guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER])
     async def idk(self, ctx: discord.ApplicationContext) -> None:
         self.idk_count += 1
         if self.idk_count < 5:

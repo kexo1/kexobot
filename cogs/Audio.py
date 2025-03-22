@@ -1,4 +1,3 @@
-# python
 import discord
 import wavelink
 from discord.ext import commands

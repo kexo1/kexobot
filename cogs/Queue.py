@@ -16,6 +16,8 @@ class Queue(commands.Cog):
     @slash_command(name="queue", description="Shows songs in queue.")
     @is_joined()
     async def queue(self, ctx: discord.ApplicationContext) -> None:
+        vc: wavelink.Player = ctx.voice_client
+
         if not vc.queue.is_empty:
             return await ctx.respond(embed=await self._get_queue_embed(ctx, vc))
         embed = discord.Embed(title="", description="**Queue is empty**", color=discord.Color.blue())
@@ -30,6 +32,8 @@ class Queue(commands.Cog):
     @option("pos", description="Value 1 Removes the first one.", min_value=1, required=False)
     @is_joined()
     async def remove(self, ctx: discord.ApplicationContext, pos: int):
+        vc: wavelink.Player = ctx.voice_client
+
         if pos is None:
             vc.queue.pop()
         else:
@@ -113,6 +117,7 @@ class Queue(commands.Cog):
     @slash_command(name="clear-queue", description="Clears queue")
     @is_joined()
     async def clear_queue(self, ctx: discord.ApplicationContext):
+        vc: wavelink.Player = ctx.voice_client
         vc.queue.clear()
 
         embed = discord.Embed(title="", description="🗑️ **Cleared**", color=discord.Color.blue())

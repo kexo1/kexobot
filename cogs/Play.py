@@ -7,7 +7,7 @@ from discord.ext import commands
 from discord.commands import slash_command
 from aiohttp.client_exceptions import ClientConnectorError
 from wavelink import TrackStartEventPayload, Playable
-from wavelink.exceptions import LavalinkLoadException, LavalinkException
+from wavelink.exceptions import LavalinkLoadException
 from decorators import is_joined, is_playing
 
 

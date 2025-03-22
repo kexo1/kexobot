@@ -20,9 +20,9 @@ from classes.Esutaze import Esutaze
 from classes.OnlineFix import OnlineFix
 from classes.Game3rb import Game3rb
 from classes.AlienwareArena import AlienwareArena
-from classes.LavalinkFetch import LavalinkFetch
+from classes.LavalinkServerFetch import LavalinkServerFetch
 from classes.ElektrinaVypadky import ElektrinaVypadky
-from classes.RedditCrackwatch import RedditCrackWatch
+from classes.RedditCrackWatch import RedditCrackWatch
 from classes.RedditFreegamefindings import RedditFreeGameFindings
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
@@ -33,7 +33,6 @@ bot = discord.Bot()
 
 # TODO: Rewrite Game3rb
 # TODO: Rewrite Queue cog, fix queue length
-# TODO: Use enums instead of strings in DatabaseManager
 
 class KexoBOT:
     def __init__(self):
@@ -91,7 +90,7 @@ class KexoBOT:
                                                   self.game_updates_channel, self.user_kexo)
         self.elektrina_vypadky = ElektrinaVypadky(self.session, self.database, self.user_kexo)
         self.esutaze = Esutaze(self.session, self.database, self.esutaze_channel)
-        self.lavalink_fetch = LavalinkFetch(bot, self.session)
+        self.lavalink_fetch = LavalinkServerFetch(bot, self.session)
         print("Classes defined.")
 
     async def create_session(self) -> None:
@@ -102,23 +101,30 @@ class KexoBOT:
 
     async def connect_node(self) -> None:
         lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
-        if not lavalink_servers:
-            print("No lavalink servers found.")
+        for _ in range(len(lavalink_servers)):
+            if not lavalink_servers:
+                print("No lavalink servers found.")
+                return
+
+            self.which_lavalink_server += 1
+            if self.which_lavalink_server >= len(lavalink_servers):
+                self.which_lavalink_server = 0
+
+            ip = lavalink_servers[self.which_lavalink_server]["ip"]
+            password = lavalink_servers[self.which_lavalink_server]["password"]
+            print(f"Server {ip} fetched, testing connection...")
+
+            node = [
+                wavelink.Node(uri=ip, password=password, retries=1, resume_timeout=0, inactive_player_timeout=600)]
+
+            try:
+                await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=5)
+            except asyncio.TimeoutError:
+                print(f"Node {ip} is not ready, trying next...")
+                continue
+
+            bot.node = node
             return
-
-        self.which_lavalink_server += 1
-        if self.which_lavalink_server >= len(lavalink_servers):
-            self.which_lavalink_server = 0
-
-        ip = lavalink_servers[self.which_lavalink_server]["ip"]
-        password = lavalink_servers[self.which_lavalink_server]["password"]
-        print(f"Server {ip} fetched.")
-
-        node = [
-            wavelink.Node(uri=ip, password=password, retries=1, resume_timeout=0, inactive_player_timeout=600)]
-
-        bot.node = node
-        await wavelink.Pool.connect(nodes=node, client=bot)
 
     async def set_joke(self) -> None:
         # insults, dark
