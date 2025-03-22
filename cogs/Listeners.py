@@ -23,7 +23,6 @@ class Listeners(commands.Cog):
     @commands.Cog.listener()
     async def on_wavelink_node_disconnected(self, payload: NodeDisconnectedEventPayload) -> None:
         print(f"Node {payload.node.uri} is disconnected, fetching new node...")
-        await asyncio.sleep(1)
         await self.bot.connect_node()
 
     @commands.Cog.listener()

@@ -1,6 +1,5 @@
 import aiohttp
 import discord
-import wavelink
 import os
 
 

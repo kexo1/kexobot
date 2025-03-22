@@ -5,7 +5,6 @@ import dns.resolver
 import random
 import wavelink
 import asyncio
-import signal
 
 from fake_useragent import UserAgent
 from discord.ext import tasks, commands
