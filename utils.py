@@ -18,6 +18,7 @@ def return_dict(subbredit_cache) -> dict:
                                 "which_subreddit": int(which_subreddit)}
     return subbredit_cache
 
+
 class VideoDownloader:
     def __init__(self):
         self.session = None

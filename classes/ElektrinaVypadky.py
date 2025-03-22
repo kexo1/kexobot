@@ -1,7 +1,7 @@
 import discord
 import logging
+import datetime
 
-from datetime import datetime
 from bs4 import BeautifulSoup
 from constants import ELEKTRINA_MAX_ARTICLES, DB_CACHE
 
@@ -52,13 +52,16 @@ class ElektrinaVypadky:
             description = soup.find(class_="ci-full").text
 
             if len(description) > 2048:
-                embed = discord.Embed(title=title, url=url,
-                                      description="Under embed (amount of text in embed is restricted")
+                embed = discord.Embed(
+                    title=title,
+                    url=url,
+                    description="Under embed (amount of text in embed is restricted"
+                )
                 above_limit = True
             else:
                 embed = discord.Embed(title=title, url=url, description=description)
 
-            embed.timestamp = datetime.utcnow()
+            embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
             embed.set_footer(text="",
                              icon_url="https://www.hliniknadhronom.sk/portals_pictures/i_006868/i_6868718.png")
             await self.user_kexo.send(embed=embed)

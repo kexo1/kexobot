@@ -16,11 +16,11 @@ class Disconnect(commands.Cog):
     async def disconnect_command(self, ctx: discord.ApplicationContext) -> None:
         vc = ctx.voice_client
         if vc.channel.id != ctx.author.voice.channel.id:
-            embed = discord.Embed(title="",
-                                  description=str(
-                                      ctx.author.mention) + ", join the voice channel the bot is playing in to "
-                                                            "disconnect it.",
-                                  color=discord.Color.blue())
+            embed = discord.Embed(
+                title="",
+                description=f"{ctx.author.mention}, join the voice channel the bot is playing in to disconnect it.",
+                color=discord.Color.blue()
+            )
             return await ctx.respond(embed=embed, ephemeral=True)
 
         embed = discord.Embed(title="", description=f"**✅ Left <#{vc.channel.id}>**",

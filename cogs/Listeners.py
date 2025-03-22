@@ -47,11 +47,14 @@ class Listeners(commands.Cog):
     @commands.Cog.listener()
     async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:
         await Disconnect.disconnect_player(player.guild)
-        embed = discord.Embed(title="",
-                              description=f"**Left <#{player.channel.id}> after 10 minutes of inactivity.**",
-                              color=discord.Color.blue())
+        embed = discord.Embed(
+            title="",
+            description=f"**Left <#{player.channel.id}> after 10 minutes of inactivity.**",
+            color=discord.Color.blue()
+        )
         await player.text_channel.send(embed=embed)
 
+    # noinspection PyUnusedLocal
     @commands.Cog.listener()
     async def on_voice_state_update(
             self,

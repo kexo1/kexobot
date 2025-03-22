@@ -52,8 +52,8 @@ class DatabaseManager(commands.Cog):
         db_list = await self._get_database(collection)
 
         if to_upload in db_list:
-            return await ctx.respond(
-                str(ctx.author.mention) + ", string `" + to_upload + "` is already in the database, use `/show_data`")
+            return await ctx.respond(f"{ctx.author.mention} string `{to_upload}` "
+                                     f"is already in the database, use `/show_data`")
 
         db_list.append(to_upload)
         await self._update_database(collection, db_list)

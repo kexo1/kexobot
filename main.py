@@ -39,8 +39,8 @@ class KexoBOT:
         self.user_kexo = None
         self.session = None
         self.which_lavalink_server = -1
-        self.lavalink_ip = str
-        self.lavalink_password = str
+        self.lavalink_servers = []
+        self.main_loop_counter = 0
         self.database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]["KexoBOTCollection"]
 
         self.reddit = asyncpraw.Reddit(
@@ -62,7 +62,6 @@ class KexoBOT:
         self.reddit_crackwatch = None
         self.elektrina_vypadky = None
         self.esutaze = None
-        self.main_loop_counter = 0
 
     async def initialize(self) -> None:
         await self._fetch_users()
@@ -72,7 +71,6 @@ class KexoBOT:
         bot.subbredit_cache = return_dict(
             await self.database.find_one(DB_REDDIT_CACHE, {"_id": False}))
         await self._define_classes()
-        await kexobot.connect_node()
 
     async def _fetch_channels(self) -> None:
         self.esutaze_channel = await bot.fetch_channel(ESUTAZE_CHANNEL)
@@ -100,18 +98,17 @@ class KexoBOT:
         print("Httpx session initialized.")
 
     async def connect_node(self) -> None:
-        lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
-        for _ in range(len(lavalink_servers)):
-            if not lavalink_servers:
-                print("No lavalink servers found.")
-                return
+        if not self.lavalink_servers:
+            print("No lavalink servers found.")
+            return
 
+        for _ in range(len(self.lavalink_servers)):
             self.which_lavalink_server += 1
-            if self.which_lavalink_server >= len(lavalink_servers):
+            if self.which_lavalink_server >= len(self.lavalink_servers):
                 self.which_lavalink_server = 0
 
-            ip = lavalink_servers[self.which_lavalink_server]["ip"]
-            password = lavalink_servers[self.which_lavalink_server]["password"]
+            ip = self.lavalink_servers[self.which_lavalink_server]["ip"]
+            password = self.lavalink_servers[self.which_lavalink_server]["password"]
             print(f"Server {ip} fetched, testing connection...")
 
             node = [
@@ -186,6 +183,7 @@ class KexoBOT:
         if now.hour == 0:
             await self.set_joke()
 
+        self.lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
         await self.update_reddit_cache(now)
         await self.elektrina_vypadky.run()
 
@@ -241,14 +239,19 @@ async def on_ready() -> None:
     await kexobot.initialize()
     main_loop_task.start()
     hourly_loop_task.start()
+    while not kexobot.lavalink_servers:
+        await asyncio.sleep(1)
+    await kexobot.connect_node()
 
 
 @bot.event
 async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
     if isinstance(error, commands.errors.CommandNotFound):
-        embed = discord.Embed(title="",
-                              description=f"🚫 This command doesn't exist.",
-                              color=discord.Color.from_rgb(r=255, g=0, b=0))
+        embed = discord.Embed(
+            title="",
+            description=f"🚫 This command doesn't exist.",
+            color=discord.Color.from_rgb(r=255, g=0, b=0)
+        )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.send(embed=embed, delete_after=20)
 
@@ -257,9 +260,11 @@ async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
 async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
     if isinstance(error, commands.CommandOnCooldown):
         error_str = str(error).split()
-        embed = discord.Embed(title="",
-                              description=f"🚫 You're sending too much!, try again in `{error_str[7]}`.",
-                              color=discord.Color.from_rgb(r=255, g=0, b=0))
+        embed = discord.Embed(
+            title="",
+            description=f"🚫 You're sending too much!, try again in `{error_str[7]}`.",
+            color=discord.Color.from_rgb(r=255, g=0, b=0)
+        )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         return await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
     raise error

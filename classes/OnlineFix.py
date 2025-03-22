@@ -1,8 +1,8 @@
 import re
 import discord
+import datetime
 
 from deep_translator import GoogleTranslator
-from datetime import datetime
 from bs4 import BeautifulSoup
 from httpx import Response
 from constants import ONLINEFIX_MAX_GAMES, DB_CACHE, DB_LISTS
@@ -33,11 +33,13 @@ class OnlineFix:
         version = pattern.findall(description)
         version = f" v{version[0][0]}" if version else ""
 
-        embed = discord.Embed(title=game_title + version,
-                              url=url,
-                              description=description,
-                              color=discord.Color.blue())
-        embed.timestamp = datetime.utcnow()
+        embed = discord.Embed(
+            title=game_title + version,
+            url=url,
+            description=description,
+            color=discord.Color.blue()
+        )
+        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         embed.set_footer(text="online-fix.me",
                          icon_url="https://media.discordapp.net/attachments/796453724713123870"
                                   "/1035951759505506364/favicon-1.png")

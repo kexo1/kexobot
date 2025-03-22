@@ -9,8 +9,8 @@ from discord.ext import commands
 from discord.commands import slash_command
 from discord import option
 from asyncprawcore.exceptions import AsyncPrawcoreException, ResponseException, RequestException
-from constants import ROAST_COMMANDS_MSG, IMGFLIP_PASSWORD, IMGFLIP_USERNAME, SHITPOST_SUBREDDITS, REDDIT_VIDEO_STRIP,\
-                       KYS_MESSAGES, DB_REDDIT_CACHE, KEXO_SERVER, SISKA_GANG_SERVER
+from constants import ROAST_COMMANDS_MSG, IMGFLIP_PASSWORD, IMGFLIP_USERNAME, SHITPOST_SUBREDDITS, REDDIT_VIDEO_STRIP, \
+    KYS_MESSAGES, DB_REDDIT_CACHE, KEXO_SERVER, SISKA_GANG_SERVER
 from utils import load_text_file, VideoDownloader
 
 
@@ -103,9 +103,10 @@ class FunStuff(commands.Cog):
                 if submission.over_18 and not guild_subreddit_cache.get("urls"):
                     continue
 
-                embed = await self.create_reddit_embed(submission,
-                                                       SHITPOST_SUBREDDITS[
-                                                           guild_subreddit_cache.get("which_subreddit")])
+                embed = await self.create_reddit_embed(
+                    submission,
+                    SHITPOST_SUBREDDITS[guild_subreddit_cache.get("which_subreddit")]
+                )
 
                 if submission.media:
                     await ctx.respond(embed=embed)
@@ -184,13 +185,13 @@ class FunStuff(commands.Cog):
 
     @staticmethod
     async def create_reddit_embed(submission: asyncpraw.reddit.Submission, subbreddit_name: str) -> discord.Embed:
-        embed = discord.Embed(title=f"{submission.title}", url=f"https://www.reddit.com{submission.permalink}",
-                              color=discord.Color.orange())
+        embed = discord.Embed(
+            title=f"{submission.title}",
+            url=f"https://www.reddit.com{submission.permalink}",
+            color=discord.Color.orange()
+        )
         embed.set_footer(text=f"r/{subbreddit_name} ｜🔺{submission.score}｜💬 {submission.num_comments}",
-                         icon_url="https://media.discordapp.net/attachments/796453724713123870"
-                                  "/1293985674696855552/reddit-logo-2436.png?ex=67095d91&is=67080c11&hm"
-                                  "=9728ebfb9f2b540d6dcac25149e9d620b249ef724f4b004cf831b9b6c5868083&=&format"
-                                  "=webp&quality=lossless")
+                         icon_url="https://www.pngkit.com/png/full/207-2074270_reddit-icon-png.png")
         embed.timestamp = datetime.fromtimestamp(submission.created_utc)
         return embed
 
@@ -200,10 +201,12 @@ class FunStuff(commands.Cog):
 
     @staticmethod
     async def reddit_unresponsive_msg(ctx: discord.ApplicationContext) -> None:
-        embed = discord.Embed(title="",
-                              description=f"🚫 Reddit didn't respond, try again in a minute.\nWhat could cause "
-                                          f"error? - Reddit is down, Subreddit is locked, API might be overloaded",
-                              color=discord.Color.from_rgb(r=255, g=0, b=0))
+        embed = discord.Embed(
+            title="",
+            description=f"🚫 Reddit didn't respond, try again in a minute.\nWhat could cause "
+                        f"error? - Reddit is down, Subreddit is locked, API might be overloaded",
+            color=discord.Color.from_rgb(r=255, g=0, b=0)
+        )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
 

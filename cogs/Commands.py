@@ -1,12 +1,12 @@
 import asyncio
 import discord
+import datetime
 import random
 import aiohttp
 import wavelink
 import time
 import sys
 
-from datetime import datetime, timedelta
 from discord.ext import commands
 from discord.commands import slash_command
 from discord.commands import option
@@ -27,9 +27,11 @@ class Commands(commands.Cog):
     @option('password', description='Lavalink server password.', required=True)
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def manual_recconect_node(self, ctx: discord.ApplicationContext, uri: str, port: int, password: str) -> None:
-        embed = discord.Embed(title="",
-                              description=f'**🔄 Connecting to `{uri}`**',
-                              color=discord.Color.blue())
+        embed = discord.Embed(
+            title="",
+            description=f'**🔄 Connecting to `{uri}`**',
+            color=discord.Color.blue()
+        )
         message = await ctx.respond(embed=embed)
 
         node = [wavelink.Node(uri=f"http://{uri}:{str(port)}", password=password, retries=1, resume_timeout=0)]
@@ -42,41 +44,49 @@ class Commands(commands.Cog):
         try:
             await node[0].fetch_info()
 
-            embed = discord.Embed(title="",
-                                  description=f'**✅ Connected to node `{uri}`**',
-                                  color=discord.Color.blue())
+            embed = discord.Embed(
+                title="",
+                description=f'**✅ Connected to node `{uri}`**',
+                color=discord.Color.blue()
+            )
             await message.edit(embed=embed)
 
         except (aiohttp.client_exceptions.ClientConnectorError, aiohttp.ConnectionTimeoutError,
                 wavelink.exceptions.NodeException, AssertionError):
-            embed = discord.Embed(title="",
-                                  description=f":x: Failed to connect to `{uri}`",
-                                  color=discord.Color.from_rgb(r=255, g=0, b=0))
+            embed = discord.Embed(
+                title="",
+                description=f":x: Failed to connect to `{uri}`",
+                color=discord.Color.from_rgb(r=255, g=0, b=0)
+            )
             await message.edit(embed=embed)
 
     @slash_command(name='reconnect_node', description='Automatically reconnect to avaiable node')
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def recconect_node(self, ctx: discord.ApplicationContext) -> None:
         await ctx.trigger_typing()
-        embed = discord.Embed(title="",
-                              description=f'**🔄 Getting Lavalink server.**',
-                              color=discord.Color.blue())
+        embed = discord.Embed(
+            title="",
+            description=f'**🔄 Getting Lavalink server.**',
+            color=discord.Color.blue()
+        )
         await ctx.respond(embed=embed)
 
         try:
             await self.bot.connect_node()
-            await self.bot.node[0].fetch_info()
         except (aiohttp.client_exceptions.ClientConnectorError, aiohttp.ConnectionTimeoutError,
                 wavelink.exceptions.NodeException, AssertionError):
-            embed = discord.Embed(title="",
-                                  description=f":x: Failed to connect to `{self.bot.node[0].uri}`, "
-                                              f"rolling back to previous node.",
-                                  color=discord.Color.from_rgb(r=255, g=0, b=0))
+            embed = discord.Embed(
+                title="",
+                description=f":x: Failed to connect to `{self.bot.node[0].uri}`, rolling back to previous node.",
+                color=discord.Color.from_rgb(r=255, g=0, b=0)
+            )
             return await ctx.send(embed=embed)
 
-        embed = discord.Embed(title="",
-                              description=f'**✅ Connected to node `{self.bot.node[0].uri}`**',
-                              color=discord.Color.blue())
+        embed = discord.Embed(
+            title="",
+            description=f'**✅ Connected to node `{self.bot.node[0].uri}`**',
+            color=discord.Color.blue()
+        )
         await ctx.send(embed=embed)
 
     @slash_command(name='host', description='Creates hosting embed, you can also choose some optional info.',
@@ -95,25 +105,37 @@ class Commands(commands.Cog):
     @option('image', description='Add custom image url for embed, needs to end with .png, .gif and etc.',
             required=False)
     @commands.cooldown(1, 300, commands.BucketType.user)
-    async def host(self, ctx, server_name: str, duration, password: str, region: str, category_maps: str, scripts: str,
-            slots: int = 8, ping: bool = True, image: str = None) -> None:
+    async def host(
+            self,
+            ctx,
+            server_name: str,
+            duration,
+            password: str,
+            region: str,
+            category_maps: str,
+            scripts: str,
+            slots: int = 8,
+            ping: bool = True,
+            image: str = None) -> None:
         author = ctx.author
 
         if author in host_authors:
             return await ctx.respond(
                 "You have already created host embed! Click on button embed to stop it from beign active.",
                 delete_after=10,
-                ephemeral=True)
+                ephemeral=True
+            )
 
         host_authors.append(author.name)
 
         embed = discord.Embed(
             title=server_name,
             description='**Online**  :green_circle: ',
-            color=discord.Color.green())
+            color=discord.Color.green()
+        )
 
         embed.set_author(icon_url=author.avatar.url, name=f'{author.name} is now hosting!')
-        embed.timestamp = datetime.utcnow()
+        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
 
         embed.add_field(name='Uptime:ㅤㅤ', value=duration)
         embed.set_footer(text=f'Slots: {slots}')
@@ -152,7 +174,7 @@ class Commands(commands.Cog):
     async def info(self, ctx: discord.ApplicationContext) -> None:
         embed = discord.Embed(title="INFO", color=discord.Color.blue())
         embed.add_field(name="Run time:ㅤㅤ" + '\u200b',
-                        value=f"{str(timedelta(seconds=round(int(time.time()) - self.run_time)))}")
+                        value=f"{str(datetime.timedelta(seconds=round(int(time.time()) - self.run_time)))}")
         embed.add_field(name="Ping:ㅤㅤㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
         embed.add_field(name="Version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤ", value=discord.__version__)
@@ -199,9 +221,13 @@ class HostView(discord.ui.View):
             await interaction.response.edit_message(embed=embed, view=None)
             pos = host_authors.index(self.author.name)
             host_authors.pop(pos)
-        else:
-            await interaction.response.send_message(
-                interaction.user.mention + ', you are not author of this embed.', delete_after=5, ephemeral=True)
+            return
+
+        await interaction.response.send_message(
+            f"{interaction.user.mention}, you are not author of this embed.",
+            delete_after=5,
+            ephemeral=True
+        )
 
     async def on_timeout(self) -> None:
         embed = await self.disable_embed()

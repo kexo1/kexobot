@@ -80,9 +80,11 @@ class RedditFreeGameFindings:
     async def _create_embed(self, embed_dict: dict, url: str) -> None:
         url_obj = urlparse(url)
         domain = url_obj.netloc
-        embed = discord.Embed(title=embed_dict["title"],
-                              description=f"{embed_dict['description']}\n\n**[{domain}]({url})**",
-                              color=discord.Color.dark_theme())
+        embed = discord.Embed(
+            title=embed_dict["title"],
+            description=f"{embed_dict['description']}\n\n**[{domain}]({url})**",
+            color=discord.Color.dark_theme()
+        )
         embed.set_thumbnail(url=embed_dict["icon"])
         embed.set_footer(text="I took it from - r/FreeGameFindings",
                          icon_url="https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png")

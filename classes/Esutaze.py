@@ -1,6 +1,6 @@
 import discord
+import datetime
 
-from datetime import datetime
 from io import BytesIO
 from bs4 import BeautifulSoup
 from constants import DB_CACHE, DB_LISTS
@@ -43,19 +43,22 @@ class Esutaze:
         article_description = article_body.find_all("p")
         contest_description = article_description[0].text
         contest_requirements = article_description[2].text
-        
+
         contest_ending_time = article_body.find("h4").text
         img_url = article_body.find("img").get("src")
         image_response = await self.session.get(img_url)
         image = BytesIO(image_response.content)
 
-        embed = discord.Embed(title=title, url=url,
-                              description=f"{contest_description}\n\n"
-                                          f"{contest_requirements}\n\n"
-                                          f"**{contest_ending_time}**",
-                              colour=discord.Colour.brand_red())
+        embed = discord.Embed(
+            title=title,
+            url=url,
+            description=f"{contest_description}\n\n"
+                        f"{contest_requirements}\n\n"
+                        f"**{contest_ending_time}**",
+            colour=discord.Colour.brand_red()
+        )
         embed.set_image(url="attachment://image.png")
-        embed.timestamp = datetime.utcnow()
+        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         embed.set_footer(text="www.esutaze.sk",
                          icon_url="https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg")
         await self.channel.send(embed=embed, file=discord.File(image, "image.png"))

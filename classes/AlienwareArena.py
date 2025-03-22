@@ -36,9 +36,11 @@ class AlienwareArena:
             soup = BeautifulSoup(giveaway["description"], "html.parser")
             description = soup.find("strong").text + f"\n\n**[eu.alienwarearena.com]({url})**"
 
-            embed = discord.Embed(title=title,
-                                  description=description,
-                                  colour=discord.Colour.dark_theme())
+            embed = discord.Embed(
+                title=title,
+                description=description,
+                colour=discord.Colour.dark_theme()
+            )
             embed.set_image(url=giveaway["image"])
             await self.channel.send(embed=embed)
 
