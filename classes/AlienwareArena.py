@@ -38,9 +38,9 @@ class AlienwareArena:
             alienwarearena_cache[0] = url
 
             soup = BeautifulSoup(giveaway["description"], "html.parser")
-            description = (
-                soup.find("strong").text + f"\n\n**[eu.alienwarearena.com]({url})**"
-            )
+            strong_element = soup.find("strong")
+            strong_text = strong_element.text if strong_element else ""
+            description = strong_text + f"\n\n**[eu.alienwarearena.com]({url})**"
 
             embed = discord.Embed(
                 title=title, description=description, colour=discord.Colour.dark_theme()

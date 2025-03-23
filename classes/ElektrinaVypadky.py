@@ -2,7 +2,7 @@ import discord
 import logging
 import datetime
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from constants import ELEKTRINA_MAX_ARTICLES, DB_CACHE
 
 
@@ -22,15 +22,23 @@ class ElektrinaVypadky:
             await self._process_articles(articles, elektrinavypadky_cache)
 
     @staticmethod
-    async def _get_articles(html_content: list) -> None:
+    async def _get_articles(html_content: str) -> list:
         soup = BeautifulSoup(html_content, "html.parser")
         collumn = soup.find(
-            class_="oznamy-new-columns-all-list-default oznamy-new-columns-all-list"
+            "ul",
+            class_="oznamy-new-columns-all-list-default oznamy-new-columns-all-list",
         )
         # If site is unreachable
         if not collumn:
-            logging.error("ElektrinaVypadky: Site is unreachable")
-            return None
+            logging.error(
+                "ElektrinaVypadky: Site is unreachable - ul element not found"
+            )
+            return []
+
+        if not isinstance(collumn, Tag):
+            logging.error(f"ElektrinaVypadky: Expected a Tag but got {type(collumn)}")
+            return []
+
         articles = collumn.find_all(
             "div", class_="short-text-envelope-default short-text-envelope"
         )
@@ -63,7 +71,8 @@ class ElektrinaVypadky:
 
             article_content = await self.session.get(url)
             soup = BeautifulSoup(article_content.text, "html.parser")
-            description = soup.find(class_="ci-full").text
+            element = soup.find(class_="ci-full")
+            description = element.text if element else ""
 
             if len(description) > 2048:
                 embed = discord.Embed(

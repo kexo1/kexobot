@@ -2,7 +2,7 @@ import discord
 import datetime
 
 from io import BytesIO
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from constants import DB_CACHE, DB_LISTS
 
 
@@ -42,12 +42,24 @@ class Esutaze:
         soup = BeautifulSoup(article_content.text, "html.parser")
         article_body = soup.find("div", class_="thecontent")
 
+        if not isinstance(article_body, Tag):
+            return
+
         article_description = article_body.find_all("p")
         contest_description = article_description[0].text
         contest_requirements = article_description[2].text
 
-        contest_ending_time = article_body.find("h4").text
-        img_url = article_body.find("img").get("src")
+        contest_ending_time_tag = article_body.find("h4")
+        contest_ending_time: str = (
+            contest_ending_time_tag.text if contest_ending_time_tag else ""
+        )
+
+        img_tag = article_body.find("img")
+        if not isinstance(img_tag, Tag):
+            print("Esutaze: Image tag not found")
+            return
+
+        img_url = img_tag.get("src")
         image_response = await self.session.get(img_url)
         image = BytesIO(image_response.content)
 
@@ -67,14 +79,20 @@ class Esutaze:
         )
         await self.channel.send(embed=embed, file=discord.File(image, "image.png"))
 
-    async def _get_articles(self) -> BeautifulSoup:
+    async def _get_articles(self) -> list:
         html_content = await self.session.get(
             "https://www.esutaze.sk/category/internetove-sutaze/"
         )
         soup = BeautifulSoup(html_content.text, "html.parser")
-        return soup.find("div", id="content_box").find_all("article")
+        content_box = soup.find("div", id="content_box")
 
-    async def _load_database(self) -> list:
+        if not isinstance(content_box, Tag):
+            print(f"Esutaze: Expected a Tag but got {type(content_box)}")
+            return []
+
+        return content_box.find_all("article")
+
+    async def _load_database(self) -> tuple:
         to_filter = await self.database.find_one(DB_LISTS)
         esutaze_cache = await self.database.find_one(DB_CACHE)
         return to_filter["esutaze_exceptions"], esutaze_cache["esutaze_cache"]

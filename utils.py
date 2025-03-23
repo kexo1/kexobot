@@ -1,6 +1,7 @@
 import aiohttp
 import discord
 import os
+from typing import Optional
 
 
 def load_text_file(name: str) -> list:
@@ -25,7 +26,7 @@ class VideoDownloader:
         self.file_path = None
         self.session = None
 
-    async def download_video(self, url, nsfw) -> discord.File:
+    async def download_video(self, url, nsfw) -> Optional[discord.File]:
         if not self.session:
             self.session = aiohttp.ClientSession()
             video_dir = os.path.join(os.getcwd(), "video")

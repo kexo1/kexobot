@@ -2,8 +2,8 @@ import re
 import discord
 import datetime
 
-from deep_translator import GoogleTranslator
-from bs4 import BeautifulSoup
+from deep_translator import GoogleTranslator  # type: ignore
+from bs4 import BeautifulSoup, Tag
 from httpx import Response
 from constants import ONLINEFIX_MAX_GAMES, DB_CACHE, DB_LISTS
 
@@ -23,17 +23,32 @@ class OnlineFix:
     async def _send_embed(self, url: str, game_title: str) -> None:
         onlinefix_article = await self.session.get(url)
         soup = BeautifulSoup(onlinefix_article.text, "html.parser")
-        img_url = soup.find("head").find("meta", attrs={"property": "og:image"})[
-            "content"
-        ]
+        head_tag = soup.find("head")
+        if not isinstance(head_tag, Tag):
+            print("OnlineFix: Image tag not found")
+            return
 
-        description = soup.find("article").find("div", class_="edited-block right").text
+        meta_tag = head_tag.find("meta", attrs={"property": "og:image"})
+        if not isinstance(meta_tag, Tag):
+            print("OnlineFix: Image tag not found")
+            return
+
+        img_url = meta_tag.get("content")
+        article_description = soup.find("article")
+        if not isinstance(article_description, Tag):
+            print("OnlineFix: Article tag not found")
+            return
+
+        description_element = article_description.find(
+            "div", class_="edited-block right"
+        )
+        description: str = description_element.text if description_element else ""
         description = GoogleTranslator(source="ru").translate(text=description)
         description = description.replace(". ", "\n")
 
         pattern = re.compile(r"version\s*(\d+(\.\d+)*)")
-        version = pattern.findall(description)
-        version = f" v{version[0][0]}" if version else ""
+        version_pattern = pattern.findall(description)
+        version: str = f" v{version_pattern[0][0]}" if version else ""
 
         embed = discord.Embed(
             title=game_title + version,
@@ -85,12 +100,15 @@ class OnlineFix:
             )
 
     @staticmethod
-    async def _get_messages(chat_log: Response) -> list:
+    async def _get_messages(chat_log: str) -> list:
         soup = BeautifulSoup(chat_log, "html.parser")
-        chat_log = soup.find("ul", id="lc_chat")
-        return chat_log.find_all("li", class_="lc_chat_li lc_chat_li_foto")
+        chat_element = soup.find("ul", id="lc_chat")
+        if not isinstance(chat_element, Tag):
+            print("OnlineFix: Chat element not found")
+            return []
+        return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
 
-    async def _load_database(self) -> list:
+    async def _load_database(self) -> tuple:
         onlinefix_cache = await self.database.find_one(DB_CACHE)
         games = await self.database.find_one(DB_LISTS)
         # Remove quotes due to online-fix.me not using quotes

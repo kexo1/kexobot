@@ -7,26 +7,32 @@ class LavalinkServerFetch:
     def __init__(self, bot, session: httpx.AsyncClient):
         self.bot = bot
         self.session = session
-        self.repeated_hostnames = []
+        self.repeated_hostnames: list[str] = []
 
-    async def get_lavalink_servers(self) -> None:
+    async def get_lavalink_servers(self) -> list:
         lavalink_servers = []
+        import json
+
         try:
             for url in LAVAINFO_API_URLS:
                 json_data = await self.session.get(url, timeout=10)
                 lavalink_servers += await self._lavainfo_fetch(json_data.json())
         except httpx.TimeoutException:
             print(f"The request to {LAVAINFO_API_URLS[0]} timed out.")
+        except json.decoder.JSONDecodeError:
+            print(f"Failed to decode JSON from {LAVAINFO_API_URLS[0]}")
 
         try:
             json_data = await self.session.get(LAVALIST_URL, timeout=10)
             lavalink_servers += await self._lavalist_fetch(json_data.json())
         except httpx.TimeoutException:
             print(f"The request to {LAVALIST_URL} timed out.")
+        except json.decoder.JSONDecodeError:
+            print(f"Failed to decode JSON from {LAVALIST_URL}")
 
         return lavalink_servers
 
-    async def _lavalist_fetch(self, json_data) -> None:
+    async def _lavalist_fetch(self, json_data: list) -> list:
         lavalink_servers = []
 
         for server in json_data:
@@ -44,7 +50,7 @@ class LavalinkServerFetch:
             )
         return lavalink_servers
 
-    async def _lavainfo_fetch(self, json_data) -> None:
+    async def _lavainfo_fetch(self, json_data: list) -> list:
         lavalink_servers = []
 
         for server in json_data:

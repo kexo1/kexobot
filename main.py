@@ -1,5 +1,5 @@
 import discord
-import asyncpraw
+import asyncpraw  # type: ignore
 import httpx
 import dns.resolver
 import random
@@ -116,8 +116,7 @@ class KexoBOT:
 
     async def create_session(self) -> None:
         self.session = httpx.AsyncClient()
-        self.session.verify = True
-        self.session.headers = {"User-Agent": UserAgent().random}
+        self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
     async def connect_node(self) -> None:
@@ -237,8 +236,7 @@ kexobot = KexoBOT()
 
 def create_cog_session() -> None:
     bot.session = httpx.AsyncClient()
-    bot.session.verify = True
-    bot.session.headers = {"User-Agent": UserAgent().random}
+    bot.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
 
 
 def setup_cogs() -> None:
@@ -310,7 +308,8 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
-        return await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
+        await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
+        return
     raise error
 
 

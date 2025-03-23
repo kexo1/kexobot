@@ -1,7 +1,7 @@
 import discord
 
 from urllib.parse import urlparse
-from asyncprawcore.exceptions import (
+from asyncprawcore.exceptions import (  # type: ignore
     AsyncPrawcoreException,
     ResponseException,
     RequestException,
@@ -67,18 +67,19 @@ class RedditFreeGameFindings:
 
     async def _process_submission(self, url: str) -> None:
         self.upload = True
+        feeegame_embeds: dict = REDDIT_FREEGAME_EMBEDS
 
         if "gleam" in url:
-            await self._create_embed(REDDIT_FREEGAME_EMBEDS["Gleam"], url)
+            await self._create_embed(feeegame_embeds["Gleam"], url)
         elif "alienwarearena" in url:
             await self._alienwarearena(url)
         elif "fanatical" in url:
             await self._fanatical(url)
         else:
-            await self._create_embed(REDDIT_FREEGAME_EMBEDS["Default"], url)
+            await self._create_embed(feeegame_embeds["Default"], url)
 
     async def _fanatical(self, url) -> None:
-        await self.user_kexo.send(f"Update function!: {url}")
+        await self.channel.send(f"Update function!: {url}")
         return
 
     async def _alienwarearena(self, url) -> None:
@@ -88,7 +89,9 @@ class RedditFreeGameFindings:
         for cached_url in alienwarearena_cache["alienwarearena_cache"]:
             if reddit_path in cached_url:
                 return
-        await self._create_embed(REDDIT_FREEGAME_EMBEDS["AlienwareArena"], url)
+
+        feeegame_embeds: dict = REDDIT_FREEGAME_EMBEDS
+        await self._create_embed(feeegame_embeds["AlienwareArena"], url)
 
     async def _create_embed(self, embed_dict: dict, url: str) -> None:
         url_obj = urlparse(url)
@@ -105,7 +108,7 @@ class RedditFreeGameFindings:
         )
         await self.channel.send(embed=embed)
 
-    async def _load_database(self) -> list:
+    async def _load_database(self) -> tuple:
         freegamefindings_cache = await self.database.find_one(DB_CACHE)
         to_filter = await self.database.find_one(DB_LISTS)
         return (

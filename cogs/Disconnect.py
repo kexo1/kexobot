@@ -14,14 +14,16 @@ class Disconnect(commands.Cog):
     @commands.cooldown(1, 4, commands.BucketType.user)
     @is_joined()
     async def disconnect_command(self, ctx: discord.ApplicationContext) -> None:
-        vc = ctx.voice_client
-        if vc.channel.id != ctx.author.voice.channel.id:
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
+
+        if vc.channel.id != ctx.author.voice.channel.id:  # type: ignore
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention}, join the voice channel the bot is playing in to disconnect it.",
                 color=discord.Color.blue(),
             )
-            return await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.respond(embed=embed, ephemeral=True)
+            return
 
         embed = discord.Embed(
             title="",
@@ -33,7 +35,7 @@ class Disconnect(commands.Cog):
 
     @staticmethod
     async def disconnect_player(guild: discord.Guild) -> None:
-        vc: wavelink.Player = guild.voice_client
+        vc: wavelink.Player = guild.voice_client  # type: ignore
         await vc.disconnect()
 
 

@@ -17,7 +17,7 @@ class DatabaseManager(commands.Cog):
         self.bot = bot
         self.database = self.bot.database
 
-    async def _get_database(self, collection: DataTypes) -> list:
+    async def _get_database(self, collection: str) -> list:
         db_list = await self.database.find_one(DB_LISTS)
         if collection == self.DataTypes.GAMES:
             return db_list["games"]
@@ -30,8 +30,9 @@ class DatabaseManager(commands.Cog):
 
         elif collection == self.DataTypes.ESUTAZE_EXCEPTIONS:
             return db_list["esutaze_exceptions"]
+        return []
 
-    async def _update_database(self, collection: DataTypes, updated_db: str) -> None:
+    async def _update_database(self, collection: str, updated_db: list) -> None:
         if collection == self.DataTypes.GAMES:
             await self.database.update_one(DB_LISTS, {"$set": {"games": updated_db}})
 

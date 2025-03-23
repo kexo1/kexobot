@@ -1,7 +1,7 @@
 import discord
 import wavelink
 
-from typing import Union
+from typing import Union, Optional
 from discord import option
 from discord.ext import commands
 from discord.commands import slash_command
@@ -28,7 +28,7 @@ class Play(commands.Cog):
                 return
             await self._prepare_wavelink(ctx)
 
-        vc: wavelink.Player = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
         await ctx.trigger_typing()
 
         track = await self._fetch_track(ctx, search)
@@ -37,7 +37,8 @@ class Play(commands.Cog):
 
         if vc.playing:
             vc.queue.put(track)
-            return await ctx.respond(embed=self._queue_embed(track))
+            await ctx.respond(embed=self._queue_embed(track))
+            return
 
         if not vc.just_connected and vc.queue.is_empty:
             vc.should_respond = True
@@ -59,7 +60,7 @@ class Play(commands.Cog):
     )
     @is_joined()
     async def play_next(self, ctx: discord.ApplicationContext, search: str) -> None:
-        vc = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
 
         await ctx.trigger_typing()
 
@@ -80,7 +81,7 @@ class Play(commands.Cog):
     @slash_command(name="skip", description="Skip playing song.")
     @is_playing()
     async def skip_command(self, ctx: discord.ApplicationContext) -> None:
-        vc = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
         await vc.skip()
 
         vc.should_respond = False
@@ -98,13 +99,14 @@ class Play(commands.Cog):
     )
     @is_playing()
     async def skip_to_command(self, ctx: discord.ApplicationContext, pos: int) -> None:
-        vc = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
 
         if vc.queue.is_empty:
             embed = discord.Embed(
                 title="", description="**Queue is empty**", color=discord.Color.blue()
             )
-            return await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed)
+            return
 
         try:
             track = vc.queue[pos - 1]
@@ -128,7 +130,7 @@ class Play(commands.Cog):
     @slash_command(name="pause", description="Pauses song that is currently playing.")
     @is_playing()
     async def pause_command(self, ctx: discord.ApplicationContext) -> None:
-        vc = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
 
         if vc.paused:
             embed = discord.Embed(
@@ -136,7 +138,8 @@ class Play(commands.Cog):
                 description=f"{ctx.user.mention}, song is already paused, use `/resume`",
                 color=discord.Color.blue(),
             )
-            return await ctx.response.send_message(embed=embed)
+            await ctx.response.send_message(embed=embed)
+            return
 
         await vc.pause(True)
 
@@ -150,7 +153,7 @@ class Play(commands.Cog):
     @slash_command(name="resume", description="Resumes paused song.")
     @is_playing()
     async def resume_command(self, ctx: discord.ApplicationContext) -> None:
-        vc = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
         await vc.pause(False)
 
         embed = discord.Embed(
@@ -163,7 +166,7 @@ class Play(commands.Cog):
 
     async def _fetch_track(
         self, ctx: discord.ApplicationContext, search: str
-    ) -> wavelink.Playable:
+    ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
         if not tracks:
             return None
@@ -171,9 +174,10 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _fetch_first_track(
-        ctx: discord.ApplicationContext, tracks: Union[Playable, TrackStartEventPayload]
+        ctx: discord.ApplicationContext,
+        tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
     ) -> wavelink.Playable:
-        vc = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
         # If it's a playlist
         if isinstance(tracks, wavelink.Playlist):
             for track in tracks:
@@ -201,7 +205,7 @@ class Play(commands.Cog):
     @staticmethod
     async def _search_tracks(
         ctx: discord.ApplicationContext, search: str
-    ) -> wavelink.Search:
+    ) -> Optional[wavelink.Search]:
         try:
             tracks: wavelink.Search = await wavelink.Playable.search(search)
         except (LavalinkLoadException, ClientConnectorError):
@@ -218,7 +222,7 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _join_channel(ctx: discord.ApplicationContext) -> bool:
-        if not ctx.author.voice or not ctx.author.voice.channel:
+        if not ctx.author.voice or not ctx.author.voice.channel:  # type: ignore
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention}, you're not in a voice channel. Type `/p` from vc.",
@@ -228,7 +232,7 @@ class Play(commands.Cog):
             return False
 
         try:
-            await ctx.author.voice.channel.connect(cls=wavelink.Player)
+            await ctx.author.voice.channel.connect(cls=wavelink.Player)  # type: ignore
         except wavelink.InvalidChannelStateException:
             embed = discord.Embed(
                 title="",
@@ -250,7 +254,7 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _prepare_wavelink(ctx: discord.ApplicationContext) -> None:
-        vc = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
         vc.autoplay = wavelink.AutoPlayMode.partial
         vc.text_channel = ctx.channel
         vc.should_respond = False

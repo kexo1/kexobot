@@ -1,14 +1,15 @@
-import asyncpraw.reddit
+import asyncpraw.reddit  # type: ignore
 import discord
 import random
-import imgflip
-import requests
+import imgflip  # type: ignore
+import requests  # type: ignore
 
 from datetime import datetime, timedelta
 from discord.ext import commands
 from discord.commands import slash_command
 from discord import option
-from asyncprawcore.exceptions import (
+from typing import Literal
+from asyncprawcore.exceptions import (  # type: ignore
     AsyncPrawcoreException,
     ResponseException,
     RequestException,
@@ -98,7 +99,8 @@ class FunStuff(commands.Cog):
     async def idk(self, ctx: discord.ApplicationContext) -> None:
         self.idk_count += 1
         if self.idk_count < 5:
-            return await ctx.respond("idk")
+            await ctx.respond("idk")
+            return
         await ctx.respond(
             "https://media.discordapp.net/attachments/796453724713123870/1042486203842306159/image.png"
         )
@@ -162,7 +164,9 @@ class FunStuff(commands.Cog):
     )
     @option("nsfw", bool, description="Turn on/off NSFW posts.", required=False)
     @commands.cooldown(1, 5, commands.BucketType.user)
-    async def shitpost(self, ctx: discord.ApplicationContext, nsfw: False) -> None:
+    async def shitpost(
+        self, ctx: discord.ApplicationContext, nsfw: Literal[False]
+    ) -> None:
         if nsfw:
             if ctx.guild:
                 self.bot.subbredit_cache[str(ctx.guild.id)]["nsfw"] = nsfw

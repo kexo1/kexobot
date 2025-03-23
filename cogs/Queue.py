@@ -15,13 +15,15 @@ class QueuePaginator(discord.ui.View):
         self.embeds = embeds
         self.current_page = 0
 
-    async def update_message(self, interaction: discord.Interaction):
+    async def update_message(self, interaction: discord.Interaction) -> None:
         await interaction.response.edit_message(
             embed=self.embeds[self.current_page], view=self
         )
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple)
-    async def previous(self, interaction: discord.Interaction):
+    async def previous(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         if self.current_page > 0:
             self.current_page -= 1
         else:
@@ -29,7 +31,9 @@ class QueuePaginator(discord.ui.View):
         await self.update_message(interaction)
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple)
-    async def next(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def next(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         if self.current_page < len(self.embeds) - 1:
             self.current_page += 1
         else:
@@ -44,13 +48,14 @@ class Queue(commands.Cog):
     @slash_command(name="queue", description="Shows songs in queue.")
     @is_joined()
     async def queue(self, ctx: discord.ApplicationContext) -> None:
-        vc: wavelink.Player = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
 
         if vc.queue.is_empty:
             embed = discord.Embed(
                 title="", description="**Queue is empty**", color=discord.Color.blue()
             )
-            return await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed)
+            return
 
         pages = await self._get_queue_embeds(ctx, vc)
 
@@ -75,7 +80,7 @@ class Queue(commands.Cog):
     )
     @is_joined()
     async def remove(self, ctx: discord.ApplicationContext, pos: Optional[int] = None):
-        vc: wavelink.Player = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
 
         if not pos:
             embed = discord.Embed(
@@ -84,7 +89,7 @@ class Queue(commands.Cog):
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed)
-            vc.queue.pop()
+            vc.queue.pop()  # type: ignore
             return
 
         try:
@@ -110,7 +115,7 @@ class Queue(commands.Cog):
     )
     @is_joined()
     async def shuffle(self, ctx: discord.ApplicationContext):
-        vc: wavelink.Player = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
 
         if vc.queue.is_empty:
             embed = discord.Embed(
@@ -138,13 +143,14 @@ class Queue(commands.Cog):
     )
     @is_joined()
     async def loop_queue(self, ctx: discord.ApplicationContext) -> None:
-        vc: wavelink.Player = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
 
         if vc.queue.is_empty:
             embed = discord.Embed(
                 title="", description="**Queue is empty**", color=discord.Color.blue()
             )
-            return await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed)
+            return
 
         if vc.queue.mode == wavelink.QueueMode.loop_all:
             vc.queue.mode = wavelink.QueueMode.loop_all
@@ -153,7 +159,8 @@ class Queue(commands.Cog):
                 description="**No longer looping queue.**",
                 color=discord.Color.blue(),
             )
-            return await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed)
+            return
         else:
             vc.queue.mode = wavelink.QueueMode.loop_all
             embed = discord.Embed(
@@ -161,7 +168,8 @@ class Queue(commands.Cog):
                 description=f"🔁 **Looping current queue ({vc.queue.count} songs)**",
                 color=discord.Color.blue(),
             )
-            return await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed)
+            return
 
     @slash_command(
         name="loop",
@@ -169,7 +177,7 @@ class Queue(commands.Cog):
     )
     @is_playing()
     async def loop(self, ctx: discord.ApplicationContext) -> None:
-        vc: wavelink.Player = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
 
         if vc.queue.mode == wavelink.QueueMode.loop:
             vc.queue.mode = wavelink.QueueMode.normal
@@ -178,7 +186,8 @@ class Queue(commands.Cog):
                 description="**No longer looping current song.**",
                 color=discord.Color.blue(),
             )
-            return await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed)
+            return
 
         vc.queue.mode = wavelink.QueueMode.loop
         embed = discord.Embed(
@@ -191,7 +200,7 @@ class Queue(commands.Cog):
     @slash_command(name="clear-queue", description="Clears queue")
     @is_joined()
     async def clear_queue(self, ctx: discord.ApplicationContext):
-        vc: wavelink.Player = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
         vc.queue.clear()
 
         embed = discord.Embed(
@@ -243,7 +252,7 @@ class Queue(commands.Cog):
         return pages
 
     @staticmethod
-    async def _get_queue_status(queue_mode: wavelink.QueueMode) -> str:
+    async def _get_queue_status(queue_mode: wavelink.QueueMode) -> tuple:
         if queue_mode == wavelink.QueueMode.loop_all:
             return "Looping queue", "🔁 "
         elif queue_mode == wavelink.QueueMode.loop:
@@ -253,7 +262,7 @@ class Queue(commands.Cog):
 
     @staticmethod
     async def _get_playing_embed(ctx: discord.ApplicationContext) -> discord.Embed:
-        vc: wavelink.Player = ctx.voice_client
+        vc: wavelink.Player = ctx.voice_client  # type: ignore
 
         embed = discord.Embed(
             title="Now playing",
