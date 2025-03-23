@@ -1,8 +1,11 @@
 import re
+
+import asyncpraw  # type: ignore
 import discord
 
 from datetime import datetime
-from asyncprawcore.exceptions import (
+from typing import Optional
+from asyncprawcore.exceptions import (  # type: ignore
     AsyncPrawcoreException,
     ResponseException,
     RequestException,
@@ -40,7 +43,7 @@ class RedditCrackWatch:
                 if not submission_text:
                     continue
 
-                description = []
+                description_list = []
 
                 for part in REDDIT_STRIP:
                     submission_text = submission_text.replace(part, "")
@@ -55,26 +58,21 @@ class RedditCrackWatch:
                     if ".png" in line or ".jpeg" in line or ".jpg" in line:
                         img_url = await self._get_image(line)
                         continue
-                    description.append(f"• {line}\n")
+                    description_list.append(f"• {line}\n")
 
                 crackwatch_cache_upload = [
                     crackwatch_cache_upload[-1]
                 ] + crackwatch_cache_upload[:-1]
                 crackwatch_cache_upload[0] = submission.permalink
 
-                description = "".join(description)[:4096]
-                embed = discord.Embed(
-                    title=submission.title[:256],
-                    url=f"https://www.reddit.com{submission.permalink}",
-                    description=description,
-                )
-
-                embed.color = discord.Color.orange()
+                description = "".join(description_list)[:4096]
                 if (
                     "denuvo removed" in submission.title.lower()
                     or "denuvo removed" in description.lower()
                 ):
-                    embed.color = discord.Color.gold()
+                    embed = await self._create_embed(submission, description, discord.Color.gold())
+                else:
+                    embed = await self._create_embed(submission, description, discord.Color.orange())
 
                 if img_url:
                     embed.set_image(url=img_url)
@@ -94,19 +92,27 @@ class RedditCrackWatch:
             print(f"Error when accessing crackwatch:\n{e}")
 
     @staticmethod
-    async def _get_image(line: str) -> str:
+    async def _create_embed(submission: asyncpraw.Reddit, description: str, color: discord.Color) -> discord.Embed:
+        embed = discord.Embed(
+            title=submission["title"][:256],
+            url=f"https://www.reddit.com{submission['permalink']}",
+            description=description,
+            color=color,
+        )
+        return embed
+
+    @staticmethod
+    async def _get_image(line: str) -> Optional[str]:
         print(line)
         image_url = re.findall(r"\((.*?)\)", line)
         if not image_url:
             return None
 
         if len(image_url) > 1:
-            image_url = image_url[1]
-        else:
-            image_url = image_url[0]
-        return image_url
+            return image_url[1]
+        return image_url[0]
 
-    async def _load_database(self) -> list:
+    async def _load_database(self) -> tuple:
         crackwatch_cache = await self.database.find_one(DB_CACHE)
         to_filter = await self.database.find_one(DB_LISTS)
         return crackwatch_cache["crackwatch_cache"], to_filter["crackwatch_exceptions"]
