@@ -70,9 +70,13 @@ class RedditCrackWatch:
                     "denuvo removed" in submission.title.lower()
                     or "denuvo removed" in description.lower()
                 ):
-                    embed = await self._create_embed(submission, description, discord.Color.gold())
+                    embed = await self._create_embed(
+                        submission, description, discord.Color.gold()
+                    )
                 else:
-                    embed = await self._create_embed(submission, description, discord.Color.orange())
+                    embed = await self._create_embed(
+                        submission, description, discord.Color.orange()
+                    )
 
                 if img_url:
                     embed.set_image(url=img_url)
@@ -92,7 +96,9 @@ class RedditCrackWatch:
             print(f"Error when accessing crackwatch:\n{e}")
 
     @staticmethod
-    async def _create_embed(submission: asyncpraw.Reddit, description: str, color: discord.Color) -> discord.Embed:
+    async def _create_embed(
+        submission: asyncpraw.Reddit, description: str, color: discord.Color
+    ) -> discord.Embed:
         embed = discord.Embed(
             title=submission["title"][:256],
             url=f"https://www.reddit.com{submission['permalink']}",

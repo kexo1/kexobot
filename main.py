@@ -157,14 +157,12 @@ class KexoBOT:
     async def set_joke(self) -> None:
         # insults, dark
         joke_categroy = random.choice(("jewish", "racist"))
-        joke = (
-            await self.session.get(
-                f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
-                f"{joke_categroy}&api-key={HUMOR_SECRET}"
-            )
-            .json()
-            .get("joke")
+        joke = await self.session.get(
+            f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
+            f"{joke_categroy}&api-key={HUMOR_SECRET}"
         )
+        joke = joke.json().get("joke")
+
         await bot.change_presence(
             activity=discord.Activity(type=discord.ActivityType.watching, name=joke)
         )

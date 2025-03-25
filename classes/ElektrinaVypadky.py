@@ -47,10 +47,15 @@ class ElektrinaVypadky:
     async def _process_articles(
         self, articles: list, elektrinavypadky_cache: list
     ) -> None:
+        elektrinavypadky_cache_upload = elektrinavypadky_cache
         above_limit = False
         for article in articles:
             description = article.find("div").text.lower()
             title = article.find("a")["aria-label"]
+
+            url = f"https://www.hliniknadhronom.sk{article.find('a')['href']}"
+            if url in elektrinavypadky_cache:
+                return
 
             if not (
                 "elektriny" in description
@@ -59,15 +64,10 @@ class ElektrinaVypadky:
             ):
                 continue
 
-            url = f"https://www.hliniknadhronom.sk{article.find('a')['href']}"
-
-            if url in elektrinavypadky_cache:
-                return
-
-            elektrinavypadky_cache = [
-                elektrinavypadky_cache[-1]
-            ] + elektrinavypadky_cache[:-1]
-            elektrinavypadky_cache[0] = url
+            elektrinavypadky_cache_upload = [
+                elektrinavypadky_cache_upload[-1]
+            ] + elektrinavypadky_cache_upload[:-1]
+            elektrinavypadky_cache_upload[0] = url
 
             article_content = await self.session.get(url)
             soup = BeautifulSoup(article_content.text, "html.parser")
@@ -94,7 +94,7 @@ class ElektrinaVypadky:
             if above_limit:
                 await self.user_kexo.send(description)
         await self.database.update_one(
-            DB_CACHE, {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache}}
+            DB_CACHE, {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache_upload}}
         )
 
     async def _load_database(self) -> list:

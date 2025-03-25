@@ -2,6 +2,8 @@ import discord
 import datetime
 
 from io import BytesIO
+
+import httpx
 from bs4 import BeautifulSoup, Tag
 from constants import DB_CACHE, DB_LISTS
 
@@ -14,7 +16,11 @@ class Esutaze:
 
     async def run(self) -> None:
         to_filter, esutaze_cache = await self._load_database()
+        esutaze_cache_upload = esutaze_cache
         articles = await self._get_articles()
+
+        if not articles:
+            return
 
         for article in articles:
             header = article.find("header")
@@ -29,12 +35,12 @@ class Esutaze:
             if is_filtered:
                 continue
 
-            esutaze_cache = [esutaze_cache[-1]] + esutaze_cache[:-1]
-            esutaze_cache[0] = url
+            esutaze_cache_upload = [esutaze_cache_upload[-1]] + esutaze_cache_upload[:-1]
+            esutaze_cache_upload[0] = url
             await self._send_article(url, title)
 
         await self.database.update_one(
-            DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache}}
+            DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache_upload}}
         )
 
     async def _send_article(self, url: str, title: str) -> None:
@@ -80,9 +86,14 @@ class Esutaze:
         await self.channel.send(embed=embed, file=discord.File(image, "image.png"))
 
     async def _get_articles(self) -> list:
-        html_content = await self.session.get(
-            "https://www.esutaze.sk/category/internetove-sutaze/"
-        )
+        try:
+            html_content = await self.session.get(
+                "https://www.esutaze.sk/category/internetove-sutaze/"
+            )
+        except httpx.ReadTimeout:
+            print("Esutaze: ReadTimeout")
+            return []
+
         soup = BeautifulSoup(html_content.text, "html.parser")
         content_box = soup.find("div", id="content_box")
 
