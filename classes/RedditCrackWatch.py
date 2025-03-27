@@ -97,11 +97,11 @@ class RedditCrackWatch:
 
     @staticmethod
     async def _create_embed(
-        submission: asyncpraw.Reddit, description: str, color: discord.Color
+        submission: asyncpraw.Reddit.submission, description: str, color: discord.Color
     ) -> discord.Embed:
         embed = discord.Embed(
-            title=submission["title"][:256],
-            url=f"https://www.reddit.com{submission['permalink']}",
+            title=submission.title[:256],
+            url=f"https://www.reddit.com{submission.permalink}",
             description=description,
             color=color,
         )

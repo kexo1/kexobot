@@ -14,6 +14,7 @@ requests
 deep_translator
 unidecode
 aiohttp
+lxml
 
 # Wavelink depencies
 yarl>=1.9.2

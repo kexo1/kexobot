@@ -1,8 +1,8 @@
 import discord
 import logging
-import datetime
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
+from datetime import datetime
 from constants import ELEKTRINA_MAX_ARTICLES, DB_CACHE
 
 
@@ -14,34 +14,25 @@ class ElektrinaVypadky:
 
     async def run(self) -> None:
         elektrinavypadky_cache = await self._load_database()
-        html_content = await self.session.get(
-            "https://www.hliniknadhronom.sk/mid/492460/ma0/all/.html"
-        )
+        try:
+            html_content = await self.session.get(
+                "https://www.hliniknadhronom.sk/get_rss.php?id=1_atom_1947"
+            )
+        except httpx.ReadTimeout:
+            print("ElektrinaVypadky: Timeout")
+            return
+
         articles = await self._get_articles(html_content.text)
         if articles:
             await self._process_articles(articles, elektrinavypadky_cache)
+            return
+        print("ElektrinaVypadky: No articles found")
 
     @staticmethod
     async def _get_articles(html_content: str) -> list:
-        soup = BeautifulSoup(html_content, "html.parser")
-        collumn = soup.find(
-            "ul",
-            class_="oznamy-new-columns-all-list-default oznamy-new-columns-all-list",
-        )
-        # If site is unreachable
-        if not collumn:
-            logging.error(
-                "ElektrinaVypadky: Site is unreachable - ul element not found"
-            )
-            return []
+        soup = BeautifulSoup(html_content, "xml")
 
-        if not isinstance(collumn, Tag):
-            logging.error(f"ElektrinaVypadky: Expected a Tag but got {type(collumn)}")
-            return []
-
-        articles = collumn.find_all(
-            "div", class_="short-text-envelope-default short-text-envelope"
-        )
+        articles = soup.find_all("entry")
         return articles[:ELEKTRINA_MAX_ARTICLES]
 
     async def _process_articles(
@@ -49,13 +40,14 @@ class ElektrinaVypadky:
     ) -> None:
         elektrinavypadky_cache_upload = elektrinavypadky_cache
         above_limit = False
-        for article in articles:
-            description = article.find("div").text.lower()
-            title = article.find("a")["aria-label"]
 
-            url = f"https://www.hliniknadhronom.sk{article.find('a')['href']}"
+        for article in articles:
+            description = article.find("content").text
+            url = article.find("link")["href"]
             if url in elektrinavypadky_cache:
                 return
+
+            title = article.find("title").text
 
             if not (
                 "elektriny" in description
@@ -69,10 +61,8 @@ class ElektrinaVypadky:
             ] + elektrinavypadky_cache_upload[:-1]
             elektrinavypadky_cache_upload[0] = url
 
-            article_content = await self.session.get(url)
-            soup = BeautifulSoup(article_content.text, "html.parser")
-            element = soup.find(class_="ci-full")
-            description = element.text if element else ""
+            iso_time = article.find("published").text
+            timestamp = datetime.fromisoformat(iso_time)
 
             if len(description) > 2048:
                 embed = discord.Embed(
@@ -84,7 +74,7 @@ class ElektrinaVypadky:
             else:
                 embed = discord.Embed(title=title, url=url, description=description)
 
-            embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+            embed.timestamp = timestamp
             embed.set_footer(
                 text="",
                 icon_url="https://www.hliniknadhronom.sk/portals_pictures/i_006868/i_6868718.png",
@@ -94,7 +84,8 @@ class ElektrinaVypadky:
             if above_limit:
                 await self.user_kexo.send(description)
         await self.database.update_one(
-            DB_CACHE, {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache_upload}}
+            DB_CACHE,
+            {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache_upload}},
         )
 
     async def _load_database(self) -> list:

@@ -13,9 +13,16 @@ class AlienwareArena:
 
     async def run(self) -> None:
         alienwarearena_cache = await self._load_database()
-        json_data = await self.session.get(
-            "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
-        )
+        import httpx
+
+        try:
+            json_data = await self.session.get(
+                "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
+            )
+        except httpx.ReadTimeout:
+            print("AlienwareArena: Timeout")
+            return
+
         await self._send_embed(json_data.json(), alienwarearena_cache)
 
     async def _send_embed(self, json_data: dict, alienwarearena_cache: list) -> None:

@@ -20,47 +20,46 @@ class Esutaze:
         articles = await self._get_articles()
 
         if not articles:
+            print("Esutaze: No articles found")
             return
 
         for article in articles:
-            header = article.find("header")
-            a_tag = header.find("a")
-            url = a_tag.get("href")
+            url = article.find("link").text
 
             if url in esutaze_cache:
                 return  # If first url is already in cache, all the rest are too
 
-            title = a_tag.get("title")
+            title = article.find("title").text
             is_filtered = [k for k in to_filter if k.lower() in title]
             if is_filtered:
                 continue
 
-            esutaze_cache_upload = [esutaze_cache_upload[-1]] + esutaze_cache_upload[:-1]
+            esutaze_cache_upload = [esutaze_cache_upload[-1]] + esutaze_cache_upload[
+                :-1
+            ]
             esutaze_cache_upload[0] = url
-            await self._send_article(url, title)
+
+            await self._send_article(article)
 
         await self.database.update_one(
             DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache_upload}}
         )
 
-    async def _send_article(self, url: str, title: str) -> None:
-        article_content = await self.session.get(url)
-        soup = BeautifulSoup(article_content.text, "html.parser")
-        article_body = soup.find("div", class_="thecontent")
-
-        if not isinstance(article_body, Tag):
-            return
-
-        article_description = article_body.find_all("p")
-        contest_description = article_description[0].text
-        contest_requirements = article_description[2].text
-
-        contest_ending_time_tag = article_body.find("h4")
-        contest_ending_time: str = (
-            contest_ending_time_tag.text if contest_ending_time_tag else ""
+    async def _send_article(self, article) -> None:
+        title = article.find("title").text
+        url = article.find("link").text
+        contest_description = article.find("description")
+        contest_description = (
+            BeautifulSoup(contest_description.text, "html.parser").find("p").text
         )
+        unix_time = article.find("pubDate").text
+        timestamp = datetime.datetime.strptime(unix_time, "%a, %d %b %Y %H:%M:%S %z")
 
-        img_tag = article_body.find("img")
+        article_content = article.find("content:encoded").text
+        soup = BeautifulSoup(article_content, "html.parser")
+        contest_ending_time = soup.find("h4").text.strip()
+
+        img_tag = soup.find("img")
         if not isinstance(img_tag, Tag):
             print("Esutaze: Image tag not found")
             return
@@ -72,13 +71,11 @@ class Esutaze:
         embed = discord.Embed(
             title=title,
             url=url,
-            description=f"{contest_description}\n\n"
-            f"{contest_requirements}\n\n"
-            f"**{contest_ending_time}**",
+            description=f"{contest_description}\n\n**{contest_ending_time}**",
             colour=discord.Colour.brand_red(),
         )
         embed.set_image(url="attachment://image.png")
-        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        embed.timestamp = timestamp
         embed.set_footer(
             text="www.esutaze.sk",
             icon_url="https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg",
@@ -88,20 +85,14 @@ class Esutaze:
     async def _get_articles(self) -> list:
         try:
             html_content = await self.session.get(
-                "https://www.esutaze.sk/category/internetove-sutaze/"
+                "https://www.esutaze.sk/category/internetove-sutaze/feed/"
             )
         except httpx.ReadTimeout:
             print("Esutaze: ReadTimeout")
             return []
 
-        soup = BeautifulSoup(html_content.text, "html.parser")
-        content_box = soup.find("div", id="content_box")
-
-        if not isinstance(content_box, Tag):
-            print(f"Esutaze: Expected a Tag but got {type(content_box)}")
-            return []
-
-        return content_box.find_all("article")
+        soup = BeautifulSoup(html_content.content, "xml")
+        return soup.find_all("item")
 
     async def _load_database(self) -> tuple:
         to_filter = await self.database.find_one(DB_LISTS)

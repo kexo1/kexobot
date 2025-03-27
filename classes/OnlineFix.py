@@ -1,6 +1,7 @@
 import re
 import discord
 import datetime
+import httpx
 
 from deep_translator import GoogleTranslator  # type: ignore
 from bs4 import BeautifulSoup, Tag
@@ -16,7 +17,12 @@ class OnlineFix:
 
     async def run(self) -> None:
         onlinefix_cache, games = await self._load_database()
-        chat_log = await self.session.get("https://online-fix.me/chat.php")
+        try:
+            chat_log = await self.session.get("https://online-fix.me/chat.php")
+        except httpx.ReadTimeout:
+            print("OnlineFix: Read timeout")
+            return
+
         chat_messages = await self._get_messages(chat_log.text)
         await self._process_messages(chat_messages, onlinefix_cache, games)
 

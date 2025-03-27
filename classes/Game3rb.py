@@ -1,4 +1,6 @@
 import re
+
+import httpx
 import unidecode
 import discord
 import logging
@@ -20,8 +22,14 @@ class Game3rb:
 
         game_list = await self.database.find_one(DB_LISTS)
         game_list = "\n".join(game_list["games"])
+        try:
+            source = await self.session.get(
+                "https://game3rb.com/category/games-online/"
+            )
+        except httpx.ReadTimeout:
+            logging.info("Game3rb: Read timeout")
+            return
 
-        source = await self.session.get("https://game3rb.com/category/games-online/")
         game_info = []
         to_upload = []
 
