@@ -73,14 +73,8 @@ class RedditFreeGameFindings:
             await self._create_embed(feeegame_embeds["Gleam"], url)
         elif "alienwarearena" in url:
             await self._alienwarearena(url)
-        elif "fanatical" in url:
-            await self._fanatical(url)
         else:
             await self._create_embed(feeegame_embeds["Default"], url)
-
-    async def _fanatical(self, url) -> None:
-        await self.channel.send(f"Update function!: {url}")
-        return
 
     async def _alienwarearena(self, url) -> None:
         # There might be an occurence where giveaway is not showing in alienwarearena.com

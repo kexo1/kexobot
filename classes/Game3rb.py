@@ -149,9 +149,10 @@ class Game3rb:
                 game_update_url.append(unidecode.unidecode(match.group(2).strip()))
 
             embed = discord.Embed(
-                title=game["title"] + game["version"], url=game["url"]
+                title=game["title"] + game["version"],
+                url=game["url"],
+                timestamp=datetime.fromisoformat(game["timestamp"]),
             )
-            embed.timestamp = datetime.fromisoformat(game["timestamp"])
             embed.add_field(name="Download links:", value="\n".join(description))
             if game_update_name:
                 game_update = "\n".join(

@@ -1,4 +1,5 @@
 import discord
+import httpx
 
 from bs4 import BeautifulSoup
 from constants import DB_CACHE, ALIENWAREARENA_MAX_POSTS, ALIENWAREARENA_STRIP
@@ -9,11 +10,9 @@ class AlienwareArena:
         self.database = database
         self.session = session
         self.channel = channel
-        self.upload = False
 
     async def run(self) -> None:
         alienwarearena_cache = await self._load_database()
-        import httpx
 
         try:
             json_data = await self.session.get(
@@ -30,7 +29,7 @@ class AlienwareArena:
             url = "https://eu.alienwarearena.com" + giveaway["url"]
 
             if url in alienwarearena_cache:
-                return
+                continue
 
             title = giveaway["title"].lower()
             if "dlc" in title:

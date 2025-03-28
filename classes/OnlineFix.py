@@ -61,8 +61,8 @@ class OnlineFix:
             url=url,
             description=description,
             color=discord.Color.blue(),
+            timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
-        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         embed.set_footer(
             text="online-fix.me",
             icon_url="https://media.discordapp.net/attachments/796453724713123870"
@@ -87,7 +87,7 @@ class OnlineFix:
             url = message.find_all("a")[1].get("href")
 
             if message_id in onlinefix_cache:
-                return
+                continue
 
             game_title = message.find_all("a")[1].text.replace(" по сети", "")
             if game_title not in games:

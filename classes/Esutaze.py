@@ -20,14 +20,13 @@ class Esutaze:
         articles = await self._get_articles()
 
         if not articles:
-            print("Esutaze: No articles found")
             return
 
         for article in articles:
             url = article.find("link").text
 
             if url in esutaze_cache:
-                return  # If first url is already in cache, all the rest are too
+                continue
 
             title = article.find("title").text
             is_filtered = [k for k in to_filter if k.lower() in title]
@@ -73,9 +72,9 @@ class Esutaze:
             url=url,
             description=f"{contest_description}\n\n**{contest_ending_time}**",
             colour=discord.Colour.brand_red(),
+            timestamp=timestamp,
         )
         embed.set_image(url="attachment://image.png")
-        embed.timestamp = timestamp
         embed.set_footer(
             text="www.esutaze.sk",
             icon_url="https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg",

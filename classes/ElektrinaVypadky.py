@@ -2,8 +2,8 @@ import discord
 import logging
 
 from bs4 import BeautifulSoup
-from datetime import datetime
 from constants import ELEKTRINA_MAX_ARTICLES, DB_CACHE
+from utils import iso_to_timestamp
 
 
 class ElektrinaVypadky:
@@ -45,7 +45,7 @@ class ElektrinaVypadky:
             description = article.find("content").text
             url = article.find("link")["href"]
             if url in elektrinavypadky_cache:
-                return
+                continue
 
             title = article.find("title").text
 
@@ -62,19 +62,21 @@ class ElektrinaVypadky:
             elektrinavypadky_cache_upload[0] = url
 
             iso_time = article.find("published").text
-            timestamp = datetime.fromisoformat(iso_time)
+            timestamp = iso_to_timestamp(iso_time)
 
             if len(description) > 2048:
                 embed = discord.Embed(
                     title=title,
                     url=url,
                     description="Under embed (amount of text in embed is restricted",
+                    timestamp=timestamp,
                 )
                 above_limit = True
             else:
-                embed = discord.Embed(title=title, url=url, description=description)
+                embed = discord.Embed(
+                    title=title, url=url, description=description, timestamp=timestamp
+                )
 
-            embed.timestamp = timestamp
             embed.set_footer(
                 text="",
                 icon_url="https://www.hliniknadhronom.sk/portals_pictures/i_006868/i_6868718.png",

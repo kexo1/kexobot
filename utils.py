@@ -1,7 +1,9 @@
 import aiohttp
 import discord
 import os
+
 from typing import Optional
+from datetime import datetime
 
 
 def load_text_file(name: str) -> list:
@@ -19,6 +21,11 @@ def return_dict(subbredit_cache) -> dict:
             "which_subreddit": int(which_subreddit),
         }
     return subbredit_cache
+
+
+def iso_to_timestamp(iso_time: str) -> datetime:
+    timestamp = datetime.fromisoformat(iso_time.replace("Z", "+00:00"))
+    return timestamp
 
 
 class VideoDownloader:

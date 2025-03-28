@@ -36,6 +36,7 @@ from classes.LavalinkServerFetch import LavalinkServerFetch
 from classes.ElektrinaVypadky import ElektrinaVypadky
 from classes.RedditCrackWatch import RedditCrackWatch
 from classes.RedditFreegamefindings import RedditFreeGameFindings
+from classes.Fanatical import Fanatical
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
@@ -101,6 +102,7 @@ class KexoBOT:
         self.alienwarearena = AlienwareArena(
             self.database, self.session, self.free_stuff_channel
         )
+        self.fanatical = Fanatical(self.database, self.session, self.free_stuff_channel)
         self.reddit_freegamefindings = RedditFreeGameFindings(
             self.database, self.reddit, self.session, self.free_stuff_channel
         )
@@ -215,6 +217,10 @@ class KexoBOT:
             await self.reddit_crackwatch.run()
 
         elif self.main_loop_counter == 5:
+            self.main_loop_counter = 6
+            await self.fanatical.run()
+
+        elif self.main_loop_counter == 6:
             self.main_loop_counter = 0
             await self.esutaze.run()
 
