@@ -48,9 +48,19 @@ bot = discord.Bot()
 
 
 class KexoBOT:
+    """Main class for the bot.
+    This class is responsible for initializing the bot, creating the session,
+    and connecting to the lavalink server.
+    It also contains the main loop and the hourly loop.
+    The main loop is responsible for running the different classes that
+    fetch data from different sources.
+    The hourly loop is responsible for updating the reddit cache and
+    fetching lavalink servers.
+    """
     def __init__(self):
-        self.user_kexo = None
-        self.session = None
+        self.user_kexo = None | discord.User
+        self.session = None | httpx.AsyncClient
+        self.subreddit_cache = None | dict
         self.which_lavalink_server = -1
         self.lavalink_servers = []
         self.main_loop_counter = 0
@@ -71,14 +81,22 @@ class KexoBOT:
         bot.reddit = self.reddit
         bot.connect_node = self.connect_node
 
-        self.onlinefix = None
-        self.game3rb = None
-        self.reddit_freegamefindings = None
-        self.reddit_crackwatch = None
-        self.elektrina_vypadky = None
-        self.esutaze = None
+        self.onlinefix = None | OnlineFix
+        self.game3rb = None | Game3rb
+        self.reddit_freegamefindings = None | RedditFreeGameFindings
+        self.reddit_crackwatch = None | RedditCrackWatch
+        self.elektrina_vypadky = None | ElektrinaVypadky
+        self.esutaze = None | Esutaze
+        self.lavalink_fetch = None | LavalinkServerFetch
+        self.fanatical = None | Fanatical
+        self.alienwarearena = None | AlienwareArena
+        self.esutaze_channel = None | discord.TextChannel
+        self.game_updates_channel = None | discord.TextChannel
+        self.free_stuff_channel = None | discord.TextChannel
 
     async def initialize(self) -> None:
+        """Initialize the bot and fetch all channels and users."""
+
         await self._fetch_users()
         await self.create_session()
         await self._fetch_channels()
@@ -95,6 +113,8 @@ class KexoBOT:
         print("Channels fetched.")
 
     async def _define_classes(self) -> None:
+        """Define classes for the bot."""
+
         self.onlinefix = OnlineFix(
             self.session, self.database, self.game_updates_channel
         )
@@ -117,11 +137,15 @@ class KexoBOT:
         print("Classes defined.")
 
     async def create_session(self) -> None:
+        """Create a httpx session for the bot."""
+
         self.session = httpx.AsyncClient()
         self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
     async def connect_node(self) -> None:
+        """Connect to lavalink node."""
+
         if not self.lavalink_servers:
             print("No lavalink servers found.")
             return
@@ -157,23 +181,32 @@ class KexoBOT:
             return
 
     async def set_joke(self) -> None:
-        # insults, dark
-        joke_categroy = random.choice(("jewish", "racist"))
-        joke = await self.session.get(
-            f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
-            f"{joke_categroy}&api-key={HUMOR_SECRET}"
-        )
-        joke = joke.json().get("joke")
+        """Set a random joke as the bot's activity."""
 
+        joke_categroy = random.choice(("jewish", "racist"))
+        try:
+            joke = await self.session.get(
+                f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
+                f"{joke_categroy}&api-key={HUMOR_SECRET}"
+            )
+        except httpx.ReadTimeout:
+            print("Couldn't fetch joke: Timeout")
+            return
+
+        joke = joke.json().get("joke")
         await bot.change_presence(
             activity=discord.Activity(type=discord.ActivityType.watching, name=joke)
         )
 
     async def _fetch_users(self) -> None:
+        """Fetch users for the bot."""
+
         self.user_kexo = await bot.fetch_user(402221830930432000)
         print(f"User {self.user_kexo.name} fetched.")
 
     async def update_reddit_cache(self, now: datetime) -> None:
+        """Update the reddit cache in the database."""
+
         update = {}
         for guild_id, cache in bot.subbredit_cache.items():
             # If midnight, set search_level to 0
@@ -196,6 +229,11 @@ class KexoBOT:
         bot.subbredit_cache = return_dict(update)
 
     async def main_loop(self) -> None:
+        """Main loop for the bot.
+        This loop runs every minute and runs the different classes that
+        fetch data from different sources.
+        It runs the classes in a round-robin fashion.
+        """
         if self.main_loop_counter == 0:
             self.main_loop_counter = 1
             await self.reddit_freegamefindings.run()
@@ -225,6 +263,12 @@ class KexoBOT:
             await self.esutaze.run()
 
     async def hourly_loop(self) -> None:
+        """Hourly loop for the bot.
+        This loop runs every hour and runs the different classes that
+        fetch data from different sources.
+        It runs the classes in a round-robin fashion.
+        It also updates the reddit cache and fetches lavalink servers.
+        """
         now = datetime.now()
 
         if now.hour == 0:
@@ -239,11 +283,13 @@ kexobot = KexoBOT()
 
 
 def create_cog_session() -> None:
+    """Create a httpx session for the cogs."""
     bot.session = httpx.AsyncClient()
     bot.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
 
 
 def setup_cogs() -> None:
+    """Load all cogs for the bot."""
     create_cog_session()
     bot.load_extension("cogs.Play")
     bot.load_extension("cogs.Listeners")
@@ -281,10 +327,17 @@ async def before_hourly_loop() -> None:
 
 @bot.event
 async def on_ready() -> None:
+    """Event that runs when the bot is ready.
+    This event is responsible for initializing the bot and
+    connecting to the lavalink server.
+    It also starts the main loop and the hourly loop.
+    """
     print(f"Logged in as {bot.user}")
+
     await kexobot.initialize()
     main_loop_task.start()
     hourly_loop_task.start()
+
     while not kexobot.lavalink_servers:
         await asyncio.sleep(1)
     await kexobot.connect_node()
@@ -292,6 +345,11 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
+    """Event that runs when a command raises an error.
+    This event is responsible for handling the error and
+    sending an error message to the user.
+    It also handles the case when the command is not found.
+    """
     if isinstance(error, commands.errors.CommandNotFound):
         embed = discord.Embed(
             title="",
@@ -304,6 +362,8 @@ async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
 
 @bot.event
 async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
+    """Event that runs when a command is timed out."""
+    
     if isinstance(error, commands.CommandOnCooldown):
         error_str = str(error).split()
         embed = discord.Embed(

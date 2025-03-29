@@ -1,5 +1,5 @@
 import discord
-import logging
+import httpx
 
 from bs4 import BeautifulSoup
 from constants import ELEKTRINA_MAX_ARTICLES, DB_CACHE
@@ -50,8 +50,8 @@ class ElektrinaVypadky:
             title = article.find("title").text
 
             if not (
-                "elektriny" in description
-                or "elektriny" in title.lower()
+                "elektrin" in description
+                or "elektrin" in title.lower()
                 or "odstávka vody" in title.lower()
             ):
                 continue

@@ -27,7 +27,7 @@ class Game3rb:
                 "https://game3rb.com/category/games-online/"
             )
         except httpx.ReadTimeout:
-            logging.info("Game3rb: Read timeout")
+            logging.info("Game3rb: Timeout")
             return
 
         game_info = []

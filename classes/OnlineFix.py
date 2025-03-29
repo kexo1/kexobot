@@ -5,7 +5,6 @@ import httpx
 
 from deep_translator import GoogleTranslator  # type: ignore
 from bs4 import BeautifulSoup, Tag
-from httpx import Response
 from constants import ONLINEFIX_MAX_GAMES, DB_CACHE, DB_LISTS
 
 
@@ -20,7 +19,7 @@ class OnlineFix:
         try:
             chat_log = await self.session.get("https://online-fix.me/chat.php")
         except httpx.ReadTimeout:
-            print("OnlineFix: Read timeout")
+            print("OnlineFix: Timeout")
             return
 
         chat_messages = await self._get_messages(chat_log.text)

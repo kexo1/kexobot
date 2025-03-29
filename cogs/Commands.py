@@ -33,7 +33,7 @@ class Commands(commands.Cog):
     @option("password", description="Lavalink server password.", required=True)
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def manual_recconect_node(
-        self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
+            self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
     ) -> None:
         embed = discord.Embed(
             title="",
@@ -67,10 +67,10 @@ class Commands(commands.Cog):
             await message.edit(embed=embed)
 
         except (
-            aiohttp.client_exceptions.ClientConnectorError,
-            aiohttp.ConnectionTimeoutError,
-            wavelink.exceptions.NodeException,
-            AssertionError,
+                aiohttp.client_exceptions.ClientConnectorError,
+                aiohttp.ConnectionTimeoutError,
+                wavelink.exceptions.NodeException,
+                AssertionError,
         ):
             embed = discord.Embed(
                 title="",
@@ -95,10 +95,10 @@ class Commands(commands.Cog):
         try:
             await self.bot.connect_node()
         except (
-            aiohttp.client_exceptions.ClientConnectorError,
-            aiohttp.ConnectionTimeoutError,
-            wavelink.exceptions.NodeException,
-            AssertionError,
+                aiohttp.client_exceptions.ClientConnectorError,
+                aiohttp.ConnectionTimeoutError,
+                wavelink.exceptions.NodeException,
+                AssertionError,
         ):
             embed = discord.Embed(
                 title="",
@@ -124,15 +124,29 @@ class Commands(commands.Cog):
         "duration",
         description="How long are you going to be hositng.",
         choices=[
-            "As long as I want/Before any crash.",
+            "As long as I want.",
             "15 minutes",
-            "30 minutes",
-            "45 minutes",
+            "15-60 minutes",
             "1 hour",
             "1+ hours",
             "2+ hours",
             "3+ hours",
         ],
+    )
+    @option(
+        "branch",
+        description="If you're hosting on stable, beta, redux, default is stable.",
+        choices=[
+            "Stable",
+            "Beta",
+            "Redux",
+        ],
+        required=False,
+    )
+    @option(
+        "version",
+        description="Which version are you hosting on.",
+        required=False,
     )
     @option(
         "ping",
@@ -141,11 +155,6 @@ class Commands(commands.Cog):
     )
     @option("password", description="Server password.", required=False)
     @option("region", description="Server region.", required=False)
-    @option(
-        "category_maps",
-        description="What kind of server, which maps, etc...",
-        required=False,
-    )
     @option("scripts", description="Which scripts are enabled.", required=False)
     @option("slots", description="How many server slots, default is 8", required=False)
     @option(
@@ -155,17 +164,18 @@ class Commands(commands.Cog):
     )
     @commands.cooldown(1, 300, commands.BucketType.user)
     async def host(
-        self,
-        ctx,
-        server_name: str,
-        duration,
-        password: str,
-        region: str,
-        category_maps: str,
-        scripts: str,
-        slots: int = 8,
-        ping: bool = True,
-        image: str = None,
+            self,
+            ctx,
+            server_name: str,
+            duration: str,
+            branch: str,
+            version: str,
+            password: str,
+            region: str,
+            scripts: str,
+            slots: int = 8,
+            ping: bool = True,
+            image: str = None,
     ) -> None:
         author = ctx.author
 
@@ -180,29 +190,32 @@ class Commands(commands.Cog):
 
         embed = discord.Embed(
             title=server_name,
-            description="**Online**  :green_circle: ",
-            color=discord.Color.green(),
+            color=discord.Color.from_rgb(r=0, g=200, b=0),
         )
 
         embed.set_author(
             icon_url=author.avatar.url, name=f"{author.name} is now hosting!"
         )
-        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
 
-        embed.add_field(name="Uptime:ㅤㅤ", value=duration)
-        embed.set_footer(text=f"Slots: {slots}")
+        if not branch:
+            branch = "Stable"
+        version = f"{branch} {version}" if version else branch or ""
+
+        timestamp = int(time.time())  # Current time in seconds
+        timestamp = f"<t:{timestamp}:R>"
+
+        embed.add_field(name="Statusㅤㅤ", value="**ONLINE** <a:online:1355562936919392557>")
+        embed.add_field(name="Durationㅤㅤ", value=duration)
+        embed.add_field(name="Uptimeㅤㅤㅤㅤ", value=timestamp)
+        embed.add_field(name="Versionㅤㅤ", value=version)
+        embed.add_field(name="Slotsㅤㅤ", value=slots)
+        embed.add_field(name="Regionㅤㅤ", value=region if region else "Not specified")
 
         if password:
-            embed.add_field(name="Password:ㅤㅤ", value=password)
-
-        if region:
-            embed.add_field(name="Region:ㅤㅤ", value=region)
-
-        if category_maps:
-            embed.add_field(name="Category/Maps:ㅤㅤ", value=category_maps)
+            embed.add_field(name="Password", value=password if password else "Not specified")
 
         if scripts:
-            embed.add_field(name="Scripts:ㅤㅤ", value=scripts)
+            embed.add_field(name="Scripts", value=scripts if scripts else "Not specified")
 
         if image:
             if image.endswith((".jpg", ".jpeg", ".png", ".gif")):
@@ -213,14 +226,22 @@ class Commands(commands.Cog):
                     ephemeral=True,
                     delete_after=10,
                 )
+                return
         if ping:
-            role = discord.utils.get(ctx.guild.roles, name="Exotic")
-            await ctx.send(role.mention)
+            try:
+                role = discord.utils.get(ctx.guild.roles, name="Exotic")
+                await ctx.send(role.mention)
+            except AttributeError:
+                await ctx.respond(
+                    "I can't ping Exotic role, please check if role exists or if I have permission to ping it.",
+                    delete_after=10,
+                    ephemeral=True,
+                )
+                return
 
         view = HostView(author=author)
         await ctx.respond(embed=embed, view=view)
 
-        # Timeout 15 minutes, convert to normal message
         interaction = await ctx.interaction.original_response()
         view.message = await ctx.channel.fetch_message(interaction.id)
 
@@ -243,7 +264,7 @@ class Commands(commands.Cog):
 
     @slash_command(name="random_number", description="Choose number between intervals.")
     async def random_number(
-        self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
+            self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
     ) -> None:
         if ineteger1 > ineteger2:
             ineteger2, ineteger1 = ineteger1, ineteger2
@@ -278,7 +299,7 @@ class HostView(discord.ui.View):
         style=discord.ButtonStyle.gray, label="I stopped hosting.", emoji="📣"
     )
     async def button_callback(
-        self, button: discord.Button, interaction: discord.Interaction
+            self, button: discord.Button, interaction: discord.Interaction
     ) -> None:
         if interaction.user.name in host_authors:
             embed = await self.disable_embed()
@@ -289,7 +310,7 @@ class HostView(discord.ui.View):
 
         await interaction.response.send_message(
             f"{interaction.user.mention}, you are not author of this embed.",
-            delete_after=5,
+            delete_after=10,
             ephemeral=True,
         )
 
@@ -298,18 +319,18 @@ class HostView(discord.ui.View):
         await self.message.edit(embed=embed, view=None)
         await self.author.send(
             f"You forgot to click button in {self.message.jump_url} you {
-                random.choice(
-                    (
-                        'dumbass',
-                        'retard',
-                        'nitwit',
-                        'cockwomble',
-                        'prick',
-                        'cunt',
-                        'pillock',
-                        'twat',
-                    )
+            random.choice(
+                (
+                    'dumbass',
+                    'retard',
+                    'nitwit',
+                    'cockwomble',
+                    'prick',
+                    'cunt',
+                    'pillock',
+                    'twat',
                 )
+            )
             }."
         )
         pos = host_authors.index(self.author.name)
@@ -323,8 +344,11 @@ class HostView(discord.ui.View):
             icon_url=self.author.avatar.url,
             name=f"{self.author.name} is no longer hosting.",
         )
-        embed.description = "Status: **Offline**  :red_circle: "
-        embed.color = discord.Color.from_rgb(r=255, g=0, b=0)
+        embed.color = discord.Color.from_rgb(r=200, g=0, b=0)
+        embed.set_field_at(0, name="Statusㅤㅤ", value="**OFFLINE** <:offline:1355571345613787296>")
+
+        timestamp = embed.fields[2].value.replace("R", "t")
+        embed.set_field_at(2, name="Hosted atㅤ", value=timestamp)
         return embed
 
 

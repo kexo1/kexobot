@@ -1,8 +1,6 @@
 import discord
 import httpx
 
-from bs4 import BeautifulSoup
-from datetime import datetime
 from constants import DB_CACHE, FANATICAL_MAX_POSTS
 from utils import iso_to_timestamp
 
@@ -21,7 +19,7 @@ class Fanatical:
                 "https://www.fanatical.com/api/all-promotions/en"
             )
         except httpx.ReadTimeout:
-            print("Fanatical: Timeout error")
+            print("Fanatical: Timeout")
             return
 
         await self._send_embed(json_data.json(), fanatical_cache)
