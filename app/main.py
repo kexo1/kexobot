@@ -45,6 +45,7 @@ bot = discord.Bot()
 
 
 # TODO: Make Game3rb more readable
+# TODO: SFD Servers API
 
 
 class KexoBOT:
