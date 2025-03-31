@@ -199,7 +199,7 @@ class Commands(commands.Cog):
         name="sfd_activity",
         description="Shows graph of SFD servers activity.",
     )
-    @option("range", description="Range of Graph.", required=True, choices=["Day", "Week"])
+    @option("graph_range", description="Range of Graph.", required=True, choices=["Day", "Week"])
     @commands.cooldown(1, 60, commands.BucketType.user)
     async def get_sfd_graph(self, ctx: discord.ApplicationContext, graph_range: str) -> None:
         await ctx.trigger_typing()

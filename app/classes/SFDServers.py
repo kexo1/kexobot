@@ -11,8 +11,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from constants import SFD_SERVER_URL, SFD_REQUEST, SFD_HEADERS, DB_SFD_ACTIVITY
 
 plt.style.use("cyberpunk")
-mpl.rcParams["font.family"] = "sans-serif"
-mpl.rcParams["font.sans-serif"] = ["DejaVu Sans", "Segoe UI", "Arial"]
+mpl.rcParams["font.family"] = "DejaVu Sans"
 plt.rc("font", family="DejaVu Sans")
 
 
