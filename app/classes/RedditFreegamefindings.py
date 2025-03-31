@@ -10,6 +10,7 @@ from asyncprawcore.exceptions import (  # type: ignore
 from constants import (
     REDDIT_FREEGAME_EMBEDS,
     REDDIT_FREEGAME_MAX_POSTS,
+    REDDIT_FREEGAME_ICON,
     DB_CACHE,
     DB_LISTS,
 )
@@ -51,10 +52,8 @@ class RedditFreeGameFindings:
                 if is_filtered:
                     continue
 
-                freegamefindings_cache_upload = [
-                    freegamefindings_cache_upload[-1]
-                ] + freegamefindings_cache_upload[:-1]
-                freegamefindings_cache_upload[0] = submission.url
+                freegamefindings_cache_upload.pop()
+                freegamefindings_cache_upload.append(submission.url)
                 await self._process_submission(submission.url)
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:
             print(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
@@ -98,7 +97,7 @@ class RedditFreeGameFindings:
         embed.set_thumbnail(url=embed_dict["icon"])
         embed.set_footer(
             text="I took it from - r/FreeGameFindings",
-            icon_url="https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png",
+            icon_url=REDDIT_FREEGAME_ICON,
         )
         await self.channel.send(embed=embed)
 

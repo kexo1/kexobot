@@ -37,6 +37,7 @@ from classes.ElektrinaVypadky import ElektrinaVypadky
 from classes.RedditCrackWatch import RedditCrackWatch
 from classes.RedditFreegamefindings import RedditFreeGameFindings
 from classes.Fanatical import Fanatical
+from classes.SFDServers import SFDServers
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
@@ -45,7 +46,7 @@ bot = discord.Bot()
 
 
 # TODO: Make Game3rb more readable
-# TODO: SFD Servers API
+# TODO: Redo Reddit DB
 
 
 class KexoBOT:
@@ -58,6 +59,7 @@ class KexoBOT:
     The hourly loop is responsible for updating the reddit cache and
     fetching lavalink servers.
     """
+
     def __init__(self):
         self.user_kexo = None | discord.User
         self.session = None | httpx.AsyncClient
@@ -90,6 +92,7 @@ class KexoBOT:
         self.esutaze = None | Esutaze
         self.lavalink_fetch = None | LavalinkServerFetch
         self.fanatical = None | Fanatical
+        self.sfd_servers = None | SFDServers
         self.alienwarearena = None | AlienwareArena
         self.esutaze_channel = None | discord.TextChannel
         self.game_updates_channel = None | discord.TextChannel
@@ -106,6 +109,7 @@ class KexoBOT:
             await self.database.find_one(DB_REDDIT_CACHE, {"_id": False})
         )
         await self._define_classes()
+        bot.sfd_servers = self.sfd_servers
 
     async def _fetch_channels(self) -> None:
         self.esutaze_channel = await bot.fetch_channel(ESUTAZE_CHANNEL)
@@ -134,6 +138,7 @@ class KexoBOT:
             self.session, self.database, self.user_kexo
         )
         self.esutaze = Esutaze(self.session, self.database, self.esutaze_channel)
+        self.sfd_servers = SFDServers(self.session, self.database)
         self.lavalink_fetch = LavalinkServerFetch(bot, self.session)
         print("Classes defined.")
 
@@ -235,6 +240,7 @@ class KexoBOT:
         fetch data from different sources.
         It runs the classes in a round-robin fashion.
         """
+        now = datetime.now()
         if self.main_loop_counter == 0:
             self.main_loop_counter = 1
             await self.reddit_freegamefindings.run()
@@ -263,6 +269,12 @@ class KexoBOT:
             self.main_loop_counter = 0
             await self.esutaze.run()
 
+        if now.minute % 10 == 0:
+            await self.sfd_servers.generate_activity_graph("Day")
+
+        if now.minute == 0:
+            await self.sfd_servers.generate_activity_graph("Week")
+
     async def hourly_loop(self) -> None:
         """Hourly loop for the bot.
         This loop runs every hour and runs the different classes that
@@ -277,6 +289,7 @@ class KexoBOT:
 
         self.lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
         await self.update_reddit_cache(now)
+
         await self.elektrina_vypadky.run()
 
 
@@ -296,10 +309,8 @@ def setup_cogs() -> None:
     bot.load_extension("cogs.Listeners")
     bot.load_extension("cogs.Queue")
     bot.load_extension("cogs.Audio")
-    bot.load_extension("cogs.Disconnect")
     bot.load_extension("cogs.FunStuff")
     bot.load_extension("cogs.Commands")
-    bot.load_extension("cogs.DatabaseManager")
     print("Cogs loaded.")
 
 
@@ -364,7 +375,7 @@ async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
 @bot.event
 async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
     """Event that runs when a command is timed out."""
-    
+
     if isinstance(error, commands.CommandOnCooldown):
         error_str = str(error).split()
         embed = discord.Embed(

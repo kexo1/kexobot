@@ -1,7 +1,7 @@
 import discord
 import httpx
 
-from constants import DB_CACHE, FANATICAL_MAX_POSTS
+from constants import DB_CACHE, FANATICAL_MAX_POSTS, FANATICAL_URL, FANATICAL_IMG_URL
 from utils import iso_to_timestamp
 
 
@@ -15,9 +15,7 @@ class Fanatical:
         fanatical_cache = await self._load_database()
 
         try:
-            json_data = await self.session.get(
-                "https://www.fanatical.com/api/all-promotions/en"
-            )
+            json_data = await self.session.get(FANATICAL_URL)
         except httpx.ReadTimeout:
             print("Fanatical: Timeout")
             return
@@ -33,16 +31,13 @@ class Fanatical:
             url = "https://www.fanatical.com/en/game/" + product_info["slug"]
 
             if url in fanatical_cache:
-                continue
+                break
 
-            fanatical_cache = [fanatical_cache[-1]] + fanatical_cache[:-1]
-            fanatical_cache[0] = url
+            fanatical_cache.pop(0)
+            fanatical_cache.append(url)
 
             title = product_info["name"]
-            img_url = (
-                "https://cdn-ext.fanatical.com/production/product/1280x720/"
-                + product_info["cover"]
-            )
+            img_url = FANATICAL_IMG_URL + product_info["cover"]
             timestamp = (
                 f"<t:{int(iso_to_timestamp(giveaway['valid_until']).timestamp())}:F>"
             )

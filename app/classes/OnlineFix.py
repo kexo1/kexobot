@@ -5,7 +5,13 @@ import httpx
 
 from deep_translator import GoogleTranslator  # type: ignore
 from bs4 import BeautifulSoup, Tag
-from constants import ONLINEFIX_MAX_GAMES, DB_CACHE, DB_LISTS
+from constants import (
+    ONLINEFIX_MAX_GAMES,
+    ONLINEFIX_URL,
+    ONLINEFIX_ICON,
+    DB_CACHE,
+    DB_LISTS,
+)
 
 
 class OnlineFix:
@@ -17,7 +23,7 @@ class OnlineFix:
     async def run(self) -> None:
         onlinefix_cache, games = await self._load_database()
         try:
-            chat_log = await self.session.get("https://online-fix.me/chat.php")
+            chat_log = await self.session.get(ONLINEFIX_URL)
         except httpx.ReadTimeout:
             print("OnlineFix: Timeout")
             return
@@ -64,8 +70,7 @@ class OnlineFix:
         )
         embed.set_footer(
             text="online-fix.me",
-            icon_url="https://media.discordapp.net/attachments/796453724713123870"
-            "/1035951759505506364/favicon-1.png",
+            icon_url=ONLINEFIX_ICON,
         )
         embed.set_thumbnail(url=img_url)
         await self.channel.send(embed=embed)

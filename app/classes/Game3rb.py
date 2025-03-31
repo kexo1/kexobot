@@ -7,7 +7,7 @@ import logging
 
 from datetime import datetime
 from bs4 import BeautifulSoup
-from constants import GAME3RB_STRIP, DB_CACHE, DB_LISTS
+from constants import GAME3RB_STRIP, GAME3RB_URL, GAME3RB_ICON, DB_CACHE, DB_LISTS
 
 
 class Game3rb:
@@ -23,9 +23,7 @@ class Game3rb:
         game_list = await self.database.find_one(DB_LISTS)
         game_list = "\n".join(game_list["games"])
         try:
-            source = await self.session.get(
-                "https://game3rb.com/category/games-online/"
-            )
+            source = await self.session.get(GAME3RB_URL)
         except httpx.ReadTimeout:
             logging.info("Game3rb: Timeout")
             return
@@ -162,9 +160,7 @@ class Game3rb:
                 embed.add_field(name="Update links:", value=game_update, inline=False)
             embed.set_footer(
                 text=", ".join(game["carts"]),
-                icon_url="https://media.discordapp.net/attachments/796453724713123870"
-                "/1162443171209433088/d95X3.png?ex=653bf491&is=65297f91&hm"
-                "=c36058433d50580eeec7cd89ddfe60965ec297d6fc8054994fee5ae976bedfd3&=",
+                icon_url=GAME3RB_ICON,
             )
             embed.set_image(url=game["image"])
             await self.channel.send(embed=embed)

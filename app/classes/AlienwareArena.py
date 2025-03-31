@@ -2,7 +2,12 @@ import discord
 import httpx
 
 from bs4 import BeautifulSoup
-from constants import DB_CACHE, ALIENWAREARENA_MAX_POSTS, ALIENWAREARENA_STRIP
+from constants import (
+    DB_CACHE,
+    ALIENWAREARENA_MAX_POSTS,
+    ALIENWAREARENA_STRIP,
+    ALIENWAREARENA_URL,
+)
 
 
 class AlienwareArena:
@@ -15,9 +20,7 @@ class AlienwareArena:
         alienwarearena_cache = await self._load_database()
 
         try:
-            json_data = await self.session.get(
-                "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
-            )
+            json_data = await self.session.get(ALIENWAREARENA_URL)
         except httpx.ReadTimeout:
             print("AlienwareArena: Timeout")
             return
@@ -29,7 +32,7 @@ class AlienwareArena:
             url = "https://eu.alienwarearena.com" + giveaway["url"]
 
             if url in alienwarearena_cache:
-                continue
+                break
 
             title = giveaway["title"].lower()
             if "dlc" in title:
@@ -38,10 +41,8 @@ class AlienwareArena:
             for part in ALIENWAREARENA_STRIP:
                 title = title.replace(part, "")
 
-            alienwarearena_cache = [alienwarearena_cache[-1]] + alienwarearena_cache[
-                :-1
-            ]
-            alienwarearena_cache[0] = url
+            alienwarearena_cache.pop(0)
+            alienwarearena_cache.append(url)
 
             soup = BeautifulSoup(giveaway["description"], "html.parser")
             strong_element = soup.find("strong")

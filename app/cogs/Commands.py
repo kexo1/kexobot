@@ -6,11 +6,15 @@ import aiohttp
 import wavelink
 import time
 import sys
+import os
 
 from discord.ext import commands
 from discord.commands import slash_command
 from discord.commands import option
-from constants import XTC_SERVER, KEXO_SERVER
+
+from constants import XTC_SERVER, KEXO_SERVER, DB_LISTS, DB_CHOICES
+from classes.DatabaseManager import DatabaseManager
+from classes.SFDServers import SFDServers
 from __init__ import __version__
 
 host_authors = []
@@ -19,8 +23,15 @@ host_authors = []
 class Commands(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        self.database = bot.database
         self.run_time = time.time()
+        self.sfd_servers = SFDServers(bot.session, self.database)
+        self.database_manager = DatabaseManager(self.database)
 
+    async def init_sfd_servers(self) -> None:
+        self.sfd_servers = self.bot.sfd_servers
+
+    # -------------------- Node Managment -------------------- #
     @slash_command(
         name="manual_reconnect_node", description="Manually input server info"
     )
@@ -114,6 +125,109 @@ class Commands(commands.Cog):
         )
         await ctx.send(embed=embed)
 
+    # -------------------- SFD Servers -------------------- #
+    @slash_command(
+        name="sfd_servers",
+        description="Fetches Superfighters Deluxe servers."
+    )
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    async def get_sfd_servers(self, ctx: discord.ApplicationContext) -> None:
+        servers = await self.sfd_servers.get_servers()
+        if not servers:
+            embed = discord.Embed(
+                title="",
+                description=":x: There are no servers available right now.",
+                color=discord.Color.from_rgb(r=255, g=0, b=0),
+            )
+            await ctx.respond(
+                embed=embed,
+                ephemeral=True,
+                delete_after=10,
+            )
+            return
+
+        servers_dict, all_players = await self.sfd_servers.get_servers_info()
+        embed = discord.Embed(
+            title="Available Servers",
+            color=discord.Color.blue(),
+        )
+        embed.set_footer(text=f"Total players: {all_players}")
+        embed.add_field(name="Servers", value="\n".join(servers_dict["server_name"]))
+        embed.add_field(name="Current Map", value="\n".join(servers_dict["maps"]))
+        embed.add_field(name="Players", value="\n".join(servers_dict["players"]))
+        await ctx.respond(embed=embed)
+
+    @slash_command(
+        name="sfd_server_info",
+        description="Find searched server."
+    )
+    @option("server", description="Server name.")
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    async def get_sfd_server_info(self, ctx: discord.ApplicationContext, search: str) -> None:
+        server = await self.sfd_servers.get_server(search)
+        if not server:
+            embed = discord.Embed(
+                title="",
+                description=":x: Server you searched for is not in the list,\n"
+                            "make sure you parsed correct server name.",
+                color=discord.Color.from_rgb(r=255, g=0, b=0),
+            )
+            await ctx.respond(
+                embed=embed,
+                ephemeral=True,
+                delete_after=10,
+            )
+            return
+
+        server = await server.get_full_server_info()
+
+        embed = discord.Embed(
+            title=server.server_name,
+            description=server.description,
+            color=discord.Color.blue(),
+        )
+        embed.set_footer(text=f"Version: {server.version}")
+        embed.add_field(name="Playersㅤㅤ", value=server.players)
+        embed.add_field(name="Max Playersㅤㅤ", value=server.max_players)
+        embed.add_field(name="Botsㅤㅤ", value=server.bots)
+        embed.add_field(name="Map Nameㅤㅤ", value=server.map_name)
+        embed.add_field(name="Has Passwordㅤㅤ", value=server.has_password)
+        embed.add_field(name="Game Modeㅤㅤ", value=await server.get_game_mode())
+        await ctx.respond(embed=embed)
+
+    @slash_command(
+        name="sfd_activity",
+        description="Shows graph of SFD servers activity.",
+    )
+    @option("range", description="Range of Graph.", required=True, choices=["Day", "Week"])
+    @commands.cooldown(1, 60, commands.BucketType.user)
+    async def get_sfd_graph(self, ctx: discord.ApplicationContext, graph_range: str) -> None:
+        await ctx.trigger_typing()
+        embed = discord.Embed(
+            title="",
+            description="**🔄 Fetching SFD servers activity.**",
+            color=discord.Color.blue(),
+        )
+        message = await ctx.respond(embed=embed)
+
+        if graph_range == "Day":
+            await self.sfd_servers.generate_activity_graph("Day")
+            image_location = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                "sfd_activity_day.png"
+            )
+        elif graph_range == "Week":
+            await self.sfd_servers.generate_activity_graph("Week")
+            image_location = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                "sfd_activity_week.png"
+            )
+
+        filename = os.path.basename(image_location)
+        file = discord.File(image_location, filename=filename)
+        await message.edit(files=[file], embed=None)
+
+    # -------------------- SFD Hosting -------------------- #
     @slash_command(
         name="host",
         description="Creates hosting embed, you can also choose some optional info.",
@@ -165,7 +279,7 @@ class Commands(commands.Cog):
     @commands.cooldown(1, 300, commands.BucketType.user)
     async def host(
             self,
-            ctx,
+            ctx: discord.ApplicationContext,
             server_name: str,
             duration: str,
             branch: str,
@@ -204,7 +318,9 @@ class Commands(commands.Cog):
         timestamp = int(time.time())  # Current time in seconds
         timestamp = f"<t:{timestamp}:R>"
 
-        embed.add_field(name="Statusㅤㅤ", value="**ONLINE** <a:online:1355562936919392557>")
+        embed.add_field(
+            name="Statusㅤㅤ", value="**ONLINE** <a:online:1355562936919392557>"
+        )
         embed.add_field(name="Durationㅤㅤ", value=duration)
         embed.add_field(name="Uptimeㅤㅤㅤㅤ", value=timestamp)
         embed.add_field(name="Versionㅤㅤ", value=version)
@@ -212,21 +328,26 @@ class Commands(commands.Cog):
         embed.add_field(name="Regionㅤㅤ", value=region if region else "Not specified")
 
         if password:
-            embed.add_field(name="Password", value=password if password else "Not specified")
+            embed.add_field(
+                name="Password", value=password if password else "Not specified"
+            )
 
         if scripts:
-            embed.add_field(name="Scripts", value=scripts if scripts else "Not specified")
+            embed.add_field(
+                name="Scripts", value=scripts if scripts else "Not specified"
+            )
 
         if image:
             if image.endswith((".jpg", ".jpeg", ".png", ".gif")):
                 embed.set_thumbnail(url=image)
             else:
                 await ctx.respond(
-                    "Image url needs to end with .jpg, .png, .gif and etc.",
+                    "Image url needs to end with .png, .gif and etc.",
                     ephemeral=True,
                     delete_after=10,
                 )
                 return
+
         if ping:
             try:
                 role = discord.utils.get(ctx.guild.roles, name="Exotic")
@@ -245,16 +366,17 @@ class Commands(commands.Cog):
         interaction = await ctx.interaction.original_response()
         view.message = await ctx.channel.fetch_message(interaction.id)
 
+    # -------------------- Discord functions -------------------- #
     @slash_command(name="info")
     async def info(self, ctx: discord.ApplicationContext) -> None:
         embed = discord.Embed(title="INFO", color=discord.Color.blue())
         embed.add_field(
-            name="Run time:ㅤㅤ" + "\u200b",
+            name="Run time:ㅤㅤ",
             value=f"{str(datetime.timedelta(seconds=round(int(time.time()) - self.run_time)))}",
         )
-        embed.add_field(name="Ping:ㅤㅤㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
+        embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
         embed.add_field(name="Version:", value=__version__)
-        embed.add_field(name="Py-cord version:ㅤ", value=discord.__version__)
+        embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
         embed.add_field(
             name="Python version:",
             value=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
@@ -279,7 +401,7 @@ class Commands(commands.Cog):
         words = words.split()
         await ctx.respond("I chose " + "`" + str(random.choice(words)) + "`")
 
-    @slash_command(name="c", description="Clears messages, max 50 (Admin)")
+    @slash_command(name="clear", description="Clears messages, max 50 (Admin)")
     @discord.default_permissions(administrator=True)
     @option("integer", description="Max is 50.", min_value=1, max_value=50)
     async def clear(self, ctx: discord.ApplicationContext, integer: int) -> None:
@@ -287,6 +409,68 @@ class Commands(commands.Cog):
             f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=True
         )
         await ctx.channel.purge(limit=integer)
+
+    # -------------------- Database Managment -------------------- #
+    @slash_command(
+        name="add_to",
+        description="Adds string to selected list.",
+        guild_ids=[KEXO_SERVER],
+    )
+    @discord.ext.commands.is_owner()
+    @option("collection", description="Choose database", choices=DB_CHOICES)
+    async def add_to(self, ctx, collection: str, to_upload: str) -> None:
+        db_list = await self.database_manager.get_database(collection)
+
+        if to_upload in db_list:
+            return await ctx.respond(
+                f"{ctx.author.mention} string `{to_upload}` "
+                f"is already in the database, use `/show_data`"
+            )
+
+        db_list.append(to_upload)
+        await self.database_manager.update_database(collection, db_list)
+        await ctx.respond(
+            f"String `{to_upload}` was added to `{collection}` :white_check_mark:"
+        )
+
+    @slash_command(
+        name="remove_from",
+        description="Removes string from selected list.",
+        guild_ids=[KEXO_SERVER],
+    )
+    @discord.ext.commands.is_owner()
+    @option("collection", description="Choose database", choices=DB_CHOICES)
+    async def remove(self, ctx, collection: str, to_remove: str) -> None:
+        db_list = await self.database_manager.get_database(collection)
+
+        if to_remove not in db_list:
+            await ctx.respond(
+                f"{ctx.author.mention}, string `{to_remove}` is not in the database, use `/show_data`"
+            )
+            return
+        db_list.pop(db_list.index(to_remove))
+
+        await self.database_manager.update_database(collection, db_list)
+        await ctx.respond(
+            f"String `{to_remove}` was removed from `{collection}` :white_check_mark:"
+        )
+
+    @slash_command(
+        name="show_data",
+        description="Shows data from selected lists.",
+        guild_ids=[KEXO_SERVER],
+    )
+    @discord.ext.commands.is_owner()
+    @option("collection", description="Choose database", choices=DB_CHOICES)
+    async def show_data(self, ctx, collection: str) -> None:
+        listing = await self.database_manager.get_database(collection)
+
+        embed = discord.Embed(title=collection, color=discord.Color.blue())
+        embed.add_field(
+            name=f"_{len(listing)} items_",
+            value="\n".join(f"{i + 1}. {listing[i]}" for i in range(len(listing))),
+        )
+        await ctx.respond(embed=embed)
 
 
 class HostView(discord.ui.View):
@@ -304,12 +488,16 @@ class HostView(discord.ui.View):
         if interaction.user.name in host_authors:
             embed = await self.disable_embed()
             await interaction.response.edit_message(embed=embed, view=None)
-            pos = host_authors.index(self.author.name)
-            host_authors.pop(pos)
+            host_authors.pop(host_authors.index(self.author.name))
             return
 
+        embed = discord.Embed(
+            title="",
+            description=f"{interaction.user.mention}, you are not author of this embed.",
+            color=discord.Color.blue(),
+        )
         await interaction.response.send_message(
-            f"{interaction.user.mention}, you are not author of this embed.",
+            embed=embed,
             delete_after=10,
             ephemeral=True,
         )
@@ -318,7 +506,7 @@ class HostView(discord.ui.View):
         embed = await self.disable_embed()
         await self.message.edit(embed=embed, view=None)
         await self.author.send(
-            f"You forgot to click button in {self.message.jump_url} you {
+            f"**You forgot to click button in {self.message.jump_url} you {
             random.choice(
                 (
                     'dumbass',
@@ -331,10 +519,9 @@ class HostView(discord.ui.View):
                     'twat',
                 )
             )
-            }."
+            }.**"
         )
-        pos = host_authors.index(self.author.name)
-        host_authors.pop(pos)
+        host_authors.pop(host_authors.index(self.author.name))
 
     async def disable_embed(self) -> discord.Embed:
         self.stop()
@@ -345,7 +532,9 @@ class HostView(discord.ui.View):
             name=f"{self.author.name} is no longer hosting.",
         )
         embed.color = discord.Color.from_rgb(r=200, g=0, b=0)
-        embed.set_field_at(0, name="Statusㅤㅤ", value="**OFFLINE** <:offline:1355571345613787296>")
+        embed.set_field_at(
+            0, name="Statusㅤㅤ", value="**OFFLINE** <:offline:1355571345613787296>"
+        )
 
         timestamp = embed.fields[2].value.replace("R", "t")
         embed.set_field_at(2, name="Hosted atㅤ", value=timestamp)

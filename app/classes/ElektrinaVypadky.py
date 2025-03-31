@@ -2,7 +2,7 @@ import discord
 import httpx
 
 from bs4 import BeautifulSoup
-from constants import ELEKTRINA_MAX_ARTICLES, DB_CACHE
+from constants import ELEKTRINA_MAX_ARTICLES, ELEKTRINA_URL, ELEKTRINA_ICON, DB_CACHE
 from utils import iso_to_timestamp
 
 
@@ -15,10 +15,8 @@ class ElektrinaVypadky:
     async def run(self) -> None:
         elektrinavypadky_cache = await self._load_database()
         try:
-            html_content = await self.session.get(
-                "https://www.hliniknadhronom.sk/get_rss.php?id=1_atom_1947"
-            )
-        except httpx.ReadTimeout:
+            html_content = await self.session.get(ELEKTRINA_URL)
+        except (httpx.ReadTimeout, httpx.ConnectTimeout):
             print("ElektrinaVypadky: Timeout")
             return
 
@@ -45,7 +43,7 @@ class ElektrinaVypadky:
             description = article.find("content").text
             url = article.find("link")["href"]
             if url in elektrinavypadky_cache:
-                continue
+                break
 
             title = article.find("title").text
 
@@ -56,10 +54,8 @@ class ElektrinaVypadky:
             ):
                 continue
 
-            elektrinavypadky_cache_upload = [
-                elektrinavypadky_cache_upload[-1]
-            ] + elektrinavypadky_cache_upload[:-1]
-            elektrinavypadky_cache_upload[0] = url
+            elektrinavypadky_cache_upload.pop(0)
+            elektrinavypadky_cache_upload.append(url)
 
             iso_time = article.find("published").text
             timestamp = iso_to_timestamp(iso_time)
@@ -79,7 +75,7 @@ class ElektrinaVypadky:
 
             embed.set_footer(
                 text="",
-                icon_url="https://www.hliniknadhronom.sk/portals_pictures/i_006868/i_6868718.png",
+                icon_url=ELEKTRINA_ICON,
             )
             await self.user_kexo.send(embed=embed)
 

@@ -10,7 +10,13 @@ from asyncprawcore.exceptions import (  # type: ignore
     ResponseException,
     RequestException,
 )
-from constants import REDDIT_CRACKWATCH_POSTS, REDDIT_STRIP, DB_CACHE, DB_LISTS
+from constants import (
+    REDDIT_CRACKWATCH_POSTS,
+    REDDIT_STRIP,
+    REDDIT_CRACKWATCH_ICON,
+    DB_CACHE,
+    DB_LISTS,
+)
 
 
 class RedditCrackWatch:
@@ -60,10 +66,8 @@ class RedditCrackWatch:
                         continue
                     description_list.append(f"• {line}\n")
 
-                crackwatch_cache_upload = [
-                    crackwatch_cache_upload[-1]
-                ] + crackwatch_cache_upload[:-1]
-                crackwatch_cache_upload[0] = submission.permalink
+                crackwatch_cache_upload.pop(0)
+                crackwatch_cache_upload.append(submission.permalink)
 
                 description = "".join(description_list)[:4096]
                 if (
@@ -83,7 +87,7 @@ class RedditCrackWatch:
 
                 embed.set_footer(
                     text="I took it from - r/CrackWatch",
-                    icon_url="https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png",
+                    icon_url=REDDIT_CRACKWATCH_ICON,
                 )
                 embed.timestamp = datetime.fromtimestamp(submission.created_utc)
                 await self.channel.send(embed=embed)

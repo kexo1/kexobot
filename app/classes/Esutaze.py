@@ -5,7 +5,7 @@ from io import BytesIO
 
 import httpx
 from bs4 import BeautifulSoup, Tag
-from constants import DB_CACHE, DB_LISTS
+from constants import ESUTAZE_URL, ESUTAZE_ICON, DB_CACHE, DB_LISTS
 
 
 class Esutaze:
@@ -26,17 +26,15 @@ class Esutaze:
             url = article.find("link").text
 
             if url in esutaze_cache:
-                continue
+                break
 
             title = article.find("title").text
             is_filtered = [k for k in to_filter if k.lower() in title]
             if is_filtered:
                 continue
 
-            esutaze_cache_upload = [esutaze_cache_upload[-1]] + esutaze_cache_upload[
-                :-1
-            ]
-            esutaze_cache_upload[0] = url
+            esutaze_cache_upload.pop(0)
+            esutaze_cache_upload.append(url)
 
             await self._send_article(article)
 
@@ -77,15 +75,13 @@ class Esutaze:
         embed.set_image(url="attachment://image.png")
         embed.set_footer(
             text="www.esutaze.sk",
-            icon_url="https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg",
+            icon_url=ESUTAZE_ICON,
         )
         await self.channel.send(embed=embed, file=discord.File(image, "image.png"))
 
     async def _get_articles(self) -> list:
         try:
-            html_content = await self.session.get(
-                "https://www.esutaze.sk/category/internetove-sutaze/feed/"
-            )
+            html_content = await self.session.get(ESUTAZE_URL)
         except httpx.ReadTimeout:
             print("Esutaze: ReadTimeout")
             return []

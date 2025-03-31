@@ -1,6 +1,7 @@
 FROM python:3.12.9-alpine
 
 RUN apk add --no-cache git
+RUN apt-get update && apt-get install -y fonts-dejavu
 
 WORKDIR /kexobot
 RUN mkdir -p /kexobot/video
@@ -15,4 +16,4 @@ COPY . .
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-CMD ["python", "main.py"]
+CMD ["python", "app/main.py"]

@@ -15,6 +15,8 @@ deep_translator
 unidecode
 aiohttp
 lxml
+matplotlib
+mplcyberpunk
 
 # Wavelink depencies
 yarl>=1.9.2
