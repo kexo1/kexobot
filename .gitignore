@@ -178,3 +178,5 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+/sfd_activity_week.png
+/sfd_activity_day.png
