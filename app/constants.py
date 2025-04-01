@@ -30,6 +30,17 @@ SFD_HEADERS = {
     "Content-Type": "application/soap+xml; charset=utf-8",
     "SOAPAction": "https://mythologicinteractive.com/Games/SFD/GetGameServers",
 }
+TIMEZONES = {
+    "New_York": "America/New_York",
+    "London": "Europe/London",
+    "Tokyo": "Asia/Tokyo",
+    "Shanghai": "Asia/Shanghai",
+    "Slovakia": "Europe/Bratislava",
+    "Russia": "Europe/Moscow",
+    "Spain": "Europe/Madrid",
+    "Italy": "Europe/Rome",
+}
+SFD_TIMEZONE_CHOICE = list(TIMEZONES.keys())
 
 # -------------------- MongoDB -------------------- #
 MONGO_DB_URL = (

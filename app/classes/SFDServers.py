@@ -3,34 +3,43 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import mplcyberpunk
 import datetime
+import numpy as np
+import os
 
 from bs4 import BeautifulSoup
 from typing import Union
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 from motor.motor_asyncio import AsyncIOMotorClient
-from constants import SFD_SERVER_URL, SFD_REQUEST, SFD_HEADERS, DB_SFD_ACTIVITY
+from constants import (
+    SFD_SERVER_URL,
+    SFD_REQUEST,
+    SFD_HEADERS,
+    DB_SFD_ACTIVITY,
+    TIMEZONES,
+)
 from utils import average
-import numpy as np
+
 
 plt.style.use("cyberpunk")
-mpl.rcParams["font.family"] = "DejaVu Sans"
-plt.rc("font", family="DejaVu Sans")
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
 
 
 class Server:
     def __init__(
-            self,
-            address_ipv4,
-            port,
-            server_name,
-            game_mode,
-            map_name,
-            players,
-            max_players,
-            bots,
-            has_password,
-            description,
-            version,
+        self,
+        address_ipv4,
+        port,
+        server_name,
+        game_mode,
+        map_name,
+        players,
+        max_players,
+        bots,
+        has_password,
+        description,
+        version,
     ):
         self.address_ipv4 = address_ipv4
         self.port = port
@@ -59,10 +68,8 @@ class SFDServers:
     def __init__(self, session: httpx.AsyncClient, database: AsyncIOMotorClient):
         self.session = session
         self.database = database
-
-    class GraphTypes:
-        Day = "Day"
-        Week = "Week"
+        self.graphs_dir = os.path.join(os.getcwd(), "graphs")
+        os.makedirs(self.graphs_dir, exist_ok=True)
 
     async def load_sfd_servers(self) -> str:
         try:
@@ -74,19 +81,13 @@ class SFDServers:
             print("SFD Servers: Request timed out")
         return []
 
-    async def generate_activity_graph(self, graph_type: str):
-        if graph_type == self.GraphTypes.Day:
-            await self.generate_graph_day()
-        else:
-            await self.generate_graph_week()
-
-    async def generate_graph_week(self):
+    async def generate_graph_week(self, timezone: str):
         players, servers = await self._load_database_week()
-        now = datetime.datetime.now()
-        start_time = now - timedelta(hours=168)  # one week ago
+        selected_timezone = ZoneInfo(TIMEZONES[timezone])
+        now = datetime.datetime.now(selected_timezone)
 
-        x_positions = list(range(280))
-        await self.generate_lines(x_positions, players, servers)
+        start_time = now - timedelta(hours=168)
+        await self.generate_lines_and_effects(list(range(280)), players, servers)
 
         num_ticks = 28
         tick_positions = np.linspace(0, 280 - 1, num_ticks, dtype=int)
@@ -94,35 +95,29 @@ class SFDServers:
             (start_time + timedelta(hours=(pos / (280 - 1)) * 168)).strftime("%a %#I%p")
             for pos in tick_positions
         ]
-
         plt.xticks(tick_positions, tick_labels, rotation=45)
-        max_value = int(max(max(players), max(servers)))
-        plt.yticks(range(0, max_value + 1))
-        plt.savefig("sfd_activity_week.png", dpi=300)
+        plt.subplots_adjust(bottom=0.1)
+        plt.savefig(os.path.join(self.graphs_dir, "sfd_activity_week.png"), dpi=300)
 
-    async def generate_graph_day(self):
+    async def generate_graph_day(self, timezone: str):
         players, servers = await self._load_database_day()
-        now = datetime.datetime.now()
+        selected_timezone = ZoneInfo(TIMEZONES[timezone])
+        now = datetime.datetime.now(selected_timezone)
 
         hours = [
             (now - timedelta(hours=i)).strftime("%I%p").lstrip("0")
             for i in range(23, -1, -1)
         ]
-        x_positions = list(range(240))
-        players = players[-240:]
-        servers = servers[-240:]
 
-        await self.generate_lines(x_positions, players, servers)
+        await self.generate_lines_and_effects(list(range(240)), players, servers)
 
-        # Set x-tick positions: One tick per hour
+        # One time position per hour
         time_positions = [i * 10 + 5 for i in range(24)]
         plt.xticks(time_positions, hours)
-
-        plt.tight_layout()
-        plt.savefig("sfd_activity_day.png", dpi=300)
+        plt.savefig(os.path.join(self.graphs_dir, "sfd_activity_day.png"), dpi=300)
 
     @staticmethod
-    async def generate_lines(x_positions, players, servers):
+    async def generate_lines_and_effects(x_positions, players, servers):
         plt.figure(figsize=(14, 7))
         plt.plot(x_positions, players, color="cyan", label="Players")
         plt.plot(x_positions, servers, color="magenta", label="Servers")
@@ -143,12 +138,14 @@ class SFDServers:
         players_day.append(current_players)
         servers_day.append(current_servers)
 
-        await self.database.update_many(DB_SFD_ACTIVITY, {"$set": {"players_day": players_day,
-                                                                   "servers_day": servers_day}})
+        await self.database.update_many(
+            DB_SFD_ACTIVITY,
+            {"$set": {"players_day": players_day, "servers_day": servers_day}},
+        )
 
         if not (now.hour % 4 == 0 and now.minute == 0):
             return
-        
+
         players_week, servers_week = await self._load_database_week()
 
         # Use the last 40 ticks and split them into 10 groups of 4 ticks each.
@@ -282,9 +279,7 @@ class SFDServers:
                 else 0
             )
             has_password = (
-                True
-                if server_element.find("HasPassword").text == "true"
-                else False
+                True if server_element.find("HasPassword").text == "true" else False
             )
             description = (
                 server_element.find("Description").text

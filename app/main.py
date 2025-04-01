@@ -270,8 +270,8 @@ class KexoBOT:
             await self.esutaze.run()
 
         if now.minute == 0:
-            await self.sfd_servers.generate_activity_graph("Day")
-            await self.sfd_servers.generate_activity_graph("Week")
+            await self.sfd_servers.generate_graph_day("New_York")
+            await self.sfd_servers.generate_graph_week("New_York")
 
         if now.minute % 6 == 0:
             await self.sfd_servers.update_stats()
@@ -290,7 +290,6 @@ class KexoBOT:
 
         self.lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
         await self.update_reddit_cache(now)
-
         await self.elektrina_vypadky.run()
 
 
@@ -354,6 +353,7 @@ async def on_ready() -> None:
     while not kexobot.lavalink_servers:
         await asyncio.sleep(1)
     await kexobot.connect_node()
+    print("Bot is ready.")
 
 
 @bot.event

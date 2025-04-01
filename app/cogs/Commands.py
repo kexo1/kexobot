@@ -12,9 +12,10 @@ from discord.ext import commands
 from discord.commands import slash_command
 from discord.commands import option
 
-from constants import XTC_SERVER, KEXO_SERVER, DB_LISTS, DB_CHOICES
+from constants import XTC_SERVER, KEXO_SERVER, DB_LISTS, DB_CHOICES, SFD_TIMEZONE_CHOICE
 from classes.DatabaseManager import DatabaseManager
 from classes.SFDServers import SFDServers
+from utils import get_memory_usage
 from __init__ import __version__
 
 host_authors = []
@@ -25,6 +26,7 @@ class Commands(commands.Cog):
         self.bot = bot
         self.database = bot.database
         self.run_time = time.time()
+        self.graphs_dir = os.path.join(os.getcwd(), "graphs")
         self.sfd_servers = SFDServers(bot.session, self.database)
         self.database_manager = DatabaseManager(self.database)
 
@@ -44,7 +46,7 @@ class Commands(commands.Cog):
     @option("password", description="Lavalink server password.", required=True)
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def manual_recconect_node(
-            self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
+        self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
     ) -> None:
         embed = discord.Embed(
             title="",
@@ -78,10 +80,10 @@ class Commands(commands.Cog):
             await message.edit(embed=embed)
 
         except (
-                aiohttp.client_exceptions.ClientConnectorError,
-                aiohttp.ConnectionTimeoutError,
-                wavelink.exceptions.NodeException,
-                AssertionError,
+            aiohttp.client_exceptions.ClientConnectorError,
+            aiohttp.ConnectionTimeoutError,
+            wavelink.exceptions.NodeException,
+            AssertionError,
         ):
             embed = discord.Embed(
                 title="",
@@ -106,10 +108,10 @@ class Commands(commands.Cog):
         try:
             await self.bot.connect_node()
         except (
-                aiohttp.client_exceptions.ClientConnectorError,
-                aiohttp.ConnectionTimeoutError,
-                wavelink.exceptions.NodeException,
-                AssertionError,
+            aiohttp.client_exceptions.ClientConnectorError,
+            aiohttp.ConnectionTimeoutError,
+            wavelink.exceptions.NodeException,
+            AssertionError,
         ):
             embed = discord.Embed(
                 title="",
@@ -127,8 +129,7 @@ class Commands(commands.Cog):
 
     # -------------------- SFD Servers -------------------- #
     @slash_command(
-        name="sfd_servers",
-        description="Fetches Superfighters Deluxe servers."
+        name="sfd_servers", description="Fetches Superfighters Deluxe servers."
     )
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def get_sfd_servers(self, ctx: discord.ApplicationContext) -> None:
@@ -157,19 +158,18 @@ class Commands(commands.Cog):
         embed.add_field(name="Players", value="\n".join(servers_dict["players"]))
         await ctx.respond(embed=embed)
 
-    @slash_command(
-        name="sfd_server_info",
-        description="Find searched server."
-    )
+    @slash_command(name="sfd_server_info", description="Find searched server.")
     @option("server", description="Server name.")
     @commands.cooldown(1, 5, commands.BucketType.user)
-    async def get_sfd_server_info(self, ctx: discord.ApplicationContext, search: str) -> None:
+    async def get_sfd_server_info(
+        self, ctx: discord.ApplicationContext, search: str
+    ) -> None:
         server = await self.sfd_servers.get_server(search)
         if not server:
             embed = discord.Embed(
                 title="",
                 description=":x: Server you searched for is not in the list,\n"
-                            "make sure you parsed correct server name.",
+                "make sure you parsed correct server name.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await ctx.respond(
@@ -199,9 +199,25 @@ class Commands(commands.Cog):
         name="sfd_activity",
         description="Shows graph of SFD servers activity.",
     )
-    @option("graph_range", description="Range of Graph.", required=True, choices=["Day", "Week"])
+    @option(
+        "graph_range",
+        description="Range of Graph.",
+        required=True,
+        choices=["Day", "Week"],
+    )
+    @option(
+        "timezone",
+        description="Timezone, default is New York",
+        required=False,
+        choices=SFD_TIMEZONE_CHOICE,
+    )
     @commands.cooldown(1, 60, commands.BucketType.user)
-    async def get_sfd_graph(self, ctx: discord.ApplicationContext, graph_range: str) -> None:
+    async def get_sfd_graph(
+        self,
+        ctx: discord.ApplicationContext,
+        graph_range: str,
+        timezone: str = "New_York",
+    ) -> None:
         await ctx.trigger_typing()
         embed = discord.Embed(
             title="",
@@ -211,17 +227,13 @@ class Commands(commands.Cog):
         message = await ctx.respond(embed=embed)
 
         if graph_range == "Day":
-            await self.sfd_servers.generate_activity_graph("Day")
-            image_location = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                "sfd_activity_day.png"
-            )
-        elif graph_range == "Week":
-            await self.sfd_servers.generate_activity_graph("Week")
-            image_location = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                "sfd_activity_week.png"
-            )
+            if timezone != "New_York":
+                await self.sfd_servers.generate_graph_day(timezone)
+            image_location = os.path.join(self.graphs_dir, "sfd_activity_day.png")
+        else:
+            if timezone != "New_York":
+                await self.sfd_servers.generate_graph_week(timezone)
+            image_location = os.path.join(self.graphs_dir, "sfd_activity_week.png")
 
         filename = os.path.basename(image_location)
         file = discord.File(image_location, filename=filename)
@@ -278,18 +290,18 @@ class Commands(commands.Cog):
     )
     @commands.cooldown(1, 300, commands.BucketType.user)
     async def host(
-            self,
-            ctx: discord.ApplicationContext,
-            server_name: str,
-            duration: str,
-            branch: str,
-            version: str,
-            password: str,
-            region: str,
-            scripts: str,
-            slots: int = 8,
-            ping: bool = True,
-            image: str = None,
+        self,
+        ctx: discord.ApplicationContext,
+        server_name: str,
+        duration: str,
+        branch: str,
+        version: str,
+        password: str,
+        region: str,
+        scripts: str,
+        slots: int = 8,
+        ping: bool = True,
+        image: str = None,
     ) -> None:
         author = ctx.author
 
@@ -319,22 +331,22 @@ class Commands(commands.Cog):
         timestamp = f"<t:{timestamp}:R>"
 
         embed.add_field(
-            name="Statusㅤㅤ", value="**ONLINE** <a:online:1355562936919392557>"
+            name="Status:ㅤㅤ", value="**ONLINE** <a:online:1355562936919392557>"
         )
-        embed.add_field(name="Durationㅤㅤ", value=duration)
-        embed.add_field(name="Uptimeㅤㅤㅤㅤ", value=timestamp)
-        embed.add_field(name="Versionㅤㅤ", value=version)
-        embed.add_field(name="Slotsㅤㅤ", value=slots)
-        embed.add_field(name="Regionㅤㅤ", value=region if region else "Not specified")
+        embed.add_field(name="Duration:ㅤㅤ", value=duration)
+        embed.add_field(name="Uptime:ㅤㅤㅤㅤ", value=timestamp)
+        embed.add_field(name="Version:ㅤㅤ", value=version)
+        embed.add_field(name="Slots:ㅤㅤ", value=slots)
+        embed.add_field(name="Region:ㅤㅤ", value=region if region else "Not specified")
 
         if password:
             embed.add_field(
-                name="Password", value=password if password else "Not specified"
+                name="Password:", value=password if password else "Not specified"
             )
 
         if scripts:
             embed.add_field(
-                name="Scripts", value=scripts if scripts else "Not specified"
+                name="Scripts:", value=scripts if scripts else "Not specified"
             )
 
         if image:
@@ -375,6 +387,7 @@ class Commands(commands.Cog):
             value=f"{str(datetime.timedelta(seconds=round(int(time.time()) - self.run_time)))}",
         )
         embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
+        embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
         embed.add_field(name="Version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
         embed.add_field(
@@ -386,7 +399,7 @@ class Commands(commands.Cog):
 
     @slash_command(name="random_number", description="Choose number between intervals.")
     async def random_number(
-            self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
+        self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
     ) -> None:
         if ineteger1 > ineteger2:
             ineteger2, ineteger1 = ineteger1, ineteger2
@@ -483,7 +496,7 @@ class HostView(discord.ui.View):
         style=discord.ButtonStyle.gray, label="I stopped hosting.", emoji="📣"
     )
     async def button_callback(
-            self, button: discord.Button, interaction: discord.Interaction
+        self, button: discord.Button, interaction: discord.Interaction
     ) -> None:
         if interaction.user.name in host_authors:
             embed = await self.disable_embed()
@@ -507,17 +520,17 @@ class HostView(discord.ui.View):
         await self.message.edit(embed=embed, view=None)
         await self.author.send(
             f"**You forgot to click button in {self.message.jump_url} you {
-            random.choice(
-                (
-                    'dumbass',
-                    'retard',
-                    'nitwit',
-                    'prick',
-                    'cunt',
-                    'pillock',
-                    'twat',
+                random.choice(
+                    (
+                        'dumbass',
+                        'retard',
+                        'nitwit',
+                        'prick',
+                        'cunt',
+                        'pillock',
+                        'twat',
+                    )
                 )
-            )
             }.**"
         )
         host_authors.pop(host_authors.index(self.author.name))
@@ -532,7 +545,7 @@ class HostView(discord.ui.View):
         )
         embed.color = discord.Color.from_rgb(r=200, g=0, b=0)
         embed.set_field_at(
-            0, name="Statusㅤㅤ", value="**OFFLINE** <:offline:1355571345613787296>"
+            0, name="Status:ㅤㅤ", value="**OFFLINE** <:offline:1355571345613787296>"
         )
 
         timestamp = embed.fields[2].value.replace("R", "t")

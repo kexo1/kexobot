@@ -1,6 +1,7 @@
 import aiohttp
 import discord
 import os
+import psutil
 
 from typing import Optional
 from datetime import datetime
@@ -32,6 +33,12 @@ def average(numbers: list) -> float:
     if not numbers:
         return 0.0
     return sum(numbers) / len(numbers)
+
+
+def get_memory_usage():
+    process = psutil.Process(os.getpid())
+    mem_info = process.memory_info()
+    return mem_info.rss / (1024 * 1024)
 
 
 class VideoDownloader:

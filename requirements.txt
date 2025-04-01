@@ -17,6 +17,8 @@ aiohttp
 lxml
 matplotlib
 mplcyberpunk
+tzdata
+psutil
 
 # Wavelink depencies
 yarl>=1.9.2
