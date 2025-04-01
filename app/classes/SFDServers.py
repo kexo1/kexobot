@@ -9,6 +9,8 @@ from typing import Union
 from datetime import timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
 from constants import SFD_SERVER_URL, SFD_REQUEST, SFD_HEADERS, DB_SFD_ACTIVITY
+from utils import average
+import numpy as np
 
 plt.style.use("cyberpunk")
 mpl.rcParams["font.family"] = "DejaVu Sans"
@@ -74,52 +76,32 @@ class SFDServers:
 
     async def generate_activity_graph(self, graph_type: str):
         if graph_type == self.GraphTypes.Day:
-            await self.generate_graph_daily()
-            return
-        await self.generate_graph_week()
+            await self.generate_graph_day()
+        else:
+            await self.generate_graph_week()
 
     async def generate_graph_week(self):
-        players, servers = await self._fetch_stats()
+        players, servers = await self._load_database_week()
         now = datetime.datetime.now()
+        start_time = now - timedelta(hours=168)  # one week ago
 
-        # Define the starting time for the graph (1 week ago).
-        start_time = now - timedelta(hours=168)
-        group_size = 4
-        total_groups = len(players) // group_size   # e.g. 1680 // 4 = 420
+        x_positions = list(range(280))
+        await self.generate_lines(x_positions, players, servers)
 
-        # Aggregate each group by averaging.
-        avg_players = []
-        avg_servers = []
-        for i in range(total_groups):
-            start_index = i * group_size
-            end_index = (i + 1) * group_size
-
-            average_players = sum(players[start_index:end_index]) / group_size
-            avg_players.append(average_players)
-
-            average_servers = sum(servers[start_index:end_index]) / group_size
-            avg_servers.append(average_servers)
-
-        # Define tick positions on the aggregated data. For example, every 10 points.
-        time_positions = [i * 10 for i in range((total_groups // 10) + 1)]
-        # Calculate tick labels mapping each tick position to a time between start_time and now.
+        num_ticks = 28
+        tick_positions = np.linspace(0, 280 - 1, num_ticks, dtype=int)
         tick_labels = [
-            (start_time + timedelta(hours=(pos / (total_groups - 1)) * 168)).strftime("%a %#I%p")
-            for pos in time_positions
+            (start_time + timedelta(hours=(pos / (280 - 1)) * 168)).strftime("%a %#I%p")
+            for pos in tick_positions
         ]
 
-        x_positions = list(range(total_groups))
-        await self.generate_lines(x_positions, avg_players, avg_servers)
-
-        plt.xticks(time_positions, tick_labels, rotation=45)
-        max_value = int(max(max(avg_players), max(avg_servers)))
+        plt.xticks(tick_positions, tick_labels, rotation=45)
+        max_value = int(max(max(players), max(servers)))
         plt.yticks(range(0, max_value + 1))
-
-        plt.tight_layout()
         plt.savefig("sfd_activity_week.png", dpi=300)
 
-    async def generate_graph_daily(self):
-        players, servers = await self._fetch_stats()
+    async def generate_graph_day(self):
+        players, servers = await self._load_database_day()
         now = datetime.datetime.now()
 
         hours = [
@@ -136,9 +118,6 @@ class SFDServers:
         time_positions = [i * 10 + 5 for i in range(24)]
         plt.xticks(time_positions, hours)
 
-        max_value = int(max(max(players), max(servers)))
-        plt.yticks(range(0, max_value + 1))
-
         plt.tight_layout()
         plt.savefig("sfd_activity_day.png", dpi=300)
 
@@ -151,23 +130,66 @@ class SFDServers:
 
         mplcyberpunk.add_glow_effects()
         mplcyberpunk.add_gradient_fill(alpha_gradientglow=0.5)
+        plt.tight_layout()
         plt.grid(True)
 
-    async def _fetch_stats(self) -> tuple:
-        players, servers = await self._load_database()
+    async def update_stats(self) -> tuple:
+        players_day, servers_day = await self._load_database_day()
         current_players, current_servers = await self.get_players_and_servers()
+        now = datetime.datetime.now()
 
-        players.pop(0)
-        servers.pop(0)
-        players.append(current_players)
-        servers.append(current_servers)
+        players_day.pop(0)
+        servers_day.pop(0)
+        players_day.append(current_players)
+        servers_day.append(current_servers)
 
-        await self.database.update_many(DB_SFD_ACTIVITY, {"$set": {"players": players, "servers": servers}})
-        return players, servers
+        await self.database.update_many(DB_SFD_ACTIVITY, {"$set": {"players_day": players_day,
+                                                                   "servers_day": servers_day}})
 
-    async def _load_database(self) -> tuple:
+        if not (now.hour % 4 == 0 and now.minute == 0):
+            return
+        
+        players_week, servers_week = await self._load_database_week()
+
+        # Use the last 40 ticks and split them into 10 groups of 4 ticks each.
+        # This means every 4 hours will have 10 ticks that were averaged from 40 ticks.
+        recent_players = players_day[-40:]
+        recent_servers = servers_day[-40:]
+        averages_per_group = 4
+        num_groups = 10
+
+        new_players_averages = []
+        new_servers_averages = []
+
+        for group in range(num_groups):
+            start_index = group * averages_per_group
+            end_index = (group + 1) * averages_per_group
+
+            players_group = recent_players[start_index:end_index]
+            servers_group = recent_servers[start_index:end_index]
+
+            new_players_averages.append(round(average(players_group)))
+            new_servers_averages.append(round(average(servers_group)))
+
+        for _ in range(10):
+            players_week.pop(0)
+            servers_week.pop(0)
+
+        players_week.extend(new_players_averages)
+        servers_week.extend(new_servers_averages)
+
+        await self.database.update_many(
+            DB_SFD_ACTIVITY,
+            {"$set": {"players_week": players_week, "servers_week": servers_week}},
+        )
+
+    async def _load_database_day(self) -> tuple:
         activity = await self.database.find_one(DB_SFD_ACTIVITY)
-        return activity["players"], activity["servers"]
+        return activity["players_day"], activity["servers_day"]
+
+    async def _load_database_week(self) -> tuple:
+        activity = await self.database.find_one(DB_SFD_ACTIVITY)
+        return activity["players_week"], activity["servers_week"]
 
     async def get_players_and_servers(self) -> tuple:
         servers = await self._parse_servers(None)

@@ -28,6 +28,12 @@ def iso_to_timestamp(iso_time: str) -> datetime:
     return timestamp
 
 
+def average(numbers: list) -> float:
+    if not numbers:
+        return 0.0
+    return sum(numbers) / len(numbers)
+
+
 class VideoDownloader:
     def __init__(self):
         self.file_path = None

@@ -512,7 +512,6 @@ class HostView(discord.ui.View):
                     'dumbass',
                     'retard',
                     'nitwit',
-                    'cockwomble',
                     'prick',
                     'cunt',
                     'pillock',

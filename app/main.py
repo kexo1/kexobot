@@ -269,11 +269,12 @@ class KexoBOT:
             self.main_loop_counter = 0
             await self.esutaze.run()
 
-        if now.minute % 10 == 0:
-            await self.sfd_servers.generate_activity_graph("Day")
-
         if now.minute == 0:
+            await self.sfd_servers.generate_activity_graph("Day")
             await self.sfd_servers.generate_activity_graph("Week")
+
+        if now.minute % 6 == 0:
+            await self.sfd_servers.update_stats()
 
     async def hourly_loop(self) -> None:
         """Hourly loop for the bot.
