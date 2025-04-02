@@ -1,6 +1,5 @@
 import httpx
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import mplcyberpunk
 import datetime
 import numpy as np
@@ -22,8 +21,6 @@ from utils import average
 
 
 plt.style.use("cyberpunk")
-plt.rcParams["font.family"] = "sans-serif"
-plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
 
 
 class Server:
@@ -77,7 +74,7 @@ class SFDServers:
                 SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS
             )
             return response.text
-        except httpx.ReadTimeout:
+        except (httpx.ReadTimeout, httpx.ConnectTimeout):
             print("SFD Servers: Request timed out")
         return []
 

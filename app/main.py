@@ -104,11 +104,11 @@ class KexoBOT:
         await self._fetch_users()
         await self.create_session()
         await self._fetch_channels()
-
+        await self._define_classes()
+        await self._generate_graphs()
         bot.subbredit_cache = return_dict(
             await self.database.find_one(DB_REDDIT_CACHE, {"_id": False})
         )
-        await self._define_classes()
         bot.sfd_servers = self.sfd_servers
 
     async def _fetch_channels(self) -> None:
@@ -116,6 +116,14 @@ class KexoBOT:
         self.game_updates_channel = await bot.fetch_channel(GAME_UPDATES_CHANNEL)
         self.free_stuff_channel = await bot.fetch_channel(FREE_STUFF_CHANNEL)
         print("Channels fetched.")
+
+    async def _generate_graphs(self, log: bool = True) -> None:
+        """Generate graphs for the bot."""
+        await self.sfd_servers.generate_graph_day("New_York")
+        await self.sfd_servers.generate_graph_week("New_York")
+        if not log:
+            return
+        print("Graphs generated.")
 
     async def _define_classes(self) -> None:
         """Define classes for the bot."""
@@ -270,8 +278,7 @@ class KexoBOT:
             await self.esutaze.run()
 
         if now.minute == 0:
-            await self.sfd_servers.generate_graph_day("New_York")
-            await self.sfd_servers.generate_graph_week("New_York")
+            await self._generate_graphs(log=False)
 
         if now.minute % 6 == 0:
             await self.sfd_servers.update_stats()

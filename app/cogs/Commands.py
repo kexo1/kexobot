@@ -379,7 +379,7 @@ class Commands(commands.Cog):
         view.message = await ctx.channel.fetch_message(interaction.id)
 
     # -------------------- Discord functions -------------------- #
-    @slash_command(name="info")
+    @slash_command(name="info", description="Shows bot info.")
     async def info(self, ctx: discord.ApplicationContext) -> None:
         embed = discord.Embed(title="INFO", color=discord.Color.blue())
         embed.add_field(
