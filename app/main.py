@@ -83,6 +83,7 @@ class KexoBOT:
         bot.database = self.database
         bot.reddit = self.reddit
         bot.connect_node = self.connect_node
+        bot.get_node = self.get_node
 
         self.onlinefix = None | OnlineFix
         self.game3rb = None | Game3rb
@@ -165,23 +166,9 @@ class KexoBOT:
             return
 
         for _ in range(len(self.lavalink_servers)):
-            self.which_lavalink_server += 1
-            if self.which_lavalink_server >= len(self.lavalink_servers):
-                self.which_lavalink_server = 0
-
-            ip = self.lavalink_servers[self.which_lavalink_server]["ip"]
-            password = self.lavalink_servers[self.which_lavalink_server]["password"]
-            print(f"Server {ip} fetched, testing connection...")
-
-            node = [
-                wavelink.Node(
-                    uri=ip,
-                    password=password,
-                    retries=1,
-                    resume_timeout=0,
-                    inactive_player_timeout=600,
-                )
-            ]
+            node: wavelink.Node = await self.get_node()
+            if not node:
+                return
 
             try:
                 await asyncio.wait_for(
@@ -193,6 +180,31 @@ class KexoBOT:
 
             bot.node = node
             return
+
+    async def get_node(self) -> wavelink.Node:
+        if not self.lavalink_servers:
+            print("No lavalink servers found.")
+            return None
+
+        self.which_lavalink_server += 1
+        if self.which_lavalink_server >= len(self.lavalink_servers):
+            self.which_lavalink_server = 0
+
+        ip: str = self.lavalink_servers[self.which_lavalink_server]["ip"]
+        password: str = self.lavalink_servers[self.which_lavalink_server]["password"]
+        print(f"Cycling through lavalink servers: {ip}")
+
+        node = [
+            wavelink.Node(
+                uri=ip,
+                password=password,
+                retries=1,
+                resume_timeout=0,
+                inactive_player_timeout=600,
+            )
+        ]
+
+        return node
 
     async def set_joke(self) -> None:
         """Set a random joke as the bot's activity."""
@@ -248,6 +260,7 @@ class KexoBOT:
         fetch data from different sources.
         It runs the classes in a round-robin fashion.
         """
+        await self.reddit_crackwatch.run()
         now = datetime.now()
         if self.main_loop_counter == 0:
             self.main_loop_counter = 1

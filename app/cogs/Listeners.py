@@ -3,6 +3,7 @@ import wavelink
 
 from discord.ext import commands
 from cogs.Play import Play
+from typing import Union
 from wavelink import (
     NodeDisconnectedEventPayload,
     NodeReadyEventPayload,
@@ -29,30 +30,30 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_node_disconnected(
-        self, payload: NodeDisconnectedEventPayload
+            self, payload: NodeDisconnectedEventPayload
     ) -> None:
         print(f"Node {payload.node.uri} is disconnected, fetching new node...")
         await self.bot.connect_node()
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(
-        self, payload: TrackExceptionEventPayload
+            self, payload: TrackExceptionEventPayload
     ) -> None:
         embed = discord.Embed(
             title="",
-            description=f":x: An error occured when playing song, skip song or re-join bot.",
+            description=f":warning: An error occured when playing song, trying to connect to a new node.",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
-        await payload.player.text_channel.send(embed=embed)
+        await self._manage_node(embed, payload)
 
     @commands.Cog.listener()
     async def on_wavelink_track_stuck(self, payload: TrackStuckEventPayload) -> None:
         embed = discord.Embed(
             title="",
-            description=f":x: Song got stuck, skip song or re-join bot.",
+            description=f":warning: Song got stuck, trying to connect to a new node.",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
-        await payload.player.text_channel.send(embed=embed)
+        await self._manage_node(embed, payload)
 
     @commands.Cog.listener()
     async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:
@@ -67,10 +68,10 @@ class Listeners(commands.Cog):
     # noinspection PyUnusedLocal
     @commands.Cog.listener()
     async def on_voice_state_update(
-        self,
-        member: discord.member.Member,
-        before: discord.VoiceState,
-        after: discord.VoiceState,
+            self,
+            member: discord.member.Member,
+            before: discord.VoiceState,
+            after: discord.VoiceState,
     ) -> None:
         voice_state = member.guild.voice_client
         if voice_state is None:
@@ -78,6 +79,42 @@ class Listeners(commands.Cog):
 
         if len(voice_state.channel.members) == 1:
             await Play.disconnect_player(member.guild)
+
+    async def _manage_node(
+            self, embed: discord.Embed, payload: Union[TrackExceptionEventPayload, TrackStuckEventPayload]
+    ) -> None:
+        message: discord.Message = await payload.player.text_channel.send(embed=embed)
+        is_switched: bool = await self._switch_node(payload.player)
+        await self._node_status_message(message, is_switched)
+
+    @staticmethod
+    async def _node_status_message(message: discord.Message, is_switched: bool) -> None:
+        if is_switched:
+            embed = discord.Embed(
+                title="",
+                description=f":white_check_mark: Successfully connected to a new node.",
+                color=discord.Color.from_rgb(r=0, g=255, b=0),
+            )
+        else:
+            embed = discord.Embed(
+                title="",
+                description=f":x: Failed to connect to a new node.",
+                color=discord.Color.from_rgb(r=255, g=0, b=0),
+            )
+        await message.edit(embed=embed)
+
+    async def _switch_node(self, player: wavelink.Player) -> bool:
+        for i in range(5):
+            try:
+                node: wavelink.Node = await self.bot.get_node()
+                await player.switch_node(node)
+                if player.current:
+                    await player.play(player.current)
+                return True
+            except RuntimeError:
+                print(f"{i}. Failed to switch node ({node.uri}), trying again...")
+                continue
+        return False
 
     async def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
         embed = discord.Embed(

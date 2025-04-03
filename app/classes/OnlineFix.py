@@ -35,6 +35,7 @@ class OnlineFix:
         onlinefix_article = await self.session.get(url)
         soup = BeautifulSoup(onlinefix_article.text, "html.parser")
         head_tag = soup.find("head")
+        
         if not isinstance(head_tag, Tag):
             print("OnlineFix: Image tag not found")
             return

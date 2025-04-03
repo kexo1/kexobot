@@ -16,7 +16,7 @@ class Esutaze:
 
     async def run(self) -> None:
         to_filter, esutaze_cache = await self._load_database()
-        esutaze_cache_upload = esutaze_cache
+        esutaze_cache_upload = esutaze_cache.copy()
         articles = await self._get_articles()
 
         if not articles:

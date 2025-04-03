@@ -36,7 +36,7 @@ class ElektrinaVypadky:
     async def _process_articles(
         self, articles: list, elektrinavypadky_cache: list
     ) -> None:
-        elektrinavypadky_cache_upload = elektrinavypadky_cache
+        elektrinavypadky_cache_upload = elektrinavypadky_cache.copy()
         above_limit = False
 
         for article in articles:

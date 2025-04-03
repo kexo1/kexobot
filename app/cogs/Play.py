@@ -198,7 +198,7 @@ class Play(commands.Cog):
         )
         embed.add_field(name="Latency:", value=f"{player.state.ping} ms")
         embed.add_field(name="Volume:", value=player.volume)
-        embed.add_field(name="Is Paused:", value=player.paused)
+        embed.add_field(name="Is Paused:", value=player.paused, inline=False)
         embed.add_field(name="Is Connected:", value=player.state.connected)
         await ctx.respond(embed=embed)
 
@@ -335,28 +335,24 @@ class Play(commands.Cog):
         embed.set_thumbnail(url=track.artwork)
         return embed
 
+    @commands.Cog.listener()
+    async def on_command_error(self, ctx: discord.ApplicationContext, error: Exception) -> None:
+        if isinstance(error, LavalinkException):
+            vc: wavelink.Player = ctx.voice_client
+            if not vc:
+                raise error
 
-@commands.Cog.listener()
-async def on_command_error(ctx: discord.ApplicationContext, error: Exception) -> None:
-    if isinstance(error, LavalinkException):
-        await ctx.respond(
-            embed=discord.Embed(
-                title="",
-                description="There was an error processing your request. Please try again.",
-                color=discord.Color.from_rgb(r=255, g=0, b=0)
+            await ctx.respond(
+                embed=discord.Embed(
+                    title="",
+                    description="There was an error processing your request, trying to recconnect node.",
+                    color=discord.Color.from_rgb(r=255, g=0, b=0)
+                )
             )
-        )
-    elif isinstance(error, TimeoutError):
-        await ctx.respond(
-            embed=discord.Embed(
-                title="",
-                description="The request timed out. Bot is recconnecting to a new node, try again.",
-                color=discord.Color.from_rgb(r=255, g=0, b=0)
-            )
-        )
-        await self.bot.connect_node()
-    else:
-        raise error
+            node: wavelink.Node = await self.bot.get_node()
+            await vc.switch_node(node)
+        else:
+            raise error
 
 
 def setup(bot: commands.Bot) -> None:

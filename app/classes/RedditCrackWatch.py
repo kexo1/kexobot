@@ -28,7 +28,7 @@ class RedditCrackWatch:
 
     async def run(self) -> None:
         crackwatch_cache, to_filter = await self._load_database()
-        crackwatch_cache_upload = crackwatch_cache
+        crackwatch_cache_upload = crackwatch_cache.copy()
         subreddit = await self.reddit.subreddit("CrackWatch")
         try:
             async for submission in subreddit.new(limit=REDDIT_CRACKWATCH_POSTS):

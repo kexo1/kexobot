@@ -26,7 +26,7 @@ class RedditFreeGameFindings:
 
     async def run(self) -> None:
         freegamefindings_cache, to_filter = await self._load_database()
-        freegamefindings_cache_upload = freegamefindings_cache
+        freegamefindings_cache_upload = freegamefindings_cache.copy()
 
         subreddit = await self.reddit.subreddit("FreeGameFindings")
 
