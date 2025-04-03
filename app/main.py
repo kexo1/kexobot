@@ -1,5 +1,5 @@
 import discord
-import asyncpraw  # type: ignore
+import asyncpraw
 import httpx
 import dns.resolver
 import random

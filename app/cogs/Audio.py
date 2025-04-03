@@ -25,7 +25,7 @@ class Audio(commands.Cog):
     async def change_volume(
         self, ctx: discord.ApplicationContext, vol: Optional[int] = None
     ) -> None:
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
 
         if vol is None:
             embed = discord.Embed(
@@ -57,7 +57,7 @@ class Audio(commands.Cog):
     async def speed(
         self, ctx: discord.ApplicationContext, multiplier: Optional[int] = 2
     ) -> None:
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
         filters: wavelink.Filters = vc.filters
         filters.timescale.set(speed=multiplier)
 
@@ -72,7 +72,7 @@ class Audio(commands.Cog):
     @slash_command(name="clear-effects", description="Clears all effects on player.")
     @is_joined()
     async def clear_effects(self, ctx: discord.ApplicationContext) -> None:
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
         filters: wavelink.Filters = vc.filters
         filters.timescale.reset()
         await vc.set_filters(filters)

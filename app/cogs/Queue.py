@@ -48,7 +48,7 @@ class Queue(commands.Cog):
     @slash_command(name="queue", description="Shows songs in queue.")
     @is_joined()
     async def queue(self, ctx: discord.ApplicationContext) -> None:
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.is_empty:
             embed = discord.Embed(
@@ -80,7 +80,7 @@ class Queue(commands.Cog):
     )
     @is_joined()
     async def remove(self, ctx: discord.ApplicationContext, pos: Optional[int] = None):
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
 
         if not pos:
             embed = discord.Embed(
@@ -89,7 +89,7 @@ class Queue(commands.Cog):
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed)
-            vc.queue.pop()  # type: ignore
+            vc.queue.pop()
             return
 
         try:
@@ -115,7 +115,7 @@ class Queue(commands.Cog):
     )
     @is_joined()
     async def shuffle(self, ctx: discord.ApplicationContext):
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.is_empty:
             embed = discord.Embed(
@@ -143,7 +143,7 @@ class Queue(commands.Cog):
     )
     @is_joined()
     async def loop_queue(self, ctx: discord.ApplicationContext) -> None:
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.is_empty:
             embed = discord.Embed(
@@ -177,7 +177,7 @@ class Queue(commands.Cog):
     )
     @is_playing()
     async def loop(self, ctx: discord.ApplicationContext) -> None:
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.mode == wavelink.QueueMode.loop:
             vc.queue.mode = wavelink.QueueMode.normal
@@ -200,7 +200,7 @@ class Queue(commands.Cog):
     @slash_command(name="clear-queue", description="Clears queue")
     @is_joined()
     async def clear_queue(self, ctx: discord.ApplicationContext):
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
         vc.queue.clear()
 
         embed = discord.Embed(
@@ -262,7 +262,7 @@ class Queue(commands.Cog):
 
     @staticmethod
     async def _get_playing_embed(ctx: discord.ApplicationContext) -> discord.Embed:
-        vc: wavelink.Player = ctx.voice_client  # type: ignore
+        vc: wavelink.Player = ctx.voice_client
 
         embed = discord.Embed(
             title="Now playing",

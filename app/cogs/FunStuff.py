@@ -1,15 +1,15 @@
-import asyncpraw.reddit  # type: ignore
+import asyncpraw.reddit
 import discord
 import random
-import imgflip  # type: ignore
-import requests  # type: ignore
+import imgflip
+import requests
 
 from datetime import datetime, timedelta
 from discord.ext import commands
 from discord.commands import slash_command
 from discord import option
 from typing import Literal
-from asyncprawcore.exceptions import (  # type: ignore
+from asyncprawcore.exceptions import (
     AsyncPrawcoreException,
     ResponseException,
     RequestException,

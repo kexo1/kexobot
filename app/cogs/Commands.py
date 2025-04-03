@@ -15,7 +15,8 @@ from discord.commands import option
 from constants import XTC_SERVER, KEXO_SERVER, DB_LISTS, DB_CHOICES, SFD_TIMEZONE_CHOICE
 from classes.DatabaseManager import DatabaseManager
 from classes.SFDServers import SFDServers
-from utils import get_memory_usage
+from pymongo import timeout
+from utils import get_memory_usage, iso_to_timestamp
 from __init__ import __version__
 
 host_authors = []
@@ -54,6 +55,7 @@ class Commands(commands.Cog):
             color=discord.Color.blue(),
         )
         message = await ctx.respond(embed=embed)
+        await ctx.trigger_typing()
 
         node = [
             wavelink.Node(
@@ -63,34 +65,36 @@ class Commands(commands.Cog):
                 resume_timeout=0,
             )
         ]
-        await wavelink.Pool.connect(nodes=node, client=self.bot)
-        self.bot.node = node
-
-        await ctx.trigger_typing()
-        await asyncio.sleep(2)
-
         try:
+            await asyncio.wait_for(
+                wavelink.Pool.connect(nodes=node, client=self.bot), timeout=5
+            )
+            await asyncio.sleep(1)
             await node[0].fetch_info()
-
+        except asyncio.TimeoutError:
             embed = discord.Embed(
                 title="",
-                description=f"**✅ Connected to node `{uri}`**",
-                color=discord.Color.blue(),
+                description=f":x: Timed out when trying to connect to `{uri}`",
+                color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await message.edit(embed=embed)
-
-        except (
-            aiohttp.client_exceptions.ClientConnectorError,
-            aiohttp.ConnectionTimeoutError,
-            wavelink.exceptions.NodeException,
-            AssertionError,
-        ):
+            return
+        except wavelink.exceptions.NodeException:
             embed = discord.Embed(
                 title="",
                 description=f":x: Failed to connect to `{uri}`",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await message.edit(embed=embed)
+            return
+
+        self.bot.node = node
+        embed = discord.Embed(
+            title="",
+            description=f"**✅ Connected to node `{uri}`**",
+            color=discord.Color.blue(),
+        )
+        await message.edit(embed=embed)
 
     @slash_command(
         name="reconnect_node", description="Automatically reconnect to avaiable node"
@@ -104,21 +108,7 @@ class Commands(commands.Cog):
             color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
-
-        try:
-            await self.bot.connect_node()
-        except (
-            aiohttp.client_exceptions.ClientConnectorError,
-            aiohttp.ConnectionTimeoutError,
-            wavelink.exceptions.NodeException,
-            AssertionError,
-        ):
-            embed = discord.Embed(
-                title="",
-                description=f":x: Failed to connect to `{self.bot.node[0].uri}`, rolling back to previous node.",
-                color=discord.Color.from_rgb(r=255, g=0, b=0),
-            )
-            return await ctx.send(embed=embed)
+        await self.bot.connect_node()
 
         embed = discord.Embed(
             title="",
@@ -126,6 +116,27 @@ class Commands(commands.Cog):
             color=discord.Color.blue(),
         )
         await ctx.send(embed=embed)
+
+    @slash_command(
+        name="node_info", description="Information about connected node."
+    )
+    async def node_info(self, ctx: discord.ApplicationContext) -> None:
+        node: wavelink.InfoResponsePayload = await self.bot.node[0].fetch_info()
+        embed = discord.Embed(
+            title="Node Info",
+            color=discord.Color.blue(),
+        )
+        plugins: wavelink.PluginResponsePayload = node.plugins
+        unix_timestamp = int(iso_to_timestamp(str(node.build_time)).timestamp())
+
+        embed.add_field(name="Build time:", value=f"<t:{unix_timestamp}:D>")
+        embed.add_field(name="Java version:", value=node.jvm)
+        embed.add_field(name="Lavaplayer version:", value=node.lavaplayer)
+        embed.add_field(name="Filters:", value=", ".join(node.filters))
+        embed.add_field(name="Plugins:",
+                        value=', '.join(f"{plugin.name}: {plugin.version}" for plugin in plugins),
+                        inline=False)
+        await ctx.respond(embed=embed)
 
     # -------------------- SFD Servers -------------------- #
     @slash_command(
@@ -381,7 +392,7 @@ class Commands(commands.Cog):
     # -------------------- Discord functions -------------------- #
     @slash_command(name="info", description="Shows bot info.")
     async def info(self, ctx: discord.ApplicationContext) -> None:
-        embed = discord.Embed(title="INFO", color=discord.Color.blue())
+        embed = discord.Embed(title="KexoBOT Info", color=discord.Color.blue())
         embed.add_field(
             name="Run time:ㅤㅤ",
             value=f"{str(datetime.timedelta(seconds=round(int(time.time()) - self.run_time)))}",
