@@ -113,7 +113,6 @@ class RedditCrackWatch:
 
     @staticmethod
     async def _get_image(line: str) -> Optional[str]:
-        print(line)
         image_url = re.findall(r"\((.*?)\)", line)
         if not image_url:
             return None

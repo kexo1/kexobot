@@ -184,14 +184,18 @@ class Play(commands.Cog):
             color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
-        await self.disconnect_player(ctx.guild)
+        await vc.disconnect()
 
     @slash_command(
-        name="player_info", description="Information about current wavelink player.", guild_ids=[KEXO_SERVER]
+        name="player_info",
+        description="Information about current wavelink player.",
+        guild_ids=[KEXO_SERVER],
     )
     @is_joined()
     async def player_info(self, ctx: discord.ApplicationContext) -> None:
-        player: wavelink.PlayerResponsePayload = await self.bot.node[0].fetch_player_info(ctx.guild.id)
+        player: wavelink.PlayerResponsePayload = await self.bot.node[
+            0
+        ].fetch_player_info(ctx.guild.id)
         embed = discord.Embed(
             title="Player Info",
             color=discord.Color.blue(),
@@ -201,11 +205,6 @@ class Play(commands.Cog):
         embed.add_field(name="Is Paused:", value=player.paused, inline=False)
         embed.add_field(name="Is Connected:", value=player.state.connected)
         await ctx.respond(embed=embed)
-
-    @staticmethod
-    async def disconnect_player(guild: discord.Guild) -> None:
-        vc: wavelink.Player = guild.voice_client
-        await vc.disconnect()
 
     # ----------------------- Helper functions ------------------------ #
 
@@ -277,7 +276,7 @@ class Play(commands.Cog):
             return False
 
         try:
-            await ctx.author.voice.channel.connect(cls=wavelink.Player)
+            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=10000)
         except wavelink.InvalidChannelStateException:
             embed = discord.Embed(
                 title="",
@@ -334,25 +333,6 @@ class Play(commands.Cog):
         )
         embed.set_thumbnail(url=track.artwork)
         return embed
-
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx: discord.ApplicationContext, error: Exception) -> None:
-        if isinstance(error, LavalinkException):
-            vc: wavelink.Player = ctx.voice_client
-            if not vc:
-                raise error
-
-            await ctx.respond(
-                embed=discord.Embed(
-                    title="",
-                    description="There was an error processing your request, trying to recconnect node.",
-                    color=discord.Color.from_rgb(r=255, g=0, b=0)
-                )
-            )
-            node: wavelink.Node = await self.bot.get_node()
-            await vc.switch_node(node)
-        else:
-            raise error
 
 
 def setup(bot: commands.Bot) -> None:

@@ -396,7 +396,6 @@ async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
 @bot.event
 async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
     """Event that runs when a command is timed out."""
-
     if isinstance(error, commands.CommandOnCooldown):
         error_str = str(error).split()
         embed = discord.Embed(
@@ -407,6 +406,20 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
         return
+    elif isinstance(error, LavalinkException):
+        vc: wavelink.Player = ctx.voice_client
+        if not vc:
+            raise error
+
+        await ctx.respond(
+            embed=discord.Embed(
+                title="",
+                description="There was an error processing your request, trying to recconnect node.",
+                color=discord.Color.from_rgb(r=255, g=0, b=0),
+            )
+        )
+        node: wavelink.Node = await kexobot.get_node()
+        await vc.switch_node(node)
     raise error
 
 

@@ -2,7 +2,6 @@ import discord
 import wavelink
 
 from discord.ext import commands
-from cogs.Play import Play
 from typing import Union
 from wavelink import (
     NodeDisconnectedEventPayload,
@@ -30,14 +29,14 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_node_disconnected(
-            self, payload: NodeDisconnectedEventPayload
+        self, payload: NodeDisconnectedEventPayload
     ) -> None:
         print(f"Node {payload.node.uri} is disconnected, fetching new node...")
         await self.bot.connect_node()
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(
-            self, payload: TrackExceptionEventPayload
+        self, payload: TrackExceptionEventPayload
     ) -> None:
         embed = discord.Embed(
             title="",
@@ -57,7 +56,7 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:
-        await Play.disconnect_player(player.guild)
+        await player.disconnect()
         embed = discord.Embed(
             title="",
             description=f"**Left <#{player.channel.id}> after 10 minutes of inactivity.**",
@@ -68,20 +67,22 @@ class Listeners(commands.Cog):
     # noinspection PyUnusedLocal
     @commands.Cog.listener()
     async def on_voice_state_update(
-            self,
-            member: discord.member.Member,
-            before: discord.VoiceState,
-            after: discord.VoiceState,
+        self,
+        member: discord.member.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
     ) -> None:
-        voice_state = member.guild.voice_client
-        if voice_state is None:
+        vc: wavelink.Player = member.guild.voice_client
+        if vc is None:
             return
 
         if len(voice_state.channel.members) == 1:
-            await Play.disconnect_player(member.guild)
+            await voice_state.disconnect()
 
     async def _manage_node(
-            self, embed: discord.Embed, payload: Union[TrackExceptionEventPayload, TrackStuckEventPayload]
+        self,
+        embed: discord.Embed,
+        payload: Union[TrackExceptionEventPayload, TrackStuckEventPayload],
     ) -> None:
         message: discord.Message = await payload.player.text_channel.send(embed=embed)
         is_switched: bool = await self._switch_node(payload.player)

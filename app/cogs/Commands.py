@@ -117,9 +117,7 @@ class Commands(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @slash_command(
-        name="node_info", description="Information about connected node."
-    )
+    @slash_command(name="node_info", description="Information about connected node.")
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
         node: wavelink.InfoResponsePayload = await self.bot.node[0].fetch_info()
         embed = discord.Embed(
@@ -133,9 +131,11 @@ class Commands(commands.Cog):
         embed.add_field(name="Java version:", value=node.jvm)
         embed.add_field(name="Lavaplayer version:", value=node.lavaplayer)
         embed.add_field(name="Filters:", value=", ".join(node.filters))
-        embed.add_field(name="Plugins:",
-                        value=', '.join(f"{plugin.name}: {plugin.version}" for plugin in plugins),
-                        inline=False)
+        embed.add_field(
+            name="Plugins:",
+            value=", ".join(f"{plugin.name}: {plugin.version}" for plugin in plugins),
+            inline=False,
+        )
         await ctx.respond(embed=embed)
 
     # -------------------- SFD Servers -------------------- #

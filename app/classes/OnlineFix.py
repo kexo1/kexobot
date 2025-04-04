@@ -35,16 +35,8 @@ class OnlineFix:
         onlinefix_article = await self.session.get(url)
         soup = BeautifulSoup(onlinefix_article.text, "html.parser")
         head_tag = soup.find("head")
-        
-        if not isinstance(head_tag, Tag):
-            print("OnlineFix: Image tag not found")
-            return
 
         meta_tag = head_tag.find("meta", attrs={"property": "og:image"})
-        if not isinstance(meta_tag, Tag):
-            print("OnlineFix: Image tag not found")
-            return
-
         img_url = meta_tag.get("content")
         article_description = soup.find("article")
         if not isinstance(article_description, Tag):
