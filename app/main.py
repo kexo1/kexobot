@@ -10,6 +10,7 @@ from fake_useragent import UserAgent
 from discord.ext import tasks, commands
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
+from wavelink.exceptions import LavalinkException
 
 from constants import (
     DISCORD_TOKEN,
@@ -112,14 +113,29 @@ class KexoBOT:
         )
         bot.sfd_servers = self.sfd_servers
 
+    @staticmethod
+    async def _fetch_channel(channel_id: int) -> discord.TextChannel:
+        """Helper to fetch a channel by ID."""
+
+        return await bot.fetch_channel(channel_id)
+
+    @staticmethod
+    async def _initialize_class(cls, *args):
+        """Helper to initialize a class with arguments."""
+
+        return cls(*args)
+
     async def _fetch_channels(self) -> None:
-        self.esutaze_channel = await bot.fetch_channel(ESUTAZE_CHANNEL)
-        self.game_updates_channel = await bot.fetch_channel(GAME_UPDATES_CHANNEL)
-        self.free_stuff_channel = await bot.fetch_channel(FREE_STUFF_CHANNEL)
+        """Fetch all channels for the bot."""
+
+        self.esutaze_channel = await self._fetch_channel(ESUTAZE_CHANNEL)
+        self.game_updates_channel = await self._fetch_channel(GAME_UPDATES_CHANNEL)
+        self.free_stuff_channel = await self._fetch_channel(FREE_STUFF_CHANNEL)
         print("Channels fetched.")
 
     async def _generate_graphs(self, log: bool = True) -> None:
         """Generate graphs for the bot."""
+
         await self.sfd_servers.generate_graph_day("New_York")
         await self.sfd_servers.generate_graph_week("New_York")
         if not log:
@@ -129,27 +145,44 @@ class KexoBOT:
     async def _define_classes(self) -> None:
         """Define classes for the bot."""
 
-        self.onlinefix = OnlineFix(
-            self.session, self.database, self.game_updates_channel
+        self.onlinefix = await self._initialize_class(
+            OnlineFix, self.database, self.session,  self.game_updates_channel
         )
-        self.game3rb = Game3rb(self.session, self.database, self.game_updates_channel)
-        self.alienwarearena = AlienwareArena(
-            self.database, self.session, self.free_stuff_channel
+        self.game3rb = await self._initialize_class(
+            Game3rb, self.database, self.session,  self.game_updates_channel
         )
-        self.fanatical = Fanatical(self.database, self.session, self.free_stuff_channel)
-        self.reddit_freegamefindings = RedditFreeGameFindings(
-            self.database, self.reddit, self.session, self.free_stuff_channel
+        self.alienwarearena = await self._initialize_class(
+            AlienwareArena, self.database, self.session, self.free_stuff_channel
         )
-        self.reddit_crackwatch = RedditCrackWatch(
-            self.database, self.reddit, self.game_updates_channel, self.user_kexo
+        self.fanatical = await self._initialize_class(
+            Fanatical, self.database, self.session, self.free_stuff_channel
         )
-        self.elektrina_vypadky = ElektrinaVypadky(
-            self.session, self.database, self.user_kexo
+        self.reddit_freegamefindings = await self._initialize_class(
+            RedditFreeGameFindings,
+            self.database,
+            self.session,
+            self.reddit,
+            self.free_stuff_channel,
         )
-        self.esutaze = Esutaze(self.session, self.database, self.esutaze_channel)
-        self.sfd_servers = SFDServers(self.session, self.database)
-        self.lavalink_fetch = LavalinkServerFetch(bot, self.session)
-        print("Classes defined.")
+        self.sfd_servers = await self._initialize_class(
+            SFDServers, self.database, self.session
+        )
+        self.reddit_crackwatch = await self._initialize_class(
+            RedditCrackWatch,
+            self.database,
+            self.reddit,
+            self.game_updates_channel,
+            self.user_kexo,
+        )
+        self.elektrina_vypadky = await self._initialize_class(
+            ElektrinaVypadky, self.database, self.session, self.user_kexo
+        )
+        self.esutaze = await self._initialize_class(
+            Esutaze, self.database, self.session, self.esutaze_channel
+        )
+        self.lavalink_fetch = await self._initialize_class(
+            LavalinkServerFetch,  self.session
+        )
 
     async def create_session(self) -> None:
         """Create a httpx session for the bot."""
@@ -175,13 +208,15 @@ class KexoBOT:
                     wavelink.Pool.connect(nodes=node, client=bot), timeout=5
                 )
             except asyncio.TimeoutError:
-                print(f"Node {ip} is not ready, trying next...")
+                print(f"Node {node.uri} is not ready, trying next...")
                 continue
 
             bot.node = node
             return
 
     async def get_node(self) -> wavelink.Node:
+        """Get the next lavalink node."""
+
         if not self.lavalink_servers:
             print("No lavalink servers found.")
             return None
@@ -303,6 +338,7 @@ class KexoBOT:
         It runs the classes in a round-robin fashion.
         It also updates the reddit cache and fetches lavalink servers.
         """
+
         now = datetime.now()
 
         if now.hour == 0:
@@ -318,12 +354,14 @@ kexobot = KexoBOT()
 
 def create_cog_session() -> None:
     """Create a httpx session for the cogs."""
+
     bot.session = httpx.AsyncClient()
     bot.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
 
 
 def setup_cogs() -> None:
     """Load all cogs for the bot."""
+
     create_cog_session()
     bot.load_extension("cogs.Play")
     bot.load_extension("cogs.Listeners")

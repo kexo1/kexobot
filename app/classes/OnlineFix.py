@@ -3,7 +3,8 @@ import discord
 import datetime
 import httpx
 
-from deep_translator import GoogleTranslator  # type: ignore
+from deep_translator import GoogleTranslator
+from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup, Tag
 from constants import (
     ONLINEFIX_MAX_GAMES,
@@ -15,7 +16,7 @@ from constants import (
 
 
 class OnlineFix:
-    def __init__(self, session, database, channel):
+    def __init__(self, database: AsyncIOMotorClient, session: httpx.AsyncClient, channel: discord.TextChannel) -> None:
         self.session = session
         self.database = database
         self.channel = channel

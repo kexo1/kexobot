@@ -1,4 +1,5 @@
 from constants import DB_LISTS
+from motor.motor_asyncio import AsyncIOMotorClient
 
 
 class DatabaseManager:
@@ -8,7 +9,7 @@ class DatabaseManager:
         CRACKWATCH_EXCEPTIONS = "r/CrackWatch Exceptions"
         ESUTAZE_EXCEPTIONS = "Esutaze Exceptions"
 
-    def __init__(self, database) -> None:
+    def __init__(self, database: AsyncIOMotorClient) -> None:
         self.database = database
 
     async def get_database(self, collection: str) -> list:

@@ -62,7 +62,7 @@ class Server:
 
 
 class SFDServers:
-    def __init__(self, session: httpx.AsyncClient, database: AsyncIOMotorClient):
+    def __init__(self, database: AsyncIOMotorClient, session: httpx.AsyncClient):
         self.session = session
         self.database = database
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")

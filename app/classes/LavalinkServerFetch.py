@@ -1,11 +1,11 @@
+import discord
 import httpx
 
 from constants import LAVALIST_URL, LAVAINFO_API_URLS
 
 
 class LavalinkServerFetch:
-    def __init__(self, bot, session: httpx.AsyncClient):
-        self.bot = bot
+    def __init__(self, session: httpx.AsyncClient) -> None:
         self.session = session
         self.repeated_hostnames: list[str] = []
 

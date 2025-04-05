@@ -1,15 +1,21 @@
 import discord
+import httpx
 import datetime
 
 from io import BytesIO
-
-import httpx
+from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup, Tag
 from constants import ESUTAZE_URL, ESUTAZE_ICON, DB_CACHE, DB_LISTS
 
 
 class Esutaze:
-    def __init__(self, session, database, channel):
+    def __init__(
+            self,
+            database: AsyncIOMotorClient,
+            session: httpx.AsyncClient,
+            channel: discord.TextChannel
+    ) -> None:
+
         self.session = session
         self.database = database
         self.channel = channel
@@ -82,8 +88,8 @@ class Esutaze:
     async def _get_articles(self) -> list:
         try:
             html_content = await self.session.get(ESUTAZE_URL)
-        except httpx.ReadTimeout:
-            print("Esutaze: ReadTimeout")
+        except (httpx.ReadTimeout, httpx.ConnectError):
+            print("Esutaze: Timeout")
             return []
 
         soup = BeautifulSoup(html_content.content, "xml")

@@ -1,13 +1,20 @@
 import discord
 import httpx
 
+from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup
 from constants import ELEKTRINA_MAX_ARTICLES, ELEKTRINA_URL, ELEKTRINA_ICON, DB_CACHE
 from utils import iso_to_timestamp
 
 
 class ElektrinaVypadky:
-    def __init__(self, session, database, user_kexo):
+    def __init__(
+            self,
+            database: AsyncIOMotorClient,
+            session: httpx.AsyncClient,
+            user_kexo: discord.User
+    ) -> None:
+
         self.session = session
         self.database = database
         self.user_kexo = user_kexo

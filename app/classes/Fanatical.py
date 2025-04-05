@@ -1,12 +1,13 @@
 import discord
 import httpx
 
+from motor.motor_asyncio import AsyncIOMotorClient
 from constants import DB_CACHE, FANATICAL_MAX_POSTS, FANATICAL_URL, FANATICAL_IMG_URL
 from utils import iso_to_timestamp
 
 
 class Fanatical:
-    def __init__(self, database, session, channel):
+    def __init__(self, database: AsyncIOMotorClient, session: httpx.AsyncClient, channel: discord.TextChannel) -> None:
         self.database = database
         self.session = session
         self.channel = channel

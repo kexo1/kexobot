@@ -5,6 +5,7 @@ import discord
 
 from datetime import datetime
 from typing import Optional
+from motor.motor_asyncio import AsyncIOMotorClient
 from asyncprawcore.exceptions import (  # type: ignore
     AsyncPrawcoreException,
     ResponseException,
@@ -20,7 +21,14 @@ from constants import (
 
 
 class RedditCrackWatch:
-    def __init__(self, database, reddit, channel, user_kexo):
+    def __init__(
+            self,
+            database: AsyncIOMotorClient,
+            reddit: asyncpraw.Reddit,
+            channel: discord.TextChannel,
+            user_kexo: discord.User
+    ) -> None:
+
         self.database = database
         self.reddit = reddit
         self.channel = channel

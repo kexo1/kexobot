@@ -5,13 +5,14 @@ import unidecode
 import discord
 import logging
 
+from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
 from bs4 import BeautifulSoup
 from constants import GAME3RB_STRIP, GAME3RB_URL, GAME3RB_ICON, DB_CACHE, DB_LISTS
 
 
 class Game3rb:
-    def __init__(self, session, database, channel):
+    def __init__(self, database: AsyncIOMotorClient, session: httpx.AsyncClient, channel: discord.TextChannel) -> None:
         self.session = session
         self.database = database
         self.channel = channel
