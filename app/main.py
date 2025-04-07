@@ -325,9 +325,6 @@ class KexoBOT:
             self.main_loop_counter = 0
             await self.esutaze.run()
 
-        if now.minute == 0:
-            await self._generate_graphs(log=False)
-
         if now.minute % 6 == 0:
             await self.sfd_servers.update_stats()
 
@@ -375,7 +372,7 @@ def setup_cogs() -> None:
 setup_cogs()
 
 
-@tasks.loop(minutes=1)
+@tasks.loop(minutes=2)
 async def main_loop_task() -> None:
     await kexobot.main_loop()
 

@@ -2,7 +2,6 @@ import asyncio
 import discord
 import datetime
 import random
-import aiohttp
 import wavelink
 import time
 import sys
@@ -12,11 +11,10 @@ from discord.ext import commands
 from discord.commands import slash_command
 from discord.commands import option
 
-from constants import XTC_SERVER, KEXO_SERVER, DB_LISTS, DB_CHOICES, SFD_TIMEZONE_CHOICE
+from constants import XTC_SERVER, KEXO_SERVER, DB_CHOICES, SFD_TIMEZONE_CHOICE
 from classes.DatabaseManager import DatabaseManager
 from classes.SFDServers import SFDServers
-from pymongo import timeout
-from utils import get_memory_usage, iso_to_timestamp
+from utils import get_memory_usage, iso_to_timestamp, get_file_age
 from __init__ import __version__
 
 host_authors = []
@@ -28,7 +26,7 @@ class Commands(commands.Cog):
         self.database = bot.database
         self.run_time = time.time()
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
-        self.sfd_servers = SFDServers(bot.session, self.database)
+        self.sfd_servers = SFDServers(self.database, bot.session)
         self.database_manager = DatabaseManager(self.database)
 
     async def init_sfd_servers(self) -> None:
@@ -218,7 +216,7 @@ class Commands(commands.Cog):
     )
     @option(
         "timezone",
-        description="Timezone, default is New York",
+        description="Timezone to properly adjust time-based data on graph, default is New York",
         required=False,
         choices=SFD_TIMEZONE_CHOICE,
     )
@@ -238,13 +236,17 @@ class Commands(commands.Cog):
         message = await ctx.respond(embed=embed)
 
         if graph_range == "Day":
-            if timezone != "New_York":
+            image_location = os.path.join(self.graphs_dir, f"sfd_activity_day_{timezone}.png")
+            if not os.path.exists(image_location):
                 await self.sfd_servers.generate_graph_day(timezone)
-            image_location = os.path.join(self.graphs_dir, "sfd_activity_day.png")
+            elif get_file_age(image_location) >= 3600:
+                await self.sfd_servers.generate_graph_day(timezone)
         else:
-            if timezone != "New_York":
+            image_location = os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png")
+            if not os.path.exists(image_location):
                 await self.sfd_servers.generate_graph_week(timezone)
-            image_location = os.path.join(self.graphs_dir, "sfd_activity_week.png")
+            elif get_file_age(image_location) >= 3600:
+                await self.sfd_servers.generate_graph_week(timezone)
 
         filename = os.path.basename(image_location)
         file = discord.File(image_location, filename=filename)
@@ -442,6 +444,7 @@ class Commands(commands.Cog):
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES)
+    @option("to_upload", description="String to upload.")
     async def add_to(self, ctx, collection: str, to_upload: str) -> None:
         db_list = await self.database_manager.get_database(collection)
 
@@ -464,6 +467,7 @@ class Commands(commands.Cog):
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES)
+    @option("to_remove", description="String to remove.")
     async def remove(self, ctx, collection: str, to_remove: str) -> None:
         db_list = await self.database_manager.get_database(collection)
 

@@ -94,7 +94,7 @@ class SFDServers:
         ]
         plt.xticks(tick_positions, tick_labels, rotation=45)
         plt.subplots_adjust(bottom=0.1)
-        plt.savefig(os.path.join(self.graphs_dir, "sfd_activity_week.png"), dpi=300)
+        plt.savefig(os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"), dpi=300)
         plt.close("all")
 
     async def generate_graph_day(self, timezone: str):
@@ -112,7 +112,7 @@ class SFDServers:
         # One time position per hour
         time_positions = [i * 10 + 5 for i in range(24)]
         plt.xticks(time_positions, hours)
-        plt.savefig(os.path.join(self.graphs_dir, "sfd_activity_day.png"), dpi=300)
+        plt.savefig(os.path.join(self.graphs_dir, f"sfd_activity_day_{timezone}.png"), dpi=300)
         plt.close("all")
 
     @staticmethod

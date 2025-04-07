@@ -276,7 +276,7 @@ class Play(commands.Cog):
             return False
 
         try:
-            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=10000)
+            await ctx.author.voice.channel.connect(cls=wavelink.Player)
         except wavelink.InvalidChannelStateException:
             embed = discord.Embed(
                 title="",

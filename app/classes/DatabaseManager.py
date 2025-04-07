@@ -8,6 +8,7 @@ class DatabaseManager:
         FREEGAMEFINDINGS_EXCEPTIONS = "r/FreeGameFindings Exceptions"
         CRACKWATCH_EXCEPTIONS = "r/CrackWatch Exceptions"
         ESUTAZE_EXCEPTIONS = "Esutaze Exceptions"
+        ALIENWAREARENA_EXCEPTIONS = "AlienwareArena Exceptions"
 
     def __init__(self, database: AsyncIOMotorClient) -> None:
         self.database = database
@@ -25,6 +26,9 @@ class DatabaseManager:
 
         elif collection == self.DataTypes.ESUTAZE_EXCEPTIONS:
             return db_list["esutaze_exceptions"]
+
+        elif collection == self.DataTypes.ALIENWAREARENA_EXCEPTIONS:
+            return db_list["alienwarearena_exceptions"]
         return []
 
     async def update_database(self, collection: str, updated_db: list) -> None:
@@ -44,4 +48,9 @@ class DatabaseManager:
         elif collection == self.DataTypes.ESUTAZE_EXCEPTIONS:
             await self.database.update_one(
                 DB_LISTS, {"$set": {"esutaze_exceptions": updated_db}}
+            )
+
+        elif collection == self.DataTypes.ALIENWAREARENA_EXCEPTIONS:
+            await self.database.update_one(
+                DB_LISTS, {"$set": {"alienwarearena_exceptions": updated_db}}
             )

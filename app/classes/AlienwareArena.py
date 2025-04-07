@@ -5,6 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup
 from constants import (
     DB_CACHE,
+    DB_LISTS,
     ALIENWAREARENA_MAX_POSTS,
     ALIENWAREARENA_STRIP,
     ALIENWAREARENA_URL,
@@ -18,7 +19,7 @@ class AlienwareArena:
         self.channel = channel
 
     async def run(self) -> None:
-        alienwarearena_cache = await self._load_database()
+        alienwarearena_cache, to_filter = await self._load_database()
 
         try:
             json_data = await self.session.get(ALIENWAREARENA_URL)
@@ -36,7 +37,9 @@ class AlienwareArena:
                 break
 
             title = giveaway["title"].lower()
-            if "dlc" in title:
+
+            is_filtered = [k for k in to_filter if k in title]
+            if is_filtered:
                 continue
 
             for part in ALIENWAREARENA_STRIP:
@@ -60,6 +63,7 @@ class AlienwareArena:
             DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
         )
 
-    async def _load_database(self) -> list:
+    async def _load_database(self) -> tuple:
         alienwarearena_cache = await self.database.find_one(DB_CACHE)
-        return alienwarearena_cache["alienwarearena_cache"]
+        to_filter = await self.database.find(DB_LISTS)
+        return alienwarearena_cache["alienwarearena_cache"], to_filter["alienwarearena_exceptions"]

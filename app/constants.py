@@ -56,6 +56,7 @@ DB_CHOICES = (
     "r/FreeGameFindings Exceptions",
     "r/CrackWatch Exceptions",
     "Esutaze Exceptions",
+    "AlienwareArena Exceptions",
 )
 
 # -------------------- Reddit -------------------- #

@@ -76,8 +76,8 @@ class Listeners(commands.Cog):
         if vc is None:
             return
 
-        if len(voice_state.channel.members) == 1:
-            await voice_state.disconnect()
+        if len(vc.channel.members) == 1:
+            await vc.disconnect()
 
     async def _manage_node(
         self,

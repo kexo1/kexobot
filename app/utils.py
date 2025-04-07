@@ -29,6 +29,14 @@ def iso_to_timestamp(iso_time: str) -> datetime:
     return timestamp
 
 
+def get_file_age(file_path: str) -> float:
+    if os.path.exists(file_path):
+        file_time = os.path.getmtime(file_path)
+        current_time = datetime.now().timestamp()
+        return current_time - file_time
+    return 0.0
+
+
 def average(numbers: list) -> float:
     if not numbers:
         return 0.0
