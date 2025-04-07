@@ -186,28 +186,7 @@ class Play(commands.Cog):
         await ctx.respond(embed=embed)
         await vc.disconnect()
 
-    @slash_command(
-        name="player_info",
-        description="Information about current wavelink player.",
-        guild_ids=[KEXO_SERVER],
-    )
-    @is_joined()
-    async def player_info(self, ctx: discord.ApplicationContext) -> None:
-        player: wavelink.PlayerResponsePayload = await self.bot.node[
-            0
-        ].fetch_player_info(ctx.guild.id)
-        embed = discord.Embed(
-            title="Player Info",
-            color=discord.Color.blue(),
-        )
-        embed.add_field(name="Latency:", value=f"{player.state.ping} ms")
-        embed.add_field(name="Volume:", value=player.volume)
-        embed.add_field(name="Is Paused:", value=player.paused, inline=False)
-        embed.add_field(name="Is Connected:", value=player.state.connected)
-        await ctx.respond(embed=embed)
-
     # ----------------------- Helper functions ------------------------ #
-
     async def _fetch_track(
             self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Playable]:

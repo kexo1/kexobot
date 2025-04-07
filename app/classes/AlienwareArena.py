@@ -65,5 +65,5 @@ class AlienwareArena:
 
     async def _load_database(self) -> tuple:
         alienwarearena_cache = await self.database.find_one(DB_CACHE)
-        to_filter = await self.database.find(DB_LISTS)
+        to_filter = await self.database.find_one(DB_LISTS)
         return alienwarearena_cache["alienwarearena_cache"], to_filter["alienwarearena_exceptions"]
