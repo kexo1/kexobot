@@ -234,8 +234,7 @@ class KexoBOT:
                 uri=ip,
                 password=password,
                 retries=1,
-                resume_timeout=0,
-                inactive_player_timeout=600,
+                inactive_player_timeout=600
             )
         ]
 

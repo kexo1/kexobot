@@ -19,7 +19,7 @@ class Play(commands.Cog):
     @commands.cooldown(1, 4, commands.BucketType.user)
     @option(
         "search",
-        description="URLs and youtube video titles, playlists soundcloud urls,  work too are supported.",
+        description="You can either put a url or a name of the song, both youtube and spotify are supported.",
     )
     async def play(self, ctx: discord.ApplicationContext, search: str) -> None:
         if not ctx.voice_client:
@@ -184,6 +184,7 @@ class Play(commands.Cog):
             color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
+        vc.cleanup()
         await vc.disconnect()
 
     # ----------------------- Helper functions ------------------------ #

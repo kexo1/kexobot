@@ -56,6 +56,7 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:
+        player.cleanup()
         await player.disconnect()
         embed = discord.Embed(
             title="",
