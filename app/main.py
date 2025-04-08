@@ -1,14 +1,16 @@
+import random
+import asyncio
+
+from datetime import datetime
+
 import discord
 import asyncpraw
 import httpx
 import dns.resolver
-import random
 import wavelink
-import asyncio
 
 from fake_useragent import UserAgent
 from discord.ext import tasks, commands
-from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from wavelink.exceptions import LavalinkException
 
@@ -146,10 +148,14 @@ class KexoBOT:
         """Define classes for the bot."""
 
         self.onlinefix = await self._initialize_class(
-            OnlineFix, self.database, self.session,  self.game_updates_channel
+            OnlineFix, self.database, self.session, self.game_updates_channel
         )
         self.game3rb = await self._initialize_class(
-            Game3rb, self.database, self.session,  self.game_updates_channel
+            Game3rb,
+            self.database,
+            self.session,
+            self.game_updates_channel,
+            self.user_kexo,
         )
         self.alienwarearena = await self._initialize_class(
             AlienwareArena, self.database, self.session, self.free_stuff_channel
@@ -181,7 +187,7 @@ class KexoBOT:
             Esutaze, self.database, self.session, self.esutaze_channel
         )
         self.lavalink_fetch = await self._initialize_class(
-            LavalinkServerFetch,  self.session
+            LavalinkServerFetch, self.session
         )
 
     async def create_session(self) -> None:
@@ -231,10 +237,7 @@ class KexoBOT:
 
         node = [
             wavelink.Node(
-                uri=ip,
-                password=password,
-                retries=1,
-                inactive_player_timeout=600
+                uri=ip, password=password, retries=1, inactive_player_timeout=600
             )
         ]
 
@@ -420,7 +423,7 @@ async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
     if isinstance(error, commands.errors.CommandNotFound):
         embed = discord.Embed(
             title="",
-            description=f"🚫 This command doesn't exist.",
+            description="🚫 This command doesn't exist.",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
@@ -440,7 +443,8 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
         return
-    elif isinstance(error, LavalinkException):
+
+    if isinstance(error, LavalinkException):
         vc: wavelink.Player = ctx.voice_client
         if not vc:
             raise error
@@ -448,7 +452,8 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         await ctx.respond(
             embed=discord.Embed(
                 title="",
-                description="There was an error processing your request, trying to recconnect node.",
+                description="There was an error processing your request,"
+                " trying to recconnect node.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
         )

@@ -1,9 +1,9 @@
-import asyncpraw
-import discord
-
 from urllib.parse import urlparse
 
+import asyncpraw
+import discord
 import httpx
+
 from motor.motor_asyncio import AsyncIOMotorClient
 from asyncprawcore.exceptions import (  # type: ignore
     AsyncPrawcoreException,
@@ -22,11 +22,11 @@ from constants import (
 
 class RedditFreeGameFindings:
     def __init__(
-            self,
-            database: AsyncIOMotorClient,
-            session: httpx.AsyncClient,
-            reddit: asyncpraw.Reddit,
-            channel: discord.TextChannel
+        self,
+        database: AsyncIOMotorClient,
+        session: httpx.AsyncClient,
+        reddit: asyncpraw.Reddit,
+        channel: discord.TextChannel,
     ) -> None:
         self.database = database
         self.reddit = reddit

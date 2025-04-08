@@ -1,8 +1,9 @@
+import datetime
+from io import BytesIO
+
 import discord
 import httpx
-import datetime
 
-from io import BytesIO
 from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup, Tag
 from constants import ESUTAZE_URL, ESUTAZE_ICON, DB_CACHE, DB_LISTS
@@ -10,12 +11,11 @@ from constants import ESUTAZE_URL, ESUTAZE_ICON, DB_CACHE, DB_LISTS
 
 class Esutaze:
     def __init__(
-            self,
-            database: AsyncIOMotorClient,
-            session: httpx.AsyncClient,
-            channel: discord.TextChannel
+        self,
+        database: AsyncIOMotorClient,
+        session: httpx.AsyncClient,
+        channel: discord.TextChannel,
     ) -> None:
-
         self.session = session
         self.database = database
         self.channel = channel

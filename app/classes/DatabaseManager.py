@@ -18,16 +18,16 @@ class DatabaseManager:
         if collection == self.DataTypes.GAMES:
             return db_list["games"]
 
-        elif collection == self.DataTypes.FREEGAMEFINDINGS_EXCEPTIONS:
+        if collection == self.DataTypes.FREEGAMEFINDINGS_EXCEPTIONS:
             return db_list["freegamefindings_exceptions"]
 
-        elif collection == self.DataTypes.CRACKWATCH_EXCEPTIONS:
+        if collection == self.DataTypes.CRACKWATCH_EXCEPTIONS:
             return db_list["crackwatch_exceptions"]
 
-        elif collection == self.DataTypes.ESUTAZE_EXCEPTIONS:
+        if collection == self.DataTypes.ESUTAZE_EXCEPTIONS:
             return db_list["esutaze_exceptions"]
 
-        elif collection == self.DataTypes.ALIENWAREARENA_EXCEPTIONS:
+        if collection == self.DataTypes.ALIENWAREARENA_EXCEPTIONS:
             return db_list["alienwarearena_exceptions"]
         return []
 

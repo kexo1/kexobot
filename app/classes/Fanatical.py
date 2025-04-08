@@ -7,7 +7,12 @@ from utils import iso_to_timestamp
 
 
 class Fanatical:
-    def __init__(self, database: AsyncIOMotorClient, session: httpx.AsyncClient, channel: discord.TextChannel) -> None:
+    def __init__(
+        self,
+        database: AsyncIOMotorClient,
+        session: httpx.AsyncClient,
+        channel: discord.TextChannel,
+    ) -> None:
         self.database = database
         self.session = session
         self.channel = channel

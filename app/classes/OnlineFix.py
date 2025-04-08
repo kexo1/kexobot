@@ -1,6 +1,6 @@
+import datetime
 import re
 import discord
-import datetime
 import httpx
 
 from deep_translator import GoogleTranslator
@@ -16,7 +16,12 @@ from constants import (
 
 
 class OnlineFix:
-    def __init__(self, database: AsyncIOMotorClient, session: httpx.AsyncClient, channel: discord.TextChannel) -> None:
+    def __init__(
+        self,
+        database: AsyncIOMotorClient,
+        session: httpx.AsyncClient,
+        channel: discord.TextChannel,
+    ) -> None:
         self.session = session
         self.database = database
         self.channel = channel

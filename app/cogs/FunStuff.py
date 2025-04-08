@@ -1,14 +1,17 @@
+import random
+from datetime import datetime, timedelta
+from typing import Literal
+
 import asyncpraw.reddit
 import discord
-import random
+import httpx
 import imgflip
 import requests
 
-from datetime import datetime, timedelta
 from discord.ext import commands
 from discord.commands import slash_command
 from discord import option
-from typing import Literal
+
 from asyncprawcore.exceptions import (
     AsyncPrawcoreException,
     ResponseException,
@@ -25,13 +28,15 @@ from constants import (
     KEXO_SERVER,
     SISKA_GANG_SERVER,
 )
-from utils import load_text_file, VideoDownloader
+from utils import load_text_file, download_video
 
 
 class FunStuff(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.database = self.bot.database
+        self.session: httpx.AsyncClient = self.bot.session
+
         self.topstropscreenshot = load_text_file("topstropscreenshot")
         self.kotrmelce = load_text_file("kotrmelec")
         self.imgflip_client = imgflip.Imgflip(
@@ -102,7 +107,8 @@ class FunStuff(commands.Cog):
             await ctx.respond("idk")
             return
         await ctx.respond(
-            "https://media.discordapp.net/attachments/796453724713123870/1042486203842306159/image.png"
+            "https://media.discordapp.net/attachments"
+            "/796453724713123870/1042486203842306159/image.png"
         )
         self.idk_count = 0
 
@@ -217,12 +223,11 @@ class FunStuff(commands.Cog):
         for images in submission.gallery_data["items"]:
             await ctx.send(f"https://i.redd.it/{images['media_id']}.jpg")
 
-    @staticmethod
     async def upload_video(
-        ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission
+        self, ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission
     ) -> None:
         msg = await ctx.send("Downloading video, please wait...")
-        url = submission.media.get("reddit_video")["fallback_url"]
+        url: str = submission.media.get("reddit_video")["fallback_url"]
 
         for replacement in REDDIT_VIDEO_STRIP:
             url = url.replace(replacement, "DASH_220")
@@ -233,7 +238,7 @@ class FunStuff(commands.Cog):
             f"{submission.permalink}&video_url={url}&audio_url={audio_url}"
         )
 
-        video = await videoDownloader.download_video(url, submission.over_18)
+        video = await download_video(self.session, url, submission.over_18)
         await msg.edit(content=None, file=video)
 
     @staticmethod
@@ -267,15 +272,12 @@ class FunStuff(commands.Cog):
     async def reddit_unresponsive_msg(ctx: discord.ApplicationContext) -> None:
         embed = discord.Embed(
             title="",
-            description=f"🚫 Reddit didn't respond, try again in a minute.\nWhat could cause "
-            f"error? - Reddit is down, Subreddit is locked, API might be overloaded",
+            description="🚫 Reddit didn't respond, try again in a minute.\nWhat could cause "
+            "error? - Reddit is down, Subreddit is locked, API might be overloaded",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
-
-
-videoDownloader = VideoDownloader()
 
 
 def setup(bot: commands.Bot):

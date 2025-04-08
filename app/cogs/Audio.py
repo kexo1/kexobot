@@ -1,10 +1,11 @@
+from typing import Optional
+
 import discord
 import wavelink
 
 from discord.ext import commands
 from discord import option
 from discord.commands import slash_command
-from typing import Optional
 from decorators import is_joined
 
 
@@ -49,7 +50,8 @@ class Audio(commands.Cog):
         "multiplier",
         type=int,
         required=False,
-        description="It might take 3-5 seconds to start speeding up, no value sets it to normal speed",
+        description="It might take 3-5 seconds to start speeding up,"
+        " no value sets it to normal speed",
         min_value=1,
         max_value=8,
     )

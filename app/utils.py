@@ -1,10 +1,10 @@
-import aiohttp
-import discord
 import os
-import psutil
-
 from typing import Optional
 from datetime import datetime
+
+import discord
+import httpx
+import psutil
 
 
 def load_text_file(name: str) -> list:
@@ -49,32 +49,26 @@ def get_memory_usage():
     return mem_info.rss / (1024 * 1024)
 
 
-class VideoDownloader:
-    def __init__(self):
-        self.file_path = None
-        self.session = None
+async def download_video(
+    session: httpx.AsyncClient, url: str, nsfw: bool
+) -> Optional[discord.File]:
+    video_folder = os.path.join(os.getcwd(), "video")
+    os.makedirs(video_folder, exist_ok=True)
+    video_path = os.path.join(video_folder, "video.mp4")
+    response: httpx.Response = session.get(url)
+    with open(video_path, "wb") as f:
+        try:
+            while True:
+                chunk = await response.content.read(1024)
 
-    async def download_video(self, url, nsfw) -> Optional[discord.File]:
-        if not self.session:
-            self.session = aiohttp.ClientSession()
-            video_dir = os.path.join(os.getcwd(), "video")
-            os.makedirs(video_dir, exist_ok=True)
-            self.file_path = os.path.join(video_dir, "video.mp4")
+                if not chunk:
+                    break
 
-        async with self.session.get(url) as response:
-            with open(self.file_path, "wb") as f:
-                try:
-                    while True:
-                        chunk = await response.content.read(1024)
+                f.write(chunk)
 
-                        if not chunk:
-                            break
-
-                        f.write(chunk)
-
-                    if nsfw is True:
-                        return discord.File(self.file_path, spoiler=True)
-                    return discord.File(self.file_path)
-                except Exception as e:
-                    print(f"Failed to download video: \n{e}")
-                    return None
+            if nsfw is True:
+                return discord.File(video_path, spoiler=True)
+            return discord.File(video_path)
+        except httpx.ConnectError:
+            print("Failed to download reddit video.")
+            return None

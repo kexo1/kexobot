@@ -1,11 +1,12 @@
-import asyncio
-import discord
 import datetime
 import random
-import wavelink
 import time
 import sys
 import os
+
+import asyncio
+import discord
+import wavelink
 
 from discord.ext import commands
 from discord.commands import slash_command
@@ -21,6 +22,8 @@ host_authors = []
 
 
 class Commands(commands.Cog):
+    """Cog that contains all main commands."""
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.database = bot.database
@@ -102,7 +105,7 @@ class Commands(commands.Cog):
         await ctx.trigger_typing()
         embed = discord.Embed(
             title="",
-            description=f"**🔄 Getting Lavalink server.**",
+            description="**🔄 Getting Lavalink server.**",
             color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
@@ -117,23 +120,25 @@ class Commands(commands.Cog):
 
     @slash_command(name="node_info", description="Information about connected node.")
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
-        node: wavelink.InfoResponsePayload = await self.bot.node[0].fetch_info()
+        node: wavelink.Node = self.bot.node[0]
+        node_info: wavelink.InfoResponsePayload = await node.fetch_info()
         embed = discord.Embed(
             title="Node Info",
             color=discord.Color.blue(),
         )
-        plugins: wavelink.PluginResponsePayload = node.plugins
-        unix_timestamp = int(iso_to_timestamp(str(node.build_time)).timestamp())
+        plugins: wavelink.PluginResponsePayload = node_info.plugins
+        unix_timestamp = int(iso_to_timestamp(str(node_info.build_time)).timestamp())
 
         embed.add_field(name="Build time:", value=f"<t:{unix_timestamp}:D>")
-        embed.add_field(name="Java version:", value=node.jvm)
-        embed.add_field(name="Lavaplayer version:", value=node.lavaplayer)
-        embed.add_field(name="Filters:", value=", ".join(node.filters))
+        embed.add_field(name="Java version:", value=node_info.jvm)
+        embed.add_field(name="Lavaplayer version:", value=node_info.lavaplayer)
+        embed.add_field(name="Filters:", value=", ".join(node_info.filters))
         embed.add_field(
             name="Plugins:",
             value=", ".join(f"{plugin.name}: {plugin.version}" for plugin in plugins),
             inline=False,
         )
+        embed.set_footer(text=node.uri)
         await ctx.respond(embed=embed)
 
     # -------------------- SFD Servers -------------------- #
@@ -236,13 +241,17 @@ class Commands(commands.Cog):
         message = await ctx.respond(embed=embed)
 
         if graph_range == "Day":
-            image_location = os.path.join(self.graphs_dir, f"sfd_activity_day_{timezone}.png")
+            image_location = os.path.join(
+                self.graphs_dir, f"sfd_activity_day_{timezone}.png"
+            )
             if not os.path.exists(image_location):
                 await self.sfd_servers.generate_graph_day(timezone)
             elif get_file_age(image_location) >= 3600:
                 await self.sfd_servers.generate_graph_day(timezone)
         else:
-            image_location = os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png")
+            image_location = os.path.join(
+                self.graphs_dir, f"sfd_activity_week_{timezone}.png"
+            )
             if not os.path.exists(image_location):
                 await self.sfd_servers.generate_graph_week(timezone)
             elif get_file_age(image_location) >= 3600:
@@ -320,7 +329,8 @@ class Commands(commands.Cog):
 
         if author in host_authors:
             return await ctx.respond(
-                "You have already created host embed! Click on button embed to stop it from beign active.",
+                "You have already created host embed!"
+                " Click on button embed to stop it from beign active.",
                 delete_after=10,
                 ephemeral=True,
             )
@@ -379,7 +389,8 @@ class Commands(commands.Cog):
                 await ctx.send(role.mention)
             except AttributeError:
                 await ctx.respond(
-                    "I can't ping Exotic role, please check if role exists or if I have permission to ping it.",
+                    "I can't ping Exotic role, please check if role exists or"
+                    " if I have permission to ping it.",
                     delete_after=10,
                     ephemeral=True,
                 )
@@ -473,7 +484,8 @@ class Commands(commands.Cog):
 
         if to_remove not in db_list:
             await ctx.respond(
-                f"{ctx.author.mention}, string `{to_remove}` is not in the database, use `/show_data`"
+                f"{ctx.author.mention}, string `{to_remove}`"
+                f" is not in the database, use `/show_data`"
             )
             return
         db_list.pop(db_list.index(to_remove))

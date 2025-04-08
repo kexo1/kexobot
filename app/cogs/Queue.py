@@ -1,11 +1,12 @@
+import datetime
+from typing import Optional
+
 import discord
 import wavelink
-import datetime
 
 from discord.ext import commands
 from discord.commands import slash_command, option
 from decorators import is_playing, is_joined
-from typing import Optional
 
 
 # noinspection PyUnusedLocal
@@ -104,7 +105,8 @@ class Queue(commands.Cog):
         except IndexError:
             embed = discord.Embed(
                 title="",
-                description=f"**:x: Song was not found on `{pos}`, to show what's in queue, type /q.**",
+                description=f"**:x: Song was not found on `{pos}`,"
+                f" to show what's in queue, type /q.**",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -161,15 +163,14 @@ class Queue(commands.Cog):
             )
             await ctx.respond(embed=embed)
             return
-        else:
-            vc.queue.mode = wavelink.QueueMode.loop_all
-            embed = discord.Embed(
-                title="",
-                description=f"🔁 **Looping current queue ({vc.queue.count} songs)**",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed)
-            return
+
+        vc.queue.mode = wavelink.QueueMode.loop_all
+        embed = discord.Embed(
+            title="",
+            description=f"🔁 **Looping current queue ({vc.queue.count} songs)**",
+            color=discord.Color.blue(),
+        )
+        await ctx.respond(embed=embed)
 
     @slash_command(
         name="loop",
@@ -255,10 +256,11 @@ class Queue(commands.Cog):
     async def _get_queue_status(queue_mode: wavelink.QueueMode) -> tuple:
         if queue_mode == wavelink.QueueMode.loop_all:
             return "Looping queue", "🔁 "
-        elif queue_mode == wavelink.QueueMode.loop:
+
+        if queue_mode == wavelink.QueueMode.loop:
             return "Looping currently playing song", "🔁 "
-        else:
-            return "Now Playing", ""
+
+        return "Now Playing", ""
 
     @staticmethod
     async def _get_playing_embed(ctx: discord.ApplicationContext) -> discord.Embed:
@@ -289,7 +291,8 @@ class Queue(commands.Cog):
         length = divmod(vc.current.length, 60000)
         embed.add_field(
             name="Position",
-            value=f"`{int(position[0])}:{round(position[1] / 1000):02}/{int(length[0])}:{round(length[1] / 1000):02}`",
+            value=f"`{int(position[0])}:{round(position[1] / 1000):02}"
+            f"/{int(length[0])}:{round(length[1] / 1000):02}`",
             inline=False,
         )
         return embed

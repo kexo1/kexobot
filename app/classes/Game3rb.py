@@ -1,21 +1,27 @@
-import re
+from datetime import datetime
 
+import re
 import httpx
 import unidecode
 import discord
-import logging
 
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime
 from bs4 import BeautifulSoup
 from constants import GAME3RB_STRIP, GAME3RB_URL, GAME3RB_ICON, DB_CACHE, DB_LISTS
 
 
 class Game3rb:
-    def __init__(self, database: AsyncIOMotorClient, session: httpx.AsyncClient, channel: discord.TextChannel) -> None:
+    def __init__(
+        self,
+        database: AsyncIOMotorClient,
+        session: httpx.AsyncClient,
+        channel: discord.TextChannel,
+        user_kexo: discord.User,
+    ) -> None:
         self.session = session
         self.database = database
         self.channel = channel
+        self.user_kexo = user_kexo
 
     async def run(self) -> None:
         game3rb_cache = await self.database.find_one(DB_CACHE)
@@ -26,14 +32,14 @@ class Game3rb:
         try:
             source = await self.session.get(GAME3RB_URL)
         except httpx.ReadTimeout:
-            logging.info("Game3rb: Timeout")
+            print("Game3rb: Timeout")
             return
 
         game_info = []
         to_upload = []
 
         if "Bad gateway" in source.text:
-            logging.info("Game3rb: Bad gateway")
+            print("Game3rb: Bad gateway")
             return
 
         soup = BeautifulSoup(source.text, "html.parser")

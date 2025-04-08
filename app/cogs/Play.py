@@ -1,14 +1,13 @@
+from typing import Union, Optional
+
 import discord
 import wavelink
 
-from typing import Union, Optional
 from discord import option
 from discord.ext import commands
 from discord.commands import slash_command
-from wavelink.exceptions import LavalinkException
 from wavelink.exceptions import LavalinkLoadException
 from decorators import is_joined, is_playing
-from constants import KEXO_SERVER
 
 
 class Play(commands.Cog):
@@ -19,11 +18,12 @@ class Play(commands.Cog):
     @commands.cooldown(1, 4, commands.BucketType.user)
     @option(
         "search",
-        description="You can either put a url or a name of the song, both youtube and spotify are supported.",
+        description="You can either put a url or a name of the song,"
+        " both youtube and spotify are supported.",
     )
     async def play(self, ctx: discord.ApplicationContext, search: str) -> None:
         if not ctx.voice_client:
-            is_joined = await self._join_channel(ctx)
+            is_joined: bool = await self._join_channel(ctx)
             if not is_joined:
                 return
             await self._prepare_wavelink(ctx)
@@ -121,7 +121,8 @@ class Play(commands.Cog):
         except IndexError:
             embed = discord.Embed(
                 title="",
-                description=f"**:x: Song was not found on position `{pos}`, to show what's in queue, type `/q`**",
+                description=f"**:x: Song was not found on position `{pos}`,"
+                " to show what's in queue, type `/q`**",
                 color=discord.Color.blue(),
             )
         await ctx.respond(embed=embed)
@@ -146,7 +147,7 @@ class Play(commands.Cog):
             title="", description="**⏸️   Paused**", color=discord.Color.blue()
         )
 
-        embed.set_footer(text=f"Deleting in 10s.")
+        embed.set_footer(text="Deleting in 10s.")
         await ctx.respond(embed=embed, delete_after=10)
 
     @slash_command(name="resume", description="Resumes paused song.")
@@ -160,7 +161,7 @@ class Play(commands.Cog):
             description="**:arrow_forward: Resumed**",
             color=discord.Color.blue(),
         )
-        embed.set_footer(text=f"Deleting in 10s.")
+        embed.set_footer(text="Deleting in 10s.")
         await ctx.respond(embed=embed, delete_after=10)
 
     @slash_command(name="leave", description="Leaves voice channel.")
@@ -172,7 +173,8 @@ class Play(commands.Cog):
         if vc.channel.id != ctx.author.voice.channel.id:
             embed = discord.Embed(
                 title="",
-                description=f"{ctx.author.mention}, join the voice channel the bot is playing in to disconnect it.",
+                description=f"{ctx.author.mention},"
+                f" join the voice channel the bot is playing in to disconnect it.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -189,7 +191,7 @@ class Play(commands.Cog):
 
     # ----------------------- Helper functions ------------------------ #
     async def _fetch_track(
-            self, ctx: discord.ApplicationContext, search: str
+        self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
         if not tracks:
@@ -198,8 +200,8 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _fetch_first_track(
-            ctx: discord.ApplicationContext,
-            tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
+        ctx: discord.ApplicationContext,
+        tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
     ) -> wavelink.Playable:
         vc: wavelink.Player = ctx.voice_client
         # If it's a playlist
@@ -213,7 +215,8 @@ class Play(commands.Cog):
 
             embed = discord.Embed(
                 title="",
-                description=f"Added the playlist **`{tracks.name}`** ({song_count} songs) to the queue.",
+                description=f"Added the playlist **`{tracks.name}`**"
+                f" ({song_count} songs) to the queue.",
                 color=discord.Color.blue(),
             )
             if vc.should_respond:
@@ -228,15 +231,17 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _search_tracks(
-            ctx: discord.ApplicationContext, search: str
+        ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
         try:
             tracks: wavelink.Search = await wavelink.Playable.search(search)
         except LavalinkLoadException:
             embed = discord.Embed(
                 title="",
-                description=f":x: Failed to load tracks, you probably inputted wrong link or this Lavalink server "
-                            f"doesn't have Youtube plugin. To fix this, use command `/reconnect_node`",
+                description=":x: Failed to load tracks, you probably inputted"
+                " wrong link or this Lavalink server "
+                "doesn't have Youtube plugin."
+                " To fix this, use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await ctx.respond(embed=embed)
@@ -249,7 +254,8 @@ class Play(commands.Cog):
         if not ctx.author.voice or not ctx.author.voice.channel:
             embed = discord.Embed(
                 title="",
-                description=f"{ctx.author.mention}, you're not in a voice channel. Type `/p` from vc.",
+                description=f"{ctx.author.mention},"
+                f" you're not in a voice channel. Type `/p` from vc.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -260,7 +266,7 @@ class Play(commands.Cog):
         except wavelink.InvalidChannelStateException:
             embed = discord.Embed(
                 title="",
-                description=f":x: I don't have permissions to join your channel.",
+                description=":x: I don't have permissions to join your channel.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await ctx.respond(embed=embed)
@@ -268,8 +274,8 @@ class Play(commands.Cog):
         except wavelink.exceptions.InvalidNodeException:
             embed = discord.Embed(
                 title="",
-                description=f":x: No nodes are currently assigned to the bot.\nTo fix this, use command "
-                            f"`/reconnect_node`",
+                description=":x: No nodes are currently assigned to the bot."
+                "\nTo fix this, use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await ctx.respond(embed=embed)
@@ -284,7 +290,8 @@ class Play(commands.Cog):
         vc.should_respond = False
         embed = discord.Embed(
             title="",
-            description=f"**✅ Joined to <#{vc.channel.id}> and set text channel to <#{ctx.channel.id}>.**",
+            description=f"**✅ Joined to <#{vc.channel.id}>"
+            f" and set text channel to <#{ctx.channel.id}>.**",
             color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
@@ -305,7 +312,7 @@ class Play(commands.Cog):
 
         embed = discord.Embed(
             title="Now playing",
-            description="[**{}**]({})".format(track.title, track.uri),
+            description=f"[**{track.title}**]({track.uri})",
             color=discord.Colour.green(),
         )
         embed.set_footer(

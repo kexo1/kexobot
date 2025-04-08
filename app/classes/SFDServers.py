@@ -1,14 +1,15 @@
+import datetime
+import os
+from datetime import timedelta
+from zoneinfo import ZoneInfo
+from typing import Union
+
 import httpx
 import matplotlib.pyplot as plt
 import mplcyberpunk
-import datetime
 import numpy as np
-import os
 
 from bs4 import BeautifulSoup
-from typing import Union
-from datetime import timedelta
-from zoneinfo import ZoneInfo
 from motor.motor_asyncio import AsyncIOMotorClient
 from constants import (
     SFD_SERVER_URL,
@@ -94,7 +95,9 @@ class SFDServers:
         ]
         plt.xticks(tick_positions, tick_labels, rotation=45)
         plt.subplots_adjust(bottom=0.1)
-        plt.savefig(os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"), dpi=300)
+        plt.savefig(
+            os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"), dpi=300
+        )
         plt.close("all")
 
     async def generate_graph_day(self, timezone: str):
@@ -112,7 +115,9 @@ class SFDServers:
         # One time position per hour
         time_positions = [i * 10 + 5 for i in range(24)]
         plt.xticks(time_positions, hours)
-        plt.savefig(os.path.join(self.graphs_dir, f"sfd_activity_day_{timezone}.png"), dpi=300)
+        plt.savefig(
+            os.path.join(self.graphs_dir, f"sfd_activity_day_{timezone}.png"), dpi=300
+        )
         plt.close("all")
 
     @staticmethod
@@ -151,15 +156,13 @@ class SFDServers:
         # This means every 4 hours will have 10 ticks that were averaged from 40 ticks.
         recent_players = players_day[-40:]
         recent_servers = servers_day[-40:]
-        averages_per_group = 4
-        num_groups = 10
 
         new_players_averages = []
         new_servers_averages = []
 
-        for group in range(num_groups):
-            start_index = group * averages_per_group
-            end_index = (group + 1) * averages_per_group
+        for group in range(10):
+            start_index = group * 4
+            end_index = (group + 1) * 4
 
             players_group = recent_players[start_index:end_index]
             servers_group = recent_servers[start_index:end_index]
@@ -213,7 +216,7 @@ class SFDServers:
 
     async def get_servers(self) -> list:
         servers = await self._parse_servers(None)
-        return [server for server in servers]
+        return servers
 
     async def get_server(self, search: str) -> Server:
         return await self._parse_servers(search)
@@ -277,9 +280,7 @@ class SFDServers:
                 if server_element.find("Bots")
                 else 0
             )
-            has_password = (
-                True if server_element.find("HasPassword").text == "true" else False
-            )
+            has_password = server_element.find("HasPassword").text == "true"
             description = (
                 server_element.find("Description").text
                 if server_element.find("Description")

@@ -19,7 +19,8 @@ LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
 # -------------------- SFD Servers -------------------- #
 SFD_SERVER_URL = "https://mythologicinteractive.com/SFDGameServices.asmx"
 SFD_REQUEST = """<?xml version='1.0' encoding='utf-8'?>
-    <soap12:Envelope xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xmlns:xsd='http://www.w3.org/2001/XMLSchema' xmlns:soap12='http://www.w3.org/2003/05/soap-envelope'>
+    <soap12:Envelope xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
+     xmlns:xsd='http://www.w3.org/2001/XMLSchema' xmlns:soap12='http://www.w3.org/2003/05/soap-envelope'>
         <soap12:Body>
             <GetGameServers xmlns='https://mythologicinteractive.com/Games/SFD/'>
                 <validationToken></validationToken>
@@ -44,7 +45,8 @@ SFD_TIMEZONE_CHOICE = list(TIMEZONES.keys())
 
 # -------------------- MongoDB -------------------- #
 MONGO_DB_URL = (
-    f"mongodb+srv://{os.getenv('MONGO_KEY')}@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
+    f"mongodb+srv://{os.getenv('MONGO_KEY')}"
+    f"@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
     f"=majority"
 )
 DB_CACHE = {"_id": ObjectId("617958fae4043ee4a3f073f2")}
@@ -74,7 +76,8 @@ REDDIT_FREEGAME_EMBEDS = {
     },
     "Gleam": {
         "title": "Gleam",
-        "description": "**Gleam** - keys from this site __disappear really fast__ so you should get it fast!",
+        "description": "**Gleam** - keys from this site __disappear really fast__"
+        " so you should get it fast!",
         "icon": "https://static-00.iconduck.com/assets.00/gleam-icon-512x512-vxvvbmg8.png",
     },
     "AlienwareArena": {
@@ -129,7 +132,10 @@ GAME3RB_STRIP = (
 # -------------------- Online-Fix -------------------- #
 ONLINEFIX_MAX_GAMES = 10
 ONLINEFIX_URL = "https://online-fix.me/chat.php"
-ONLINEFIX_ICON = "https://media.discordapp.net/attachments/796453724713123870/1035951759505506364/favicon-1.png"
+ONLINEFIX_ICON = (
+    "https://media.discordapp.net/attachments/"
+    "796453724713123870/1035951759505506364/favicon-1.png"
+)
 
 # -------------------- Alienwarearena -------------------- #
 ALIENWAREARENA_MAX_POSTS = 3

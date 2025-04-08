@@ -9,12 +9,11 @@ from utils import iso_to_timestamp
 
 class ElektrinaVypadky:
     def __init__(
-            self,
-            database: AsyncIOMotorClient,
-            session: httpx.AsyncClient,
-            user_kexo: discord.User
+        self,
+        database: AsyncIOMotorClient,
+        session: httpx.AsyncClient,
+        user_kexo: discord.User,
     ) -> None:
-
         self.session = session
         self.database = database
         self.user_kexo = user_kexo

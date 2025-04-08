@@ -1,6 +1,6 @@
-import discord
-from discord.ext import commands
 from functools import wraps
+
+import discord
 import wavelink
 
 
@@ -13,7 +13,8 @@ def is_joined():
             if not ctx.author.voice or not ctx.author.voice.channel:
                 embed = discord.Embed(
                     title="",
-                    description=f"{ctx.author.mention}, you're not in a voice channel. Type `/p` to join.",
+                    description=f"{ctx.author.mention},"
+                    f" you're not in a voice channel. Type `/p` to join.",
                     color=discord.Color.blue(),
                 )
                 return await ctx.respond(embed=embed, ephemeral=True)
@@ -34,7 +35,7 @@ def is_joined():
                 except wavelink.InvalidChannelStateException:
                     embed = discord.Embed(
                         title="",
-                        description=f":x: I don't have permissions to join your channel.",
+                        description=":x: I don't have permissions to join your channel.",
                         color=discord.Color.from_rgb(r=255, g=0, b=0),
                     )
                     return await ctx.respond(embed=embed)

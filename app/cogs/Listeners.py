@@ -1,8 +1,9 @@
+from typing import Union
+
 import discord
 import wavelink
 
 from discord.ext import commands
-from typing import Union
 from wavelink import (
     NodeDisconnectedEventPayload,
     NodeReadyEventPayload,
@@ -40,7 +41,7 @@ class Listeners(commands.Cog):
     ) -> None:
         embed = discord.Embed(
             title="",
-            description=f":warning: An error occured when playing song, trying to connect to a new node.",
+            description=":warning: An error occured when playing song, trying to connect to a new node.",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await self._manage_node(embed, payload)
@@ -49,7 +50,7 @@ class Listeners(commands.Cog):
     async def on_wavelink_track_stuck(self, payload: TrackStuckEventPayload) -> None:
         embed = discord.Embed(
             title="",
-            description=f":warning: Song got stuck, trying to connect to a new node.",
+            description=":warning: Song got stuck, trying to connect to a new node.",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await self._manage_node(embed, payload)
@@ -78,7 +79,16 @@ class Listeners(commands.Cog):
             return
 
         if len(vc.channel.members) == 1:
+            vc.cleanup()
             await vc.disconnect()
+
+        # If member that was removed is the bot itself
+        if (
+            member == member.guild.me
+            and before.channel is not None
+            and after.channel is None
+        ):
+            vc.cleanup()
 
     async def _manage_node(
         self,
@@ -94,13 +104,13 @@ class Listeners(commands.Cog):
         if is_switched:
             embed = discord.Embed(
                 title="",
-                description=f":white_check_mark: Successfully connected to a new node.",
+                description=":white_check_mark: Successfully connected to a new node.",
                 color=discord.Color.from_rgb(r=0, g=255, b=0),
             )
         else:
             embed = discord.Embed(
                 title="",
-                description=f":x: Failed to connect to a new node.",
+                description=":x: Failed to connect to a new node.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
         await message.edit(embed=embed)
@@ -122,7 +132,7 @@ class Listeners(commands.Cog):
         embed = discord.Embed(
             color=discord.Colour.green(),
             title="Now playing",
-            description="[**{}**]({})".format(payload.track.title, payload.track.uri),
+            description=f"[**{payload.track.title}**]({payload.track.uri})",
         )
         embed.set_footer(
             text=f"Requested by {payload.player.current.requester.name}",

@@ -1,4 +1,4 @@
-import discord
+import json
 import httpx
 
 from constants import LAVALIST_URL, LAVAINFO_API_URLS
@@ -11,7 +11,6 @@ class LavalinkServerFetch:
 
     async def get_lavalink_servers(self) -> list:
         lavalink_servers = []
-        import json
 
         try:
             for url in LAVAINFO_API_URLS:
