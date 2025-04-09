@@ -73,7 +73,7 @@ class RedditCrackWatch:
                         continue
                     description_list.append(f"• {line}\n")
 
-                crackwatch_cache_upload.pop(0)
+                del crackwatch_cache_upload[0]
                 crackwatch_cache_upload.append(submission.permalink)
 
                 description = "".join(description_list)[:4096]

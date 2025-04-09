@@ -39,7 +39,7 @@ class Esutaze:
             if is_filtered:
                 continue
 
-            esutaze_cache_upload.pop(0)
+            del esutaze_cache_upload[0]
             esutaze_cache_upload.append(url)
 
             await self._send_article(article)

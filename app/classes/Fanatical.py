@@ -39,7 +39,7 @@ class Fanatical:
             if url in fanatical_cache:
                 break
 
-            fanatical_cache.pop(0)
+            del fanatical_cache[0]
             fanatical_cache.append(url)
 
             title = product_info["name"]

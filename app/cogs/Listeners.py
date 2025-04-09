@@ -41,8 +41,10 @@ class Listeners(commands.Cog):
     ) -> None:
         embed = discord.Embed(
             title="",
-            description=":warning: An error occured when playing song, trying to connect to a new node.",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
+            description=":warning: An error occured when playing song, trying to connect to a new node."
+            f"\n\n**Cause**: {payload.exception['cause']}"
+            f"\n**Severity**: {payload.exception['severity']}",
+            color=discord.Color.yellow(),
         )
         await self._manage_node(embed, payload)
 
@@ -51,7 +53,7 @@ class Listeners(commands.Cog):
         embed = discord.Embed(
             title="",
             description=":warning: Song got stuck, trying to connect to a new node.",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
+            color=discord.Color.yellow,
         )
         await self._manage_node(embed, payload)
 
@@ -95,33 +97,36 @@ class Listeners(commands.Cog):
         embed: discord.Embed,
         payload: Union[TrackExceptionEventPayload, TrackStuckEventPayload],
     ) -> None:
-        message: discord.Message = await payload.player.text_channel.send(embed=embed)
+        await payload.player.text_channel.send(embed=embed)
         is_switched: bool = await self._switch_node(payload.player)
-        await self._node_status_message(message, is_switched)
+        await self._node_status_message(payload.player.text_channel, is_switched)
 
-    @staticmethod
-    async def _node_status_message(message: discord.Message, is_switched: bool) -> None:
+    async def _node_status_message(
+        self, channel: discord.TextChannel, is_switched: bool
+    ) -> None:
         if is_switched:
             embed = discord.Embed(
                 title="",
-                description=":white_check_mark: Successfully connected to a new node.",
-                color=discord.Color.from_rgb(r=0, g=255, b=0),
+                description=f"**:white_check_mark: Successfully connected to `{self.bot.node.uri}`**",
+                color=discord.Color.green(),
             )
         else:
             embed = discord.Embed(
                 title="",
-                description=":x: Failed to connect to a new node.",
-                color=discord.Color.from_rgb(r=255, g=0, b=0),
+                description=":x: Failed to connect to a new node, try `/reconnect_node`",
+                color=discord.Color.from_rgb(r=210, g=0, b=0),
             )
-        await message.edit(embed=embed)
+        await channel.send(embed=embed)
 
     async def _switch_node(self, player: wavelink.Player) -> bool:
-        for i in range(5):
+        for i in range(1, 6):
             try:
                 node: wavelink.Node = await self.bot.get_node()
+                await wavelink.Pool.connect(nodes=[node], client=self.bot)
                 await player.switch_node(node)
-                if player.current:
-                    await player.play(player.current)
+                await player.play(player.temp_current)
+                self.bot.node = node
+                print(f"{i}. Switched to node: {node.uri}")
                 return True
             except RuntimeError:
                 print(f"{i}. Failed to switch node ({node.uri}), trying again...")

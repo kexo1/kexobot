@@ -1,5 +1,6 @@
 import json
 import httpx
+import wavelink
 
 from constants import LAVALIST_URL, LAVAINFO_API_URLS
 
@@ -9,7 +10,7 @@ class LavalinkServerFetch:
         self.session = session
         self.repeated_hostnames: list[str] = []
 
-    async def get_lavalink_servers(self) -> list:
+    async def get_lavalink_servers(self) -> list[wavelink.Node]:
         lavalink_servers = []
 
         try:
@@ -31,7 +32,7 @@ class LavalinkServerFetch:
 
         return lavalink_servers
 
-    async def _lavalist_fetch(self, json_data: list) -> list:
+    async def _lavalist_fetch(self, json_data: list) -> list[wavelink.Node]:
         lavalink_servers = []
 
         for server in json_data:
@@ -41,15 +42,11 @@ class LavalinkServerFetch:
             if server.get("version") != "v4":
                 continue
 
-            lavalink_servers.append(
-                {
-                    "ip": f"http://{server['host']}:{server['port']}",
-                    "password": server["password"],
-                }
-            )
+            node = self._return_node(server["host"], server["port"], server["password"])
+            lavalink_servers.append(node)
         return lavalink_servers
 
-    async def _lavainfo_fetch(self, json_data: list) -> list:
+    async def _lavainfo_fetch(self, json_data: list) -> list[wavelink.Node]:
         lavalink_servers = []
 
         for server in json_data:
@@ -75,13 +72,20 @@ class LavalinkServerFetch:
                     plugin["name"] == "youtube-plugin"
                     or plugin["name"] == "lavasrc-plugin"
                 ):
-                    lavalink_servers.append(
-                        {
-                            "ip": f"http://{server['host']}:{server['port']}",
-                            "password": server["password"],
-                        }
+                    node = self._return_node(
+                        server["host"], server["port"], server["password"]
                     )
+                    lavalink_servers.append(node)
                     break
 
         self.repeated_hostnames = [server["host"] for server in json_data]
         return lavalink_servers
+
+    @staticmethod
+    def _return_node(host: str, port: int, password: str) -> wavelink.Node:
+        return wavelink.Node(
+            uri=f"http://{host}:{port}",
+            password=password,
+            retries=1,
+            inactive_player_timeout=600,
+        )

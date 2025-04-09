@@ -55,20 +55,19 @@ async def download_video(
     video_folder = os.path.join(os.getcwd(), "video")
     os.makedirs(video_folder, exist_ok=True)
     video_path = os.path.join(video_folder, "video.mp4")
-    response: httpx.Response = session.get(url)
-    with open(video_path, "wb") as f:
-        try:
-            while True:
-                chunk = await response.content.read(1024)
 
-                if not chunk:
-                    break
+    try:
+        async with session.stream("GET", url) as response:
+            with open(video_path, "wb") as f:
+                async for chunk in response.aiter_bytes(1024):
+                    f.write(chunk)
+        if nsfw:
+            return discord.File(video_path, spoiler=True)
+        return discord.File(video_path)
 
-                f.write(chunk)
-
-            if nsfw is True:
-                return discord.File(video_path, spoiler=True)
-            return discord.File(video_path)
-        except httpx.ConnectError:
-            print("Failed to download reddit video.")
-            return None
+    except httpx.ReadTimeout:
+        print("Request timed out while downloading the video.")
+        return None
+    except httpx.ConnectError:
+        print("Failed to connect to the server.")
+        return None

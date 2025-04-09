@@ -135,13 +135,11 @@ class KexoBOT:
         self.free_stuff_channel = await self._fetch_channel(FREE_STUFF_CHANNEL)
         print("Channels fetched.")
 
-    async def _generate_graphs(self, log: bool = True) -> None:
+    async def _generate_graphs(self) -> None:
         """Generate graphs for the bot."""
 
         await self.sfd_servers.generate_graph_day("New_York")
         await self.sfd_servers.generate_graph_week("New_York")
-        if not log:
-            return
         print("Graphs generated.")
 
     async def _define_classes(self) -> None:
@@ -211,7 +209,7 @@ class KexoBOT:
 
             try:
                 await asyncio.wait_for(
-                    wavelink.Pool.connect(nodes=node, client=bot), timeout=5
+                    wavelink.Pool.connect(nodes=[node], client=bot), timeout=5
                 )
             except asyncio.TimeoutError:
                 print(f"Node {node.uri} is not ready, trying next...")
@@ -231,16 +229,8 @@ class KexoBOT:
         if self.which_lavalink_server >= len(self.lavalink_servers):
             self.which_lavalink_server = 0
 
-        ip: str = self.lavalink_servers[self.which_lavalink_server]["ip"]
-        password: str = self.lavalink_servers[self.which_lavalink_server]["password"]
-        print(f"Cycling through lavalink servers: {ip}")
-
-        node = [
-            wavelink.Node(
-                uri=ip, password=password, retries=1, inactive_player_timeout=600
-            )
-        ]
-
+        node: wavelink.Node = self.lavalink_servers[self.which_lavalink_server]
+        print(f"Cycling through lavalink servers: {node.uri}")
         return node
 
     async def set_joke(self) -> None:
@@ -297,7 +287,6 @@ class KexoBOT:
         fetch data from different sources.
         It runs the classes in a round-robin fashion.
         """
-        await self.reddit_crackwatch.run()
         now = datetime.now()
         if self.main_loop_counter == 0:
             self.main_loop_counter = 1

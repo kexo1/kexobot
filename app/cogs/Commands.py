@@ -113,14 +113,14 @@ class Commands(commands.Cog):
 
         embed = discord.Embed(
             title="",
-            description=f"**✅ Connected to node `{self.bot.node[0].uri}`**",
+            description=f"**✅ Connected to node `{self.bot.node.uri}`**",
             color=discord.Color.blue(),
         )
         await ctx.send(embed=embed)
 
     @slash_command(name="node_info", description="Information about connected node.")
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
-        node: wavelink.Node = self.bot.node[0]
+        node: wavelink.Node = self.bot.node
         node_info: wavelink.InfoResponsePayload = await node.fetch_info()
         embed = discord.Embed(
             title="Node Info",

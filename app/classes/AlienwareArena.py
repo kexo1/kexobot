@@ -52,7 +52,7 @@ class AlienwareArena:
             for part in ALIENWAREARENA_STRIP:
                 title = title.replace(part, "")
 
-            alienwarearena_cache.pop(0)
+            del alienwarearena_cache[0]
             alienwarearena_cache.append(url)
 
             soup = BeautifulSoup(giveaway["description"], "html.parser")

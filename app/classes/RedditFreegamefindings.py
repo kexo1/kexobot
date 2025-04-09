@@ -32,7 +32,6 @@ class RedditFreeGameFindings:
         self.reddit = reddit
         self.session = session
         self.channel = channel
-        self.upload = False
 
     async def run(self) -> None:
         freegamefindings_cache, to_filter = await self._load_database()
@@ -68,14 +67,13 @@ class RedditFreeGameFindings:
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:
             print(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
 
-        if self.upload:
+        if freegamefindings_cache_upload != freegamefindings_cache:
             await self.database.update_one(
                 DB_CACHE,
                 {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}},
             )
 
     async def _process_submission(self, url: str) -> None:
-        self.upload = True
         feeegame_embeds: dict = REDDIT_FREEGAME_EMBEDS
 
         if "gleam" in url:

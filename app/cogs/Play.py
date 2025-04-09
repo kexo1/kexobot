@@ -43,6 +43,7 @@ class Play(commands.Cog):
         if vc.queue.is_empty:
             vc.should_respond = True
 
+        vc.temp_current = track  # To be used in case of switching nodes
         await vc.play(track)
 
         if vc.should_respond:
@@ -91,13 +92,13 @@ class Play(commands.Cog):
 
     @slash_command(name="skip-to", description="Skips to selected song in queue.")
     @option(
-        "pos",
-        description="Value 2 skips to second song in queue.",
-        min_value=1,
-        required=True,
+        "to_find",
+        description="Both position in the queue and name of the song are accepted.",
     )
     @is_playing()
-    async def skip_to_command(self, ctx: discord.ApplicationContext, pos: int) -> None:
+    async def skip_to_command(
+        self, ctx: discord.ApplicationContext, to_find: str
+    ) -> None:
         vc: wavelink.Player = ctx.voice_client
 
         if vc.queue.is_empty:
@@ -107,10 +108,30 @@ class Play(commands.Cog):
             await ctx.respond(embed=embed)
             return
 
+        if not to_find.isdigit():
+            for i, track in enumerate(vc.queue):
+                if to_find.lower() in track.title.lower():
+                    to_find = i + 1
+                    break
+
+                if i != len(vc.queue) - 1:
+                    continue
+
+                embed = discord.Embed(
+                    title="",
+                    description=f":x: Song `{to_find}` was not found in queue,"
+                    f" to show what's in queue, type `/q`",
+                    color=discord.Color.blue(),
+                )
+                await ctx.respond(embed=embed)
+                return
+        else:
+            to_find = int(to_find)
+
         try:
-            track = vc.queue[pos - 1]
+            track = vc.queue[to_find - 1]
             vc.queue.put_at(0, track)
-            del vc.queue[pos - 1]
+            del vc.queue[to_find]
             await vc.stop()
 
             embed = discord.Embed(
@@ -121,8 +142,8 @@ class Play(commands.Cog):
         except IndexError:
             embed = discord.Embed(
                 title="",
-                description=f"**:x: Song was not found on position `{pos}`,"
-                " to show what's in queue, type `/q`**",
+                description=f":x: Song was not found on position `{to_find}`,"
+                " to show what's in queue, type `/q`",
                 color=discord.Color.blue(),
             )
         await ctx.respond(embed=embed)
@@ -240,10 +261,12 @@ class Play(commands.Cog):
                 title="",
                 description=":x: Failed to load tracks, you probably inputted"
                 " wrong link or this Lavalink server "
-                "doesn't have Youtube plugin."
+                "doesn't have necessary plugins."
                 " To fix this, use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
+            vc: wavelink.Player = ctx.voice_client
+            vc.should_respond = True
             await ctx.respond(embed=embed)
             return None
 

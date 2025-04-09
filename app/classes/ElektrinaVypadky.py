@@ -60,7 +60,7 @@ class ElektrinaVypadky:
             ):
                 continue
 
-            elektrinavypadky_cache_upload.pop(0)
+            del elektrinavypadky_cache_upload[0]
             elektrinavypadky_cache_upload.append(url)
 
             iso_time = article.find("published").text
