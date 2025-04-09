@@ -43,8 +43,9 @@ class Play(commands.Cog):
         if vc.queue.is_empty:
             vc.should_respond = True
 
-        vc.temp_current = track  # To be used in case of switching nodes
-        await vc.play(track)
+        is_playing: bool = await self._play_track(ctx, track)
+        if not is_playing:
+            return
 
         if vc.should_respond:
             await ctx.respond(embed=self._playing_embed(track))
@@ -72,7 +73,10 @@ class Play(commands.Cog):
             vc.queue.put_at(0, track)
             return
 
-        await vc.play(track)
+        is_playing: bool = await self._play_track(ctx, track)
+        if not is_playing:
+            return
+
         await ctx.respond(embed=self._playing_embed(track))
         vc.queue.remove(
             track
@@ -303,6 +307,30 @@ class Play(commands.Cog):
             )
             await ctx.respond(embed=embed)
             return False
+        except wavelink.exceptions.ChannelTimeoutException as e:
+            print(f"Timeout exception: {e}")
+        return True
+
+    @staticmethod
+    async def _play_track(
+        ctx: discord.ApplicationContext, track: wavelink.Playable
+    ) -> None:
+        vc: wavelink.Player = ctx.voice_client
+
+        try:
+            await vc.play(track)
+        except wavelink.exceptions.NodeException:
+            embed = discord.Embed(
+                title="",
+                description=":x: Failed to connect to send request to the node."
+                "\nError might be caused by Discord serers not responding,"
+                "give it a minute or  use command `/reconnect_node`",
+                color=discord.Color.from_rgb(r=220, g=0, b=0),
+            )
+            await ctx.respond(embed=embed)
+            return False
+
+        vc.temp_current = track  # To be used in case of switching nodes
         return True
 
     @staticmethod

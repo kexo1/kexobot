@@ -1,5 +1,6 @@
 from typing import Union
 
+import asyncio
 import discord
 import wavelink
 
@@ -121,8 +122,10 @@ class Listeners(commands.Cog):
     async def _switch_node(self, player: wavelink.Player) -> bool:
         for i in range(1, 6):
             try:
-                node: wavelink.Node = await self.bot.get_node()
-                await wavelink.Pool.connect(nodes=[node], client=self.bot)
+                node: wavelink.Node = await self._is_node_connected()
+                if not node:
+                    continue
+
                 await player.switch_node(node)
                 await player.play(player.temp_current)
                 self.bot.node = node
@@ -132,6 +135,22 @@ class Listeners(commands.Cog):
                 print(f"{i}. Failed to switch node ({node.uri}), trying again...")
                 continue
         return False
+
+    async def _is_node_connected(self) -> wavelink.Node:
+        try:
+            node: wavelink.Node = await self.bot.get_node()
+            await asyncio.wait_for(
+                wavelink.Pool.connect(nodes=[node], client=self.bot), timeout=3
+            )
+            await node.fetch_info()
+            return node
+        except (
+            asyncio.TimeoutError,
+            wavelink.exceptions.LavalinkException,
+            wavelink.exceptions.NodeException,
+        ):
+            print(f"Failed to connect to {node.uri}")
+        return None
 
     async def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
         embed = discord.Embed(

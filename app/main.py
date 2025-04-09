@@ -209,7 +209,7 @@ class KexoBOT:
 
             try:
                 await asyncio.wait_for(
-                    wavelink.Pool.connect(nodes=[node], client=bot), timeout=5
+                    wavelink.Pool.connect(nodes=[node], client=bot), timeout=3
                 )
             except asyncio.TimeoutError:
                 print(f"Node {node.uri} is not ready, trying next...")
