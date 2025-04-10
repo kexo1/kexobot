@@ -54,10 +54,10 @@ class Server:
     def __repr__(self) -> str:
         return f"Server({self.server_name}, {self.map_name}, {self.players}, {self.max_players}, {self.bots})"
 
-    async def get_full_server_info(self):
+    def get_full_server_info(self):
         return self
 
-    async def get_game_mode(self) -> str:
+    def get_game_mode(self) -> str:
         game_modes = {1: "Versus", 2: "Custom", 3: "Campaign", 4: "Survival"}
         return game_modes.get(self.game_mode, "Unknown")
 
@@ -85,7 +85,7 @@ class SFDServers:
         now = datetime.datetime.now(selected_timezone)
 
         start_time = now - timedelta(hours=168)
-        await self.generate_lines_and_effects(list(range(280)), players, servers)
+        self.generate_lines_and_effects(list(range(280)), players, servers)
 
         num_ticks = 28
         tick_positions = np.linspace(0, 280 - 1, num_ticks, dtype=int)
@@ -110,7 +110,7 @@ class SFDServers:
             for i in range(23, -1, -1)
         ]
 
-        await self.generate_lines_and_effects(list(range(240)), players, servers)
+        self.generate_lines_and_effects(list(range(240)), players, servers)
 
         # One time position per hour
         time_positions = [i * 10 + 5 for i in range(24)]
@@ -121,7 +121,7 @@ class SFDServers:
         plt.close("all")
 
     @staticmethod
-    async def generate_lines_and_effects(x_positions, players, servers):
+    def generate_lines_and_effects(x_positions, players, servers):
         plt.figure(figsize=(14, 7))
         plt.plot(x_positions, players, color="cyan", label="Players")
         plt.plot(x_positions, servers, color="magenta", label="Servers")

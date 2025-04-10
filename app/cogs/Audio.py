@@ -5,7 +5,7 @@ import wavelink
 
 from discord.ext import commands
 from discord import option
-from discord.commands import slash_command
+from discord.commands import slash_command, guild_only
 from decorators import is_joined
 
 
@@ -14,6 +14,7 @@ class Audio(commands.Cog):
         self.bot = bot
 
     @slash_command(name="volume", description="Sets audio volume.")
+    @guild_only()
     @option(
         "vol",
         type=int,
@@ -46,6 +47,7 @@ class Audio(commands.Cog):
         await ctx.respond(embed=embed)
 
     @slash_command(name="speed", description="Speeds up music.")
+    @guild_only()
     @option(
         "multiplier",
         type=int,
@@ -59,11 +61,11 @@ class Audio(commands.Cog):
     async def speed(
         self, ctx: discord.ApplicationContext, multiplier: Optional[int] = 2
     ) -> None:
-        vc: wavelink.Player = ctx.voice_client
-        filters: wavelink.Filters = vc.filters
+        player: wavelink.Player = ctx.voice_client
+        filters: wavelink.Filters = player.filters
         filters.timescale.set(speed=multiplier)
 
-        await vc.set_filters(filters)
+        await player.set_filters(filters)
         embed = discord.Embed(
             title="",
             description=f"**⏩ Sped up by `{multiplier}x`**",
@@ -72,12 +74,13 @@ class Audio(commands.Cog):
         await ctx.respond(embed=embed)
 
     @slash_command(name="clear-effects", description="Clears all effects on player.")
+    @guild_only()
     @is_joined()
     async def clear_effects(self, ctx: discord.ApplicationContext) -> None:
-        vc: wavelink.Player = ctx.voice_client
-        filters: wavelink.Filters = vc.filters
-        filters.timescale.reset()
-        await vc.set_filters(filters)
+        player: wavelink.Player = ctx.voice_client
+        filters: wavelink.Filters = player.filters
+        filters.reset()
+        await player.set_filters(filters)
         embed = discord.Embed(
             title="",
             description="**✅ Effects were cleared.**",

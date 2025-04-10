@@ -9,8 +9,7 @@ import discord
 import wavelink
 
 from discord.ext import commands
-from discord.commands import slash_command
-from discord.commands import option
+from discord.commands import slash_command, guild_only, option
 
 from constants import XTC_SERVER, KEXO_SERVER, DB_CHOICES, SFD_TIMEZONE_CHOICE
 from classes.DatabaseManager import DatabaseManager
@@ -32,13 +31,11 @@ class Commands(commands.Cog):
         self.sfd_servers = SFDServers(self.database, bot.session)
         self.database_manager = DatabaseManager(self.database)
 
-    async def init_sfd_servers(self) -> None:
-        self.sfd_servers = self.bot.sfd_servers
-
     # -------------------- Node Managment -------------------- #
     @slash_command(
         name="manual_reconnect_node", description="Manually input server info"
     )
+    @guild_only()
     @option(
         "uri",
         description="Lavalink server URL (without http:// at start)",
@@ -68,9 +65,8 @@ class Commands(commands.Cog):
         ]
         try:
             await asyncio.wait_for(
-                wavelink.Pool.connect(nodes=node, client=self.bot), timeout=5
+                wavelink.Pool.connect(nodes=node, client=self.bot), timeout=3
             )
-            await asyncio.sleep(1)
             await node[0].fetch_info()
         except asyncio.TimeoutError:
             embed = discord.Embed(
@@ -100,6 +96,7 @@ class Commands(commands.Cog):
     @slash_command(
         name="reconnect_node", description="Automatically reconnect to avaiable node"
     )
+    @guild_only()
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def recconect_node(self, ctx: discord.ApplicationContext) -> None:
         await ctx.trigger_typing()
@@ -178,7 +175,7 @@ class Commands(commands.Cog):
     async def get_sfd_server_info(
         self, ctx: discord.ApplicationContext, search: str
     ) -> None:
-        server = await self.sfd_servers.get_server(search)
+        server = self.sfd_servers.get_server(search)
         if not server:
             embed = discord.Embed(
                 title="",
@@ -193,7 +190,7 @@ class Commands(commands.Cog):
             )
             return
 
-        server = await server.get_full_server_info()
+        server = server.get_full_server_info()
 
         embed = discord.Embed(
             title=server.server_name,

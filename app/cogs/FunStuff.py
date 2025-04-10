@@ -10,7 +10,7 @@ import imgflip
 import requests
 
 from discord.ext import commands
-from discord.commands import slash_command
+from discord.commands import slash_command, guild_only
 from discord import option
 
 from asyncprawcore.exceptions import (

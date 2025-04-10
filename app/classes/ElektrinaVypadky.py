@@ -26,14 +26,14 @@ class ElektrinaVypadky:
             print("ElektrinaVypadky: Timeout")
             return
 
-        articles = await self._get_articles(html_content.text)
+        articles = self._get_articles(html_content.text)
         if articles:
             await self._process_articles(articles, elektrinavypadky_cache)
             return
         print("ElektrinaVypadky: No articles found")
 
     @staticmethod
-    async def _get_articles(html_content: str) -> list:
+    def _get_articles(html_content: str) -> list:
         soup = BeautifulSoup(html_content, "xml")
 
         articles = soup.find_all("entry")

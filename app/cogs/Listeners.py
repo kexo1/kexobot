@@ -1,6 +1,5 @@
 from typing import Union
 
-import asyncio
 import discord
 import wavelink
 
@@ -22,7 +21,7 @@ class Listeners(commands.Cog):
     async def on_wavelink_track_start(self, payload: TrackStartEventPayload) -> None:
         if not payload.player.should_respond:
             await payload.player.text_channel.send(
-                embed=await self._playing_embed(payload)
+                embed=self._playing_embed(payload)
             )
 
     @commands.Cog.listener()
@@ -77,30 +76,30 @@ class Listeners(commands.Cog):
         before: discord.VoiceState,
         after: discord.VoiceState,
     ) -> None:
-        vc: wavelink.Player = member.guild.voice_client
-        if vc is None:
+        player: wavelink.Player = member.guild.voice_client
+        if player is None:
             return
 
-        if len(vc.channel.members) == 1:
+        if len(player.channel.members) == 1:
             if len(before.channel.members) < 2:
-                await vc.text_channel.send(
+                await player.text_channel.send(
                     embed=discord.Embed(
                         title="",
-                        description=f":x: Don't manually move me, please use `/play` from channel.",
+                        description=":x: Don't manually move me, please use `/play` from channel.",
                         color=discord.Color.from_rgb(220, 0, 0),
                     )
                 )
             else:
-                await vc.text_channel.send(
+                await player.text_channel.send(
                     embed=discord.Embed(
                         title="",
-                        description=f"**Left <#{vc.channel.id}>, no users in channel.**",
+                        description=f"**Left <#{player.channel.id}>, no users in channel.**",
                         color=discord.Color.blue(),
                     )
                 )
 
-            vc.cleanup()
-            await vc.disconnect()
+            player.cleanup()
+            await player.disconnect()
             return
 
         # If member that was removed is the bot itself
@@ -109,7 +108,7 @@ class Listeners(commands.Cog):
             and before.channel is not None
             and after.channel is None
         ):
-            vc.cleanup()
+            player.cleanup()
 
     async def _manage_node(
         self,
@@ -138,7 +137,7 @@ class Listeners(commands.Cog):
         await channel.send(embed=embed)
 
     async def _switch_node(self, player: wavelink.Player) -> bool:
-        for i in range(1, 4):
+        for _ in range(1, 4):
             try:
                 await self.bot.connect_node()
                 node: wavelink.Node = self.bot.node
@@ -150,7 +149,7 @@ class Listeners(commands.Cog):
                 continue
         return False
 
-    async def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
+    def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
         embed = discord.Embed(
             color=discord.Colour.green(),
             title="Now playing",
@@ -158,13 +157,13 @@ class Listeners(commands.Cog):
         )
         embed.set_footer(
             text=f"Requested by {payload.player.current.requester.name}",
-            icon_url=await self._has_pfp(payload.player.current.requester),
+            icon_url=self._has_pfp(payload.player.current.requester),
         )
         embed.set_thumbnail(url=payload.track.artwork)
         return embed
 
     @staticmethod
-    async def _has_pfp(member: discord.Member) -> str:
+    def _has_pfp(member: discord.Member) -> str:
         if hasattr(member.avatar, "url"):
             return member.avatar.url
         return None

@@ -80,7 +80,7 @@ class RedditCrackWatch:
                         continue
 
                     if ".png" in line or ".jpeg" in line or ".jpg" in line:
-                        img_url = await self._get_image(line)
+                        img_url = self._get_image(line)
                         continue
                     description_list.append(f"• {line}\n")
 
@@ -130,7 +130,7 @@ class RedditCrackWatch:
         return embed
 
     @staticmethod
-    async def _get_image(line: str) -> Optional[str]:
+    def _get_image(line: str) -> Optional[str]:
         image_url = re.findall(r"\((.*?)\)", line)
         if not image_url:
             return None

@@ -48,10 +48,6 @@ dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
 bot = discord.Bot()
 
 
-# TODO: Make Game3rb more readable
-# TODO: Redo Reddit DB
-
-
 class KexoBOT:
     """Main class for the bot.
     This class is responsible for initializing the bot, creating the session,
@@ -86,7 +82,6 @@ class KexoBOT:
         bot.database = self.database
         bot.reddit = self.reddit
         bot.connect_node = self.connect_node
-        bot.get_node = self.get_node
 
         self.onlinefix = None | OnlineFix
         self.game3rb = None | Game3rb
@@ -104,11 +99,10 @@ class KexoBOT:
 
     async def initialize(self) -> None:
         """Initialize the bot and fetch all channels and users."""
-
         await self._fetch_users()
-        await self.create_session()
         await self._fetch_channels()
-        await self._define_classes()
+        self._create_session()
+        self._define_classes()
         await self._generate_graphs()
         bot.subbredit_cache = return_dict(
             await self.database.find_one(DB_REDDIT_CACHE, {"_id": False})
@@ -122,14 +116,12 @@ class KexoBOT:
         return await bot.fetch_channel(channel_id)
 
     @staticmethod
-    async def _initialize_class(cls, *args):
+    def _initialize_class(cls, *args):
         """Helper to initialize a class with arguments."""
-
         return cls(*args)
 
     async def _fetch_channels(self) -> None:
         """Fetch all channels for the bot."""
-
         self.esutaze_channel = await self._fetch_channel(ESUTAZE_CHANNEL)
         self.game_updates_channel = await self._fetch_channel(GAME_UPDATES_CHANNEL)
         self.free_stuff_channel = await self._fetch_channel(FREE_STUFF_CHANNEL)
@@ -137,73 +129,69 @@ class KexoBOT:
 
     async def _generate_graphs(self) -> None:
         """Generate graphs for the bot."""
-
         await self.sfd_servers.generate_graph_day("New_York")
         await self.sfd_servers.generate_graph_week("New_York")
         print("Graphs generated.")
 
-    async def _define_classes(self) -> None:
+    def _define_classes(self) -> None:
         """Define classes for the bot."""
-
-        self.onlinefix = await self._initialize_class(
+        self.onlinefix = self._initialize_class(
             OnlineFix, self.database, self.session, self.game_updates_channel
         )
-        self.game3rb = await self._initialize_class(
+        self.game3rb = self._initialize_class(
             Game3rb,
             self.database,
             self.session,
             self.game_updates_channel,
             self.user_kexo,
         )
-        self.alienwarearena = await self._initialize_class(
+        self.alienwarearena = self._initialize_class(
             AlienwareArena, self.database, self.session, self.free_stuff_channel
         )
-        self.fanatical = await self._initialize_class(
+        self.fanatical = self._initialize_class(
             Fanatical, self.database, self.session, self.free_stuff_channel
         )
-        self.reddit_freegamefindings = await self._initialize_class(
+        self.reddit_freegamefindings = self._initialize_class(
             RedditFreeGameFindings,
             self.database,
             self.session,
             self.reddit,
             self.free_stuff_channel,
         )
-        self.sfd_servers = await self._initialize_class(
+        self.sfd_servers = self._initialize_class(
             SFDServers, self.database, self.session
         )
-        self.reddit_crackwatch = await self._initialize_class(
+        self.reddit_crackwatch = self._initialize_class(
             RedditCrackWatch,
             self.database,
             self.reddit,
             self.game_updates_channel,
             self.user_kexo,
         )
-        self.elektrina_vypadky = await self._initialize_class(
+        self.elektrina_vypadky = self._initialize_class(
             ElektrinaVypadky, self.database, self.session, self.user_kexo
         )
-        self.esutaze = await self._initialize_class(
+        self.esutaze = self._initialize_class(
             Esutaze, self.database, self.session, self.esutaze_channel
         )
-        self.lavalink_fetch = await self._initialize_class(
+        self.lavalink_fetch = self._initialize_class(
             LavalinkServerFetch, self.session
         )
 
-    async def create_session(self) -> None:
+    def _create_session(self) -> None:
         """Create a httpx session for the bot."""
-
         self.session = httpx.AsyncClient()
         self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
     async def connect_node(self) -> None:
         """Connect to lavalink node."""
-
         if not self.lavalink_servers:
             print("No lavalink servers found.")
             return
 
         for _ in range(len(self.lavalink_servers)):
-            node: wavelink.Node = await self.get_node()
+            node: wavelink.Node = self.get_node()
             if not node:
                 return
 
@@ -215,8 +203,8 @@ class KexoBOT:
                 print(f"Node {node.uri} is not responding, trying next...")
                 continue
             except (
-                wavelink.exceptions.LavalinkException,
-                wavelink.exceptions.NodeException,
+                    wavelink.exceptions.LavalinkException,
+                    wavelink.exceptions.NodeException,
             ):
                 print(f"Failed to connect to {node.uri}, trying next...")
                 continue
@@ -224,9 +212,8 @@ class KexoBOT:
             bot.node = node
             return
 
-    async def get_node(self) -> wavelink.Node:
+    def get_node(self) -> wavelink.Node:
         """Get the next lavalink node."""
-
         if not self.lavalink_servers:
             print("No lavalink servers found.")
             return None
@@ -240,7 +227,6 @@ class KexoBOT:
 
     async def set_joke(self) -> None:
         """Set a random joke as the bot's activity."""
-
         joke_categroy = random.choice(("jewish", "racist"))
         try:
             joke = await self.session.get(
@@ -258,7 +244,6 @@ class KexoBOT:
 
     async def _fetch_users(self) -> None:
         """Fetch users for the bot."""
-
         self.user_kexo = await bot.fetch_user(402221830930432000)
         print(f"User {self.user_kexo.name} fetched.")
 
@@ -447,11 +432,11 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             embed=discord.Embed(
                 title="",
                 description="There was an error processing your request,"
-                " trying to recconnect node.",
+                            " trying to recconnect node.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
         )
-        node: wavelink.Node = await kexobot.get_node()
+        node: wavelink.Node = kexobot.get_node()
         await vc.switch_node(node)
     raise error
 
