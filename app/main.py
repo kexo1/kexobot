@@ -215,8 +215,8 @@ class KexoBOT:
                 print(f"Node {node.uri} is not responding, trying next...")
                 continue
             except (
-                    wavelink.exceptions.LavalinkException,
-                    wavelink.exceptions.NodeException,
+                wavelink.exceptions.LavalinkException,
+                wavelink.exceptions.NodeException,
             ):
                 print(f"Failed to connect to {node.uri}, trying next...")
                 continue

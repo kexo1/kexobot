@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import Literal
 
 import asyncpraw.reddit
+import asyncpraw.models
 import discord
 import httpx
 import imgflip
@@ -118,8 +119,8 @@ class FunStuff(commands.Cog):
         if guild_id not in self.bot.subbredit_cache:
             await self.create_guild_dataset(guild_id)
 
-        guild_subreddit_cache = self.bot.subbredit_cache[guild_id]
-        subreddit = await self.bot.reddit.subreddit(
+        guild_subreddit_cache: dict = self.bot.subbredit_cache[guild_id]
+        subreddit: asyncpraw.models.Subreddit = await self.bot.reddit.subreddit(
             SHITPOST_SUBREDDITS[guild_subreddit_cache.get("which_subreddit")]
         )
         await self.up_search_level(guild_subreddit_cache)
@@ -133,8 +134,12 @@ class FunStuff(commands.Cog):
                 # Limiting how much to serach
                 if pos < guild_subreddit_cache.get("search_level"):
                     continue
-                # If pinned, or is a thread
-                if submission.is_self or submission.stickied:
+                # If post is locked, or is stickied, or it's a poll, skip it
+                if (
+                    submission.locked
+                    or submission.stickied
+                    or hasattr(submission, "poll_data")
+                ):
                     continue
                 # If already sent
                 if submission.url in guild_subreddit_cache.get("urls"):

@@ -3,6 +3,7 @@ from datetime import datetime
 
 import re
 import asyncpraw
+import asyncpraw.models
 import discord
 
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -36,9 +37,19 @@ class RedditCrackWatch:
     async def run(self) -> None:
         crackwatch_cache, to_filter = await self._load_database()
         crackwatch_cache_upload = crackwatch_cache.copy()
-        subreddit = await self.reddit.subreddit("CrackWatch")
+        subreddit: asyncpraw.models.Subreddit = await self.reddit.subreddit(
+            "CrackWatch"
+        )
         try:
             async for submission in subreddit.new(limit=REDDIT_CRACKWATCH_POSTS):
+                if (
+                    submission.locked
+                    or submission.stickied
+                    or submission.over_18
+                    or hasattr(submission, "poll_data")
+                ):
+                    continue
+
                 if submission.permalink in crackwatch_cache:
                     continue
 

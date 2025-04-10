@@ -70,7 +70,7 @@ REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD")
 REDDIT_STRIP = (" *", "* ", "*", "---")
 REDDIT_FREEGAME_EMBEDS = {
     "Default": {
-        "title": "Free Game - unknown site",
+        "title": "",
         "description": "",
         "icon": "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png",
     },

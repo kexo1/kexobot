@@ -73,8 +73,8 @@ class LavalinkServerFetch:
 
             for plugin in server["info"]["plugins"]:
                 if (
-                        plugin["name"] == "youtube-plugin"
-                        or plugin["name"] == "lavasrc-plugin"
+                    plugin["name"] == "youtube-plugin"
+                    or plugin["name"] == "lavasrc-plugin"
                 ):
                     node = self._return_node(
                         server["host"], server["port"], server["password"]

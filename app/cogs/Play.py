@@ -19,7 +19,7 @@ class Play(commands.Cog):
     @option(
         "search",
         description="You can either put a url or a name of the song,"
-                    " both youtube and spotify are supported.",
+        " both youtube and spotify are supported.",
     )
     async def play(self, ctx: discord.ApplicationContext, search: str) -> None:
         if not ctx.voice_client:
@@ -108,7 +108,7 @@ class Play(commands.Cog):
     )
     @is_playing()
     async def skip_to_command(
-            self, ctx: discord.ApplicationContext, to_find: str
+        self, ctx: discord.ApplicationContext, to_find: str
     ) -> None:
         vc: wavelink.Player = ctx.voice_client
 
@@ -131,7 +131,7 @@ class Play(commands.Cog):
                 embed = discord.Embed(
                     title="",
                     description=f":x: Song `{to_find}` was not found in queue,"
-                                f" to show what's in queue, type `/q`",
+                    f" to show what's in queue, type `/q`",
                     color=discord.Color.blue(),
                 )
                 await ctx.respond(embed=embed)
@@ -154,7 +154,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f":x: Song was not found on position `{to_find}`,"
-                            " to show what's in queue, type `/q`",
+                " to show what's in queue, type `/q`",
                 color=discord.Color.blue(),
             )
         await ctx.respond(embed=embed)
@@ -206,7 +206,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention},"
-                            f" join the voice channel the bot is playing in to disconnect it.",
+                f" join the voice channel the bot is playing in to disconnect it.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -223,7 +223,7 @@ class Play(commands.Cog):
 
     # ----------------------- Helper functions ------------------------ #
     async def _fetch_track(
-            self, ctx: discord.ApplicationContext, search: str
+        self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
         if not tracks:
@@ -232,8 +232,8 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _fetch_first_track(
-            ctx: discord.ApplicationContext,
-            tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
+        ctx: discord.ApplicationContext,
+        tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
     ) -> wavelink.Playable:
         vc: wavelink.Player = ctx.voice_client
         # If it's a playlist
@@ -248,7 +248,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"Added the playlist **`{tracks.name}`**"
-                            f" ({song_count} songs) to the queue.",
+                f" ({song_count} songs) to the queue.",
                 color=discord.Color.blue(),
             )
             if vc.should_respond:
@@ -263,7 +263,7 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _search_tracks(
-            ctx: discord.ApplicationContext, search: str
+        ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
         try:
             tracks: wavelink.Search = await wavelink.Playable.search(search)
@@ -271,9 +271,9 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=":x: Failed to load tracks, you probably inputted"
-                            " wrong link or this Lavalink server "
-                            "doesn't have necessary plugins."
-                            " To fix this, use command `/reconnect_node`",
+                " wrong link or this Lavalink server "
+                "doesn't have necessary plugins."
+                " To fix this, use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             vc: wavelink.Player = ctx.voice_client
@@ -314,7 +314,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention},"
-                            f" you're not in a voice channel. Type `/p` from vc.",
+                f" you're not in a voice channel. Type `/p` from vc.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -334,7 +334,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=":x: No nodes are currently assigned to the bot."
-                            "\nTo fix this, use command `/reconnect_node`",
+                "\nTo fix this, use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await ctx.respond(embed=embed)
@@ -345,7 +345,7 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _play_track(
-            ctx: discord.ApplicationContext, track: wavelink.Playable
+        ctx: discord.ApplicationContext, track: wavelink.Playable
     ) -> None:
         vc: wavelink.Player = ctx.voice_client
 
@@ -355,8 +355,8 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=":x: Failed to connect to send request to the node."
-                            "\nError might be caused by Discord serers not responding,"
-                            "give it a minute or  use command `/reconnect_node`",
+                "\nError might be caused by Discord serers not responding,"
+                "give it a minute or  use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=220, g=0, b=0),
             )
             await ctx.respond(embed=embed)
@@ -376,7 +376,7 @@ class Play(commands.Cog):
         embed = discord.Embed(
             title="",
             description=f"**✅ Joined to <#{vc.channel.id}>"
-                        f" and set text channel to <#{ctx.channel.id}>.**",
+            f" and set text channel to <#{ctx.channel.id}>.**",
             color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)

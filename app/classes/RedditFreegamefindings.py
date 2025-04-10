@@ -1,8 +1,10 @@
 from urllib.parse import urlparse
 
 import asyncpraw
+import asyncpraw.models
 import discord
 import httpx
+import re
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from asyncprawcore.exceptions import (  # type: ignore
@@ -36,13 +38,19 @@ class RedditFreeGameFindings:
     async def run(self) -> None:
         freegamefindings_cache, to_filter = await self._load_database()
         freegamefindings_cache_upload = freegamefindings_cache.copy()
-
-        subreddit = await self.reddit.subreddit("FreeGameFindings")
+        subreddit: asyncpraw.models.Subreddit = await self.reddit.subreddit(
+            "FreeGameFindings"
+        )
 
         try:
             async for submission in subreddit.new(limit=REDDIT_FREEGAME_MAX_POSTS):
-                # If pinned, or is a thread
-                if submission.is_self or submission.stickied:
+                # If post is locked, or is stickied, nsfw, or it's a poll, skip it
+                if (
+                    submission.locked
+                    or submission.stickied
+                    or submission.over_18
+                    or hasattr(submission, "poll_data")
+                ):
                     continue
 
                 if submission.url in freegamefindings_cache:
@@ -63,7 +71,7 @@ class RedditFreeGameFindings:
 
                 del freegamefindings_cache_upload[0]
                 freegamefindings_cache_upload.append(submission.url)
-                await self._process_submission(submission.url)
+                await self._process_submission(submission)
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:
             print(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
 
@@ -73,15 +81,19 @@ class RedditFreeGameFindings:
                 {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}},
             )
 
-    async def _process_submission(self, url: str) -> None:
+    async def _process_submission(
+        self, submission: asyncpraw.models.Submission
+    ) -> None:
         feeegame_embeds: dict = REDDIT_FREEGAME_EMBEDS
 
-        if "gleam" in url:
-            await self._create_embed(feeegame_embeds["Gleam"], url)
-        elif "alienwarearena" in url:
-            await self._alienwarearena(url)
+        if "gleam" in submission.url:
+            await self._create_embed(feeegame_embeds["Gleam"], submission.url)
+        elif "alienwarearena" in submission.url:
+            await self._alienwarearena(submission.url)
         else:
-            await self._create_embed(feeegame_embeds["Default"], url)
+            title_stripped = re.sub(r"\[.*?]|\(.*?\)", "", text).strip()
+            feeegame_embeds["Default"]["title"] = title_stripped
+            await self._create_embed(feeegame_embeds["Default"], submission.url)
 
     async def _alienwarearena(self, url) -> None:
         # There might be an occurence where giveaway is not showing in alienwarearena.com
