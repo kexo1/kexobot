@@ -29,17 +29,6 @@ def is_joined():
                 )
                 return await ctx.respond(embed=embed, ephemeral=True)
 
-            if not vc.connected:
-                try:
-                    await ctx.author.voice.channel.connect(cls=wavelink.Player)
-                except wavelink.InvalidChannelStateException:
-                    embed = discord.Embed(
-                        title="",
-                        description=":x: I don't have permissions to join your channel.",
-                        color=discord.Color.from_rgb(r=255, g=0, b=0),
-                    )
-                    return await ctx.respond(embed=embed)
-
             return await func(*args, **kwargs)
 
         return wrapper

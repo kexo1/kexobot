@@ -61,7 +61,7 @@ class RedditFreeGameFindings:
                 if is_filtered:
                     continue
 
-                freegamefindings_cache_upload.pop()
+                del freegamefindings_cache_upload[0]
                 freegamefindings_cache_upload.append(submission.url)
                 await self._process_submission(submission.url)
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:

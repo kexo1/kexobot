@@ -212,7 +212,13 @@ class KexoBOT:
                     wavelink.Pool.connect(nodes=[node], client=bot), timeout=3
                 )
             except asyncio.TimeoutError:
-                print(f"Node {node.uri} is not ready, trying next...")
+                print(f"Node {node.uri} is not responding, trying next...")
+                continue
+            except (
+                    wavelink.exceptions.LavalinkException,
+                    wavelink.exceptions.NodeException,
+            ):
+                print(f"Failed to connect to {node.uri}, trying next...")
                 continue
 
             bot.node = node
@@ -230,7 +236,6 @@ class KexoBOT:
             self.which_lavalink_server = 0
 
         node: wavelink.Node = self.lavalink_servers[self.which_lavalink_server]
-        print(f"Cycling through lavalink servers: {node.uri}")
         return node
 
     async def set_joke(self) -> None:
