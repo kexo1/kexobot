@@ -20,9 +20,7 @@ class Listeners(commands.Cog):
     @commands.Cog.listener()
     async def on_wavelink_track_start(self, payload: TrackStartEventPayload) -> None:
         if not payload.player.should_respond:
-            await payload.player.text_channel.send(
-                embed=self._playing_embed(payload)
-            )
+            await payload.player.text_channel.send(embed=self._playing_embed(payload))
 
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
@@ -32,8 +30,10 @@ class Listeners(commands.Cog):
     async def on_wavelink_node_disconnected(
         self, payload: NodeDisconnectedEventPayload
     ) -> None:
-        print(f"Node {payload.node.uri} is disconnected, fetching new node...")
-        await self.bot.connect_node()
+        if self.bot.get_online_nodes() < 1:
+            print(f"Node {payload.node.uri} is disconnected, fetching new node...")
+            await self.bot.connect_node()
+            await self.bot.close_unused_nodes()
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(
@@ -137,17 +137,15 @@ class Listeners(commands.Cog):
         await channel.send(embed=embed)
 
     async def _switch_node(self, player: wavelink.Player) -> bool:
-        for _ in range(1, 4):
-            try:
-                await self.bot.connect_node()
-                node: wavelink.Node = self.bot.node
-
-                await player.switch_node(node)
-                await player.play(player.temp_current)
-                return True
-            except RuntimeError:
-                continue
-        return False
+        try:
+            node: wavelink.Node = await self.bot.connect_node()
+            await player.switch_node(node)
+            await player.play(player.temp_current)
+            await self.bot.close_unused_nodes()
+            print(f"Node switched to {node.uri}")
+            return True
+        except RuntimeError:
+            return False
 
     def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
         embed = discord.Embed(

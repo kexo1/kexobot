@@ -2,6 +2,7 @@ import random
 import asyncio
 
 from datetime import datetime
+from typing import Optional
 
 import discord
 import asyncpraw
@@ -13,6 +14,7 @@ from fake_useragent import UserAgent
 from discord.ext import tasks, commands
 from motor.motor_asyncio import AsyncIOMotorClient
 from wavelink.exceptions import LavalinkException
+from wavelink.enums import NodeStatus
 
 from constants import (
     DISCORD_TOKEN,
@@ -82,6 +84,8 @@ class KexoBOT:
         bot.database = self.database
         bot.reddit = self.reddit
         bot.connect_node = self.connect_node
+        bot.close_unused_nodes = self.close_unused_nodes
+        bot.get_online_nodes = self.get_online_nodes
 
         self.onlinefix = None | OnlineFix
         self.game3rb = None | Game3rb
@@ -174,9 +178,7 @@ class KexoBOT:
         self.esutaze = self._initialize_class(
             Esutaze, self.database, self.session, self.esutaze_channel
         )
-        self.lavalink_fetch = self._initialize_class(
-            LavalinkServerFetch, self.session
-        )
+        self.lavalink_fetch = self._initialize_class(LavalinkServerFetch, self.session)
 
     def _create_session(self) -> None:
         """Create a httpx session for the bot."""
@@ -184,16 +186,16 @@ class KexoBOT:
         self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
-    async def connect_node(self) -> None:
+    async def connect_node(self) -> Optional[wavelink.Node]:
         """Connect to lavalink node."""
         if not self.lavalink_servers:
             print("No lavalink servers found.")
-            return
+            return None
 
         for _ in range(len(self.lavalink_servers)):
             node: wavelink.Node = self.get_node()
             if not node:
-                return
+                return None
 
             try:
                 await asyncio.wait_for(
@@ -203,14 +205,14 @@ class KexoBOT:
                 print(f"Node {node.uri} is not responding, trying next...")
                 continue
             except (
-                    wavelink.exceptions.LavalinkException,
-                    wavelink.exceptions.NodeException,
+                wavelink.exceptions.LavalinkException,
+                wavelink.exceptions.NodeException,
             ):
                 print(f"Failed to connect to {node.uri}, trying next...")
                 continue
 
             bot.node = node
-            return
+            return node
 
     def get_node(self) -> wavelink.Node:
         """Get the next lavalink node."""
@@ -224,6 +226,28 @@ class KexoBOT:
 
         node: wavelink.Node = self.lavalink_servers[self.which_lavalink_server]
         return node
+
+    @staticmethod
+    async def close_unused_nodes() -> None:
+        """Clear unused lavalink nodes."""
+        for temp_node in wavelink.Pool.nodes.values():
+            if len(wavelink.Pool.nodes) == 1:
+                break
+
+            if len(temp_node.players) == 0:
+                print(f"Node {temp_node.uri} is empty, removing...")
+                await temp_node.close()
+
+    @staticmethod
+    def get_online_nodes() -> int:
+        """Get the number of online lavalink nodes."""
+        return len(
+            [
+                node
+                for node in wavelink.Pool.nodes.values()
+                if node.status == NodeStatus.CONNECTED
+            ]
+        )
 
     async def set_joke(self) -> None:
         """Set a random joke as the bot's activity."""
@@ -318,7 +342,6 @@ class KexoBOT:
         """
 
         now = datetime.now()
-
         if now.hour == 0:
             await self.set_joke()
 
@@ -399,14 +422,15 @@ async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
     sending an error message to the user.
     It also handles the case when the command is not found.
     """
-    if isinstance(error, commands.errors.CommandNotFound):
+    if isinstance(error, commands.MissingPermissions):
         embed = discord.Embed(
             title="",
-            description="🚫 This command doesn't exist.",
+            description="🚫 You don't have the required permissions to use this command.",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.send(embed=embed, delete_after=20)
+        return
 
 
 @bot.event
@@ -423,21 +447,6 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
         return
 
-    if isinstance(error, LavalinkException):
-        vc: wavelink.Player = ctx.voice_client
-        if not vc:
-            raise error
-
-        await ctx.respond(
-            embed=discord.Embed(
-                title="",
-                description="There was an error processing your request,"
-                            " trying to recconnect node.",
-                color=discord.Color.from_rgb(r=255, g=0, b=0),
-            )
-        )
-        node: wavelink.Node = kexobot.get_node()
-        await vc.switch_node(node)
     raise error
 
 

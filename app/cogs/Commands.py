@@ -105,15 +105,27 @@ class Commands(commands.Cog):
             description="**🔄 Getting Lavalink server.**",
             color=discord.Color.blue(),
         )
-        await ctx.respond(embed=embed)
-        await self.bot.connect_node()
+        message = await ctx.respond(embed=embed)
+        node: wavelink.Node = await self.bot.connect_node()
 
-        embed = discord.Embed(
-            title="",
-            description=f"**✅ Connected to node `{self.bot.node.uri}`**",
-            color=discord.Color.blue(),
-        )
-        await ctx.send(embed=embed)
+        player: wavelink.Player = ctx.voice_client
+        if player:
+            await player.switch_node(node)
+            embed = discord.Embed(
+                title="",
+                description=f"**✅ Connected your player to node `{self.bot.node.uri}`**",
+                color=discord.Color.blue(),
+            )
+            await message.edit(embed=embed)
+        else:
+            embed = discord.Embed(
+                title="",
+                description=f"**✅ Connected to node `{self.bot.node.uri}`**",
+                color=discord.Color.blue(),
+            )
+            await message.edit(embed=embed)
+
+        await self.bot.close_unused_nodes()
 
     @slash_command(name="node_info", description="Information about connected node.")
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
@@ -409,6 +421,7 @@ class Commands(commands.Cog):
         )
         embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
         embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
+        embed.add_field(name="Online Nodes:ㅤ", value=self.bot.get_online_nodes())
         embed.add_field(name="Version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
         embed.add_field(
