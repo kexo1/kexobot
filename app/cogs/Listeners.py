@@ -33,7 +33,6 @@ class Listeners(commands.Cog):
         if self.bot.get_online_nodes() < 1:
             print(f"Node {payload.node.uri} is disconnected, fetching new node...")
             await self.bot.connect_node()
-            await self.bot.close_unused_nodes()
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(
@@ -81,23 +80,13 @@ class Listeners(commands.Cog):
             return
 
         if len(player.channel.members) == 1:
-            if len(before.channel.members) < 2:
-                await player.text_channel.send(
-                    embed=discord.Embed(
-                        title="",
-                        description=":x: Don't manually move me, please use `/play` from channel.",
-                        color=discord.Color.from_rgb(220, 0, 0),
-                    )
+            await player.text_channel.send(
+                embed=discord.Embed(
+                    title="",
+                    description=f"**Left <#{player.channel.id}>, no users in channel.**",
+                    color=discord.Color.blue(),
                 )
-            else:
-                await player.text_channel.send(
-                    embed=discord.Embed(
-                        title="",
-                        description=f"**Left <#{player.channel.id}>, no users in channel.**",
-                        color=discord.Color.blue(),
-                    )
-                )
-
+            )
             player.cleanup()
             await player.disconnect()
             return

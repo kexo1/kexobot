@@ -12,7 +12,6 @@ imgflip.py
 requests
 deep_translator
 unidecode
-aiohttp
 lxml
 matplotlib
 mplcyberpunk
@@ -23,3 +22,4 @@ psutil
 yarl>=1.9.2
 async_timeout
 typing_extensions
+aiohttp

@@ -30,9 +30,6 @@ class LavalinkServerFetch:
         except json.decoder.JSONDecodeError:
             print(f"Failed to decode JSON from {LAVALIST_URL}")
 
-        # Move http://lavahatry4.techbyte.host:3000 to the end of the list
-        # due to it not supporting some YouTube videos
-        lavalink_servers.append(lavalink_servers.pop(0))
         return lavalink_servers
 
     async def _lavalist_fetch(self, json_data: list) -> list[wavelink.Node]:
@@ -45,7 +42,7 @@ class LavalinkServerFetch:
             if server.get("version") != "v4":
                 continue
 
-            node = self._return_node(server["host"], server["port"], server["password"])
+            node: wavelink.Node = self._return_node(server["host"], server["port"], server["password"])
             lavalink_servers.append(node)
 
         return lavalink_servers
@@ -76,7 +73,7 @@ class LavalinkServerFetch:
                     plugin["name"] == "youtube-plugin"
                     or plugin["name"] == "lavasrc-plugin"
                 ):
-                    node = self._return_node(
+                    node: wavelink.Node = self._return_node(
                         server["host"], server["port"], server["password"]
                     )
                     lavalink_servers.append(node)

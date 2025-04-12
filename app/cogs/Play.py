@@ -80,6 +80,7 @@ class Play(commands.Cog):
         await ctx.respond(embed=embed)
 
     @slash_command(name="skip-to", description="Skips to selected song in queue.")
+    @guild_only()
     @option(
         "to_find",
         description="Both position in the queue and name of the song are accepted.",
@@ -112,7 +113,7 @@ class Play(commands.Cog):
                     f" to show what's in queue, type `/q`",
                     color=discord.Color.blue(),
                 )
-                await ctx.respond(embed=embed)
+                await ctx.respond(embed=embed, ephemeral=True)
                 return
         else:
             to_find = int(to_find)
@@ -135,7 +136,7 @@ class Play(commands.Cog):
                 " to show what's in queue, type `/q`",
                 color=discord.Color.blue(),
             )
-        await ctx.respond(embed=embed)
+        await ctx.respond(embed=embed, ephemeral=True)
 
     @slash_command(name="pause", description="Pauses song that is currently playing.")
     @guild_only()
@@ -209,13 +210,6 @@ class Play(commands.Cog):
         tracks = await self._search_tracks(ctx, search)
         if tracks:
             return await self._fetch_first_track(ctx, tracks)
-
-        embed = discord.Embed(
-            title="",
-            description=f":x: No tracks were found for `{search}`.",
-            color=discord.Color.blue(),
-        )
-        await ctx.respond(embed=embed)
         return None
 
     @staticmethod
@@ -266,15 +260,24 @@ class Play(commands.Cog):
                 " To fix this, use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=220, g=0, b=0),
             )
-            await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed, ephemeral=True)
             return None
         except NodeException:
             embed = discord.Embed(
                 title="",
-                description=":x: Node is unresponsive, please use another one `/reconnect_node`",
+                description=":x: Node is unresponsive, please use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=220, g=0, b=0),
             )
-            await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed, ephemeral=True)
+            return None
+
+        if not tracks:
+            embed = discord.Embed(
+                title="",
+                description=f":x: No tracks were found for `{search}`.",
+                color=discord.Color.blue(),
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
             return None
 
         return tracks
@@ -317,14 +320,14 @@ class Play(commands.Cog):
             return False
 
         try:
-            await ctx.author.voice.channel.connect(cls=wavelink.Player)
+            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
         except wavelink.InvalidChannelStateException:
             embed = discord.Embed(
                 title="",
                 description=":x: I don't have permissions to join your channel.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
-            await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed, ephemeral=True)
             return False
 
         except wavelink.exceptions.InvalidNodeException:
@@ -334,11 +337,18 @@ class Play(commands.Cog):
                 "\nTo fix this, use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
-            await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed, ephemeral=True)
             return False
 
-        except wavelink.exceptions.ChannelTimeoutException as e:
-            print(f"Timeout exception: {e}")
+        except wavelink.exceptions.ChannelTimeoutException:
+            embed = discord.Embed(
+                title="",
+                description=":x: Failed to connect to the voice channel,"
+                            " was bot moved manually? If yes disconnect it and try again.",
+                color=discord.Color.from_rgb(r=255, g=0, b=0),
+            )
+            await ctx.respond(embed=embed)
+            return False
         return True
 
     @staticmethod

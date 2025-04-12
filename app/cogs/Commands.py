@@ -421,7 +421,8 @@ class Commands(commands.Cog):
         )
         embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
         embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
-        embed.add_field(name="Online Nodes:ㅤ", value=self.bot.get_online_nodes())
+        embed.add_field(name="Online nodes:ㅤ", value=self.bot.get_online_nodes())
+        embed.add_field(name="Joined servers:ㅤ", value=len(self.bot.guilds))
         embed.add_field(name="Version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
         embed.add_field(

@@ -13,7 +13,6 @@ import wavelink
 from fake_useragent import UserAgent
 from discord.ext import tasks, commands
 from motor.motor_asyncio import AsyncIOMotorClient
-from wavelink.exceptions import LavalinkException
 from wavelink.enums import NodeStatus
 
 from constants import (
@@ -66,9 +65,9 @@ class KexoBOT:
         self.session = None | httpx.AsyncClient
         self.subreddit_cache = None | dict
         self.which_lavalink_server = -1
-        self.lavalink_servers = []
         self.main_loop_counter = 0
-        self.database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"][
+        self.lavalink_servers = []
+        self.database = AsyncIOMotorClient(MONGO_DB_URL)["BotConfig"][
             "KexoBOTCollection"
         ]
 
@@ -180,6 +179,59 @@ class KexoBOT:
         )
         self.lavalink_fetch = self._initialize_class(LavalinkServerFetch, self.session)
 
+    async def main_loop(self) -> None:
+        """Main loop for the bot.
+        This loop runs every minute and runs the different classes that
+        fetch data from different sources.
+        It runs the classes in a round-robin fashion.
+        """
+        now = datetime.now()
+        if self.main_loop_counter == 0:
+            self.main_loop_counter = 1
+            await self.reddit_freegamefindings.run()
+
+        elif self.main_loop_counter == 1:
+            self.main_loop_counter = 2
+            await self.alienwarearena.run()
+
+        elif self.main_loop_counter == 2:
+            self.main_loop_counter = 3
+            await self.game3rb.run()
+
+        elif self.main_loop_counter == 3:
+            self.main_loop_counter = 4
+            await self.onlinefix.run()
+
+        elif self.main_loop_counter == 4:
+            self.main_loop_counter = 5
+            await self.reddit_crackwatch.run()
+
+        elif self.main_loop_counter == 5:
+            self.main_loop_counter = 6
+            await self.fanatical.run()
+
+        elif self.main_loop_counter == 6:
+            self.main_loop_counter = 0
+            await self.esutaze.run()
+
+        if now.minute % 6 == 0:
+            await self.sfd_servers.update_stats()
+
+    async def hourly_loop(self) -> None:
+        """Hourly loop for the bot.
+        This loop runs every hour and runs the different classes that
+        fetch data from different sources.
+        It runs the classes in a round-robin fashion.
+        It also updates the reddit cache and fetches lavalink servers.
+        """
+        now = datetime.now()
+        if now.hour == 0:
+            await self.set_joke()
+
+        self.lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
+        await self.update_reddit_cache(now)
+        await self.elektrina_vypadky.run()
+
     def _create_session(self) -> None:
         """Create a httpx session for the bot."""
         self.session = httpx.AsyncClient()
@@ -230,13 +282,16 @@ class KexoBOT:
     @staticmethod
     async def close_unused_nodes() -> None:
         """Clear unused lavalink nodes."""
-        for temp_node in wavelink.Pool.nodes.values():
+        nodes: list[wavelink.Node] = wavelink.Pool.nodes.values()
+        for node in nodes:
             if len(wavelink.Pool.nodes) == 1:
                 break
 
-            if len(temp_node.players) == 0:
-                print(f"Node {temp_node.uri} is empty, removing...")
-                await temp_node.close()
+            if len(node.players) == 0:
+                print(f"Node {node.uri} is empty, removing...")
+                # noinspection PyProtectedMember
+                await node._pool_closer()  # Node is not properly closed
+                await node.close()
 
     @staticmethod
     def get_online_nodes() -> int:
@@ -294,60 +349,6 @@ class KexoBOT:
 
         await self.database.update_many(DB_REDDIT_CACHE, {"$set": update})
         bot.subbredit_cache = return_dict(update)
-
-    async def main_loop(self) -> None:
-        """Main loop for the bot.
-        This loop runs every minute and runs the different classes that
-        fetch data from different sources.
-        It runs the classes in a round-robin fashion.
-        """
-        now = datetime.now()
-        if self.main_loop_counter == 0:
-            self.main_loop_counter = 1
-            await self.reddit_freegamefindings.run()
-
-        elif self.main_loop_counter == 1:
-            self.main_loop_counter = 2
-            await self.alienwarearena.run()
-
-        elif self.main_loop_counter == 2:
-            self.main_loop_counter = 3
-            await self.game3rb.run()
-
-        elif self.main_loop_counter == 3:
-            self.main_loop_counter = 4
-            await self.onlinefix.run()
-
-        elif self.main_loop_counter == 4:
-            self.main_loop_counter = 5
-            await self.reddit_crackwatch.run()
-
-        elif self.main_loop_counter == 5:
-            self.main_loop_counter = 6
-            await self.fanatical.run()
-
-        elif self.main_loop_counter == 6:
-            self.main_loop_counter = 0
-            await self.esutaze.run()
-
-        if now.minute % 6 == 0:
-            await self.sfd_servers.update_stats()
-
-    async def hourly_loop(self) -> None:
-        """Hourly loop for the bot.
-        This loop runs every hour and runs the different classes that
-        fetch data from different sources.
-        It runs the classes in a round-robin fashion.
-        It also updates the reddit cache and fetches lavalink servers.
-        """
-
-        now = datetime.now()
-        if now.hour == 0:
-            await self.set_joke()
-
-        self.lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
-        await self.update_reddit_cache(now)
-        await self.elektrina_vypadky.run()
 
 
 kexobot = KexoBOT()
@@ -416,35 +417,56 @@ async def on_ready() -> None:
 
 
 @bot.event
-async def on_command_error(ctx: discord.ApplicationContext, error) -> None:
-    """Event that runs when a command raises an error.
-    This event is responsible for handling the error and
-    sending an error message to the user.
-    It also handles the case when the command is not found.
-    """
-    if isinstance(error, commands.MissingPermissions):
-        embed = discord.Embed(
-            title="",
-            description="🚫 You don't have the required permissions to use this command.",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
-        )
-        embed.set_footer(text="Message will be deleted in 20 seconds.")
-        await ctx.send(embed=embed, delete_after=20)
-        return
-
-
-@bot.event
 async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
-    """Event that runs when a command is timed out."""
+    """This event is called when an error occurs in an appliacation command."""
     if isinstance(error, commands.CommandOnCooldown):
-        error_str = str(error).split()
         embed = discord.Embed(
             title="",
-            description=f"🚫 You're sending too much!, try again in `{error_str[7]}`.",
+            description=f"🚫 You're sending too much!, try again in `{error.retry_after}`.",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
+        return
+
+    if isinstance(error, commands.MissingPermissions):
+        embed = discord.Embed(
+            title="",
+            description=f"🚫 You don't have the required permissions to use this command."
+            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+            color=discord.Color.from_rgb(r=255, g=0, b=0),
+        )
+        await ctx.respond(embed=embed, ephemeral=True)
+        return
+
+    if isinstance(error, commands.BotMissingPermissions):
+        embed = discord.Embed(
+            title="",
+            description=f"🚫 I don't have the required permissions to use this command."
+            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+            color=discord.Color.from_rgb(r=255, g=0, b=0),
+        )
+        await ctx.send(embed=embed)
+        return
+
+    if isinstance(error, commands.BotMissingRole):
+        embed = discord.Embed(
+            title="",
+            description=f"🚫 You don't have the required role to use this command."
+            f"\nRequired role: `{error.missing_role}`",
+            color=discord.Color.from_rgb(r=255, g=0, b=0),
+        )
+        await ctx.respond(embed=embed, ephemeral=True)
+        return
+
+    if isinstance(error, commands.BotMissingRole):
+        embed = discord.Embed(
+            title="",
+            description=f"🚫 You don't have the required role to use this command."
+            f"\nRequired role: `{', '.join(error.missing_roles)}`",
+            color=discord.Color.from_rgb(r=255, g=0, b=0),
+        )
+        await ctx.respond(embed=embed, ephemeral=True)
         return
 
     raise error

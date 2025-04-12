@@ -1,5 +1,6 @@
 text_files/
 video/
+graphs/
 
 desktop.ini
 fly.toml
@@ -178,10 +179,3 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-/sfd_activity_week.png
-/sfd_activity_day.png
-/graphs/sfd_activity_day.png
-/graphs/sfd_activity_week.png
-/graphs/sfd_activity_day_New_York.png
-/graphs/sfd_activity_day_Slovakia.png
-/graphs/sfd_activity_week_New_York.png
