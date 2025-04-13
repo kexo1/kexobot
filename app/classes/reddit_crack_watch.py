@@ -24,18 +24,18 @@ from constants import (
 class RedditCrackWatch:
     def __init__(
         self,
-        database: AsyncIOMotorClient,
+        bot_config: AsyncIOMotorClient,
         reddit: asyncpraw.Reddit,
         channel: discord.TextChannel,
         user_kexo: discord.User,
     ) -> None:
-        self.database = database
+        self.bot_config = bot_config
         self.reddit = reddit
         self.channel = channel
         self.user_kexo = user_kexo
 
     async def run(self) -> None:
-        crackwatch_cache, to_filter = await self._load_database()
+        crackwatch_cache, to_filter = await self._load_bot_config()
         crackwatch_cache_upload = crackwatch_cache.copy()
         subreddit: asyncpraw.models.Subreddit = await self.reddit.subreddit(
             "CrackWatch"
@@ -111,7 +111,7 @@ class RedditCrackWatch:
                 await self.channel.send(embed=embed)
 
             if crackwatch_cache != crackwatch_cache_upload:
-                await self.database.update_one(
+                await self.bot_config.update_one(
                     DB_CACHE, {"$set": {"crackwatch_cache": crackwatch_cache_upload}}
                 )
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:
@@ -139,7 +139,7 @@ class RedditCrackWatch:
             return image_url[1]
         return image_url[0]
 
-    async def _load_database(self) -> tuple:
-        crackwatch_cache = await self.database.find_one(DB_CACHE)
-        to_filter = await self.database.find_one(DB_LISTS)
+    async def _load_bot_config(self) -> tuple:
+        crackwatch_cache = await self.bot_config.find_one(DB_CACHE)
+        to_filter = await self.bot_config.find_one(DB_LISTS)
         return crackwatch_cache["crackwatch_cache"], to_filter["crackwatch_exceptions"]

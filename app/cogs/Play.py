@@ -7,14 +7,18 @@ from discord import option
 from discord.ext import commands
 from discord.commands import slash_command, guild_only
 from wavelink.exceptions import LavalinkLoadException, NodeException
-from decorators import is_joined, is_playing
+
+from app.decorators import is_joined, is_playing, is_song_in_queue, is_queue_empty
+from app.utils import find_track
 
 
 class Play(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @slash_command(name="play", description="Plays song.")
+    music = discord.SlashCommandGroup("music", "All music commands")
+
+    @music.command(name="play", description="Plays song.")
     @guild_only()
     @commands.cooldown(1, 4, commands.BucketType.user)
     @option(
@@ -26,6 +30,7 @@ class Play(commands.Cog):
         "play_next",
         description="If you want to play this song next in queue, set this to true.",
         required=False,
+        type=bool,
     )
     async def play(
         self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
@@ -63,10 +68,15 @@ class Play(commands.Cog):
         if not playing:
             return
 
+        if player.just_joined:
+            player.should_respond = False
+            player.just_joined = False
+
         if player.should_respond:
             await ctx.respond(embed=self._playing_embed(track))
+            player.should_respond = False
 
-    @slash_command(name="skip", description="Skip playing song.")
+    @music.command(name="skip", description="Skip playing song.")
     @guild_only()
     @is_playing()
     async def skip_command(self, ctx: discord.ApplicationContext) -> None:
@@ -79,66 +89,34 @@ class Play(commands.Cog):
         )
         await ctx.respond(embed=embed)
 
-    @slash_command(name="skip-to", description="Skips to selected song in queue.")
+    @music.command(name="skip-to", description="Skips to selected song in queue.")
     @guild_only()
     @option(
         "to_find",
         description="Both position in the queue and name of the song are accepted.",
     )
     @is_playing()
+    @is_queue_empty()
+    @is_song_in_queue()
     async def skip_to_command(
         self, ctx: discord.ApplicationContext, to_find: str
     ) -> None:
         player: wavelink.Player = ctx.voice_client
+        track_pos = find_track(player, to_find)
 
-        if player.queue.is_empty:
-            embed = discord.Embed(
-                title="", description="**Queue is empty**", color=discord.Color.blue()
-            )
-            await ctx.respond(embed=embed)
-            return
+        track = player.queue[track_pos - 1]
+        player.queue.put_at(0, track)
+        del player.queue[track_pos]
+        await player.stop()
 
-        if not to_find.isdigit():
-            for i, track in enumerate(player.queue):
-                if to_find.lower() in track.title.lower():
-                    to_find = i + 1
-                    break
-
-                if i != len(player.queue) - 1:
-                    continue
-
-                embed = discord.Embed(
-                    title="",
-                    description=f":x: Song `{to_find}` was not found in queue,"
-                    f" to show what's in queue, type `/q`",
-                    color=discord.Color.blue(),
-                )
-                await ctx.respond(embed=embed, ephemeral=True)
-                return
-        else:
-            to_find = int(to_find)
-
-        try:
-            track = player.queue[to_find - 1]
-            player.queue.put_at(0, track)
-            del player.queue[to_find]
-            await player.stop()
-
-            embed = discord.Embed(
-                title="",
-                description=f"**Skipped to [{track.title}]({track.uri})**",
-                color=discord.Color.blue(),
-            )
-        except IndexError:
-            embed = discord.Embed(
-                title="",
-                description=f":x: Song was not found on position `{to_find}`,"
-                " to show what's in queue, type `/q`",
-                color=discord.Color.blue(),
-            )
+        embed = discord.Embed(
+            title="",
+            description=f"**Skipped to [{track.title}]({track.uri})**",
+            color=discord.Color.blue(),
+        )
         await ctx.respond(embed=embed, ephemeral=True)
 
-    @slash_command(name="pause", description="Pauses song that is currently playing.")
+    @music.command(name="pause", description="Pauses song that is currently playing.")
     @guild_only()
     @is_playing()
     async def pause_command(self, ctx: discord.ApplicationContext) -> None:
@@ -162,7 +140,7 @@ class Play(commands.Cog):
         embed.set_footer(text="Deleting in 10s.")
         await ctx.respond(embed=embed, delete_after=10)
 
-    @slash_command(name="resume", description="Resumes paused song.")
+    @music.command(name="resume", description="Resumes paused song.")
     @guild_only()
     @is_playing()
     async def resume_command(self, ctx: discord.ApplicationContext) -> None:
@@ -177,7 +155,7 @@ class Play(commands.Cog):
         embed.set_footer(text="Deleting in 10s.")
         await ctx.respond(embed=embed, delete_after=10)
 
-    @slash_command(name="leave", description="Leaves voice channel.")
+    @music.command(name="leave", description="Leaves voice channel.")
     @guild_only()
     @commands.cooldown(1, 4, commands.BucketType.user)
     @is_joined()
@@ -237,6 +215,7 @@ class Play(commands.Cog):
             else:
                 await ctx.send(embed=embed)
 
+            player.should_respond = False
             return track
 
         track = tracks[0]
@@ -291,7 +270,8 @@ class Play(commands.Cog):
         if player.playing:
             embed = discord.Embed(
                 title="",
-                description=f"{ctx.author.mention}, I'm playing in another channel, wait till song finishes.",
+                description=f"{ctx.author.mention}, I'm playing in another channel,"
+                f" wait till song finishes.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed)
@@ -344,7 +324,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=":x: Failed to connect to the voice channel,"
-                            " was bot moved manually? If yes disconnect it and try again.",
+                " was bot moved manually? If yes disconnect it and try again.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await ctx.respond(embed=embed)
@@ -380,6 +360,7 @@ class Play(commands.Cog):
         player.autoplay = wavelink.AutoPlayMode.partial
         player.text_channel = ctx.channel
         player.should_respond = False
+        player.just_joined = True
 
         embed = discord.Embed(
             title="",

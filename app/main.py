@@ -14,6 +14,7 @@ from fake_useragent import UserAgent
 from discord.ext import tasks, commands
 from motor.motor_asyncio import AsyncIOMotorClient
 from wavelink.enums import NodeStatus
+from pycord.multicog import Bot
 
 from constants import (
     DISCORD_TOKEN,
@@ -32,21 +33,21 @@ from constants import (
 )
 from utils import return_dict
 
-from classes.Esutaze import Esutaze
-from classes.OnlineFix import OnlineFix
-from classes.Game3rb import Game3rb
-from classes.AlienwareArena import AlienwareArena
-from classes.LavalinkServerFetch import LavalinkServerFetch
-from classes.ElektrinaVypadky import ElektrinaVypadky
-from classes.RedditCrackWatch import RedditCrackWatch
-from classes.RedditFreegamefindings import RedditFreeGameFindings
-from classes.Fanatical import Fanatical
-from classes.SFDServers import SFDServers
+from classes.esutaze import Esutaze
+from classes.online_fix import OnlineFix
+from classes.game3rb import Game3rb
+from classes.alienware_arena import AlienwareArena
+from classes.lavalink_server_fetch import LavalinkServerFetch
+from classes.elektrina_vypadky import ElektrinaVypadky
+from classes.reddit_crack_watch import RedditCrackWatch
+from classes.reddit_freegamefindings import RedditFreeGameFindings
+from classes.fanatical import Fanatical
+from classes.sfd_servers import SFDServers
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
 
-bot = discord.Bot()
+bot = Bot()
 
 
 class KexoBOT:
@@ -67,9 +68,11 @@ class KexoBOT:
         self.which_lavalink_server = -1
         self.main_loop_counter = 0
         self.lavalink_servers = []
-        self.database = AsyncIOMotorClient(MONGO_DB_URL)["BotConfig"][
-            "KexoBOTCollection"
-        ]
+
+        database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]
+        self.bot_config = database["BotConfig"]
+        self.user_data = database["UserData"]
+        self.guild_data = database["GuildData"]
 
         self.reddit = asyncpraw.Reddit(
             client_id=REDDIT_CLIENT_ID,
@@ -80,7 +83,9 @@ class KexoBOT:
         )
 
         # Attach bot, so we can use it in cogs
-        bot.database = self.database
+        bot.bot_config = self.bot_config
+        bot.user_data = self.user_data
+        bot.guild_data = self.guild_data
         bot.reddit = self.reddit
         bot.connect_node = self.connect_node
         bot.close_unused_nodes = self.close_unused_nodes
@@ -108,7 +113,7 @@ class KexoBOT:
         self._define_classes()
         await self._generate_graphs()
         bot.subbredit_cache = return_dict(
-            await self.database.find_one(DB_REDDIT_CACHE, {"_id": False})
+            await self.bot_config.find_one(DB_REDDIT_CACHE, {"_id": False})
         )
         bot.sfd_servers = self.sfd_servers
 
@@ -139,43 +144,43 @@ class KexoBOT:
     def _define_classes(self) -> None:
         """Define classes for the bot."""
         self.onlinefix = self._initialize_class(
-            OnlineFix, self.database, self.session, self.game_updates_channel
+            OnlineFix, self.bot_config, self.session, self.game_updates_channel
         )
         self.game3rb = self._initialize_class(
             Game3rb,
-            self.database,
+            self.bot_config,
             self.session,
             self.game_updates_channel,
             self.user_kexo,
         )
         self.alienwarearena = self._initialize_class(
-            AlienwareArena, self.database, self.session, self.free_stuff_channel
+            AlienwareArena, self.bot_config, self.session, self.free_stuff_channel
         )
         self.fanatical = self._initialize_class(
-            Fanatical, self.database, self.session, self.free_stuff_channel
+            Fanatical, self.bot_config, self.session, self.free_stuff_channel
         )
         self.reddit_freegamefindings = self._initialize_class(
             RedditFreeGameFindings,
-            self.database,
+            self.bot_config,
             self.session,
             self.reddit,
             self.free_stuff_channel,
         )
         self.sfd_servers = self._initialize_class(
-            SFDServers, self.database, self.session
+            SFDServers, self.bot_config, self.session
         )
         self.reddit_crackwatch = self._initialize_class(
             RedditCrackWatch,
-            self.database,
+            self.bot_config,
             self.reddit,
             self.game_updates_channel,
             self.user_kexo,
         )
         self.elektrina_vypadky = self._initialize_class(
-            ElektrinaVypadky, self.database, self.session, self.user_kexo
+            ElektrinaVypadky, self.bot_config, self.session, self.user_kexo
         )
         self.esutaze = self._initialize_class(
-            Esutaze, self.database, self.session, self.esutaze_channel
+            Esutaze, self.bot_config, self.session, self.esutaze_channel
         )
         self.lavalink_fetch = self._initialize_class(LavalinkServerFetch, self.session)
 
@@ -347,7 +352,7 @@ class KexoBOT:
             to_upload[2] = "\n".join(reddit_urls)
             update[guild_id] = ",".join(to_upload)
 
-        await self.database.update_many(DB_REDDIT_CACHE, {"$set": update})
+        await self.bot_config.update_many(DB_REDDIT_CACHE, {"$set": update})
         bot.subbredit_cache = return_dict(update)
 
 
@@ -364,13 +369,18 @@ def create_cog_session() -> None:
 def setup_cogs() -> None:
     """Load all cogs for the bot."""
 
+    cogs_list = [
+        "play",
+        "listeners",
+        "queue",
+        "audio",
+        "fun_stuff",
+        "commands",
+    ]
+
     create_cog_session()
-    bot.load_extension("cogs.Play")
-    bot.load_extension("cogs.Listeners")
-    bot.load_extension("cogs.Queue")
-    bot.load_extension("cogs.Audio")
-    bot.load_extension("cogs.FunStuff")
-    bot.load_extension("cogs.Commands")
+    for cog in cogs_list:
+        bot.load_extension(f"cogs.{cog}")
     print("Cogs loaded.")
 
 

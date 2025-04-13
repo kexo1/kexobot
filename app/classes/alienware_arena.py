@@ -15,16 +15,16 @@ from constants import (
 class AlienwareArena:
     def __init__(
         self,
-        database: AsyncIOMotorClient,
+        bot_config: AsyncIOMotorClient,
         session: httpx.AsyncClient,
         channel: discord.TextChannel,
     ) -> None:
-        self.database = database
+        self.bot_config = bot_config
         self.session = session
         self.channel = channel
 
     async def run(self) -> None:
-        alienwarearena_cache, to_filter = await self._load_database()
+        alienwarearena_cache, to_filter = await self._load_bot_config()
 
         try:
             json_data = await self.session.get(ALIENWAREARENA_URL)
@@ -66,13 +66,13 @@ class AlienwareArena:
             embed.set_image(url=giveaway["image"])
             await self.channel.send(embed=embed)
 
-        await self.database.update_one(
+        await self.bot_config.update_one(
             DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
         )
 
-    async def _load_database(self) -> tuple:
-        alienwarearena_cache = await self.database.find_one(DB_CACHE)
-        to_filter = await self.database.find_one(DB_LISTS)
+    async def _load_bot_config(self) -> tuple:
+        alienwarearena_cache = await self.bot_config.find_one(DB_CACHE)
+        to_filter = await self.bot_config.find_one(DB_LISTS)
         return alienwarearena_cache["alienwarearena_cache"], to_filter[
             "alienwarearena_exceptions"
         ]

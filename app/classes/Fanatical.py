@@ -9,16 +9,16 @@ from utils import iso_to_timestamp
 class Fanatical:
     def __init__(
         self,
-        database: AsyncIOMotorClient,
+        bot_config: AsyncIOMotorClient,
         session: httpx.AsyncClient,
         channel: discord.TextChannel,
     ) -> None:
-        self.database = database
+        self.bot_config = bot_config
         self.session = session
         self.channel = channel
 
     async def run(self) -> None:
-        fanatical_cache = await self._load_database()
+        fanatical_cache = await self._load_bot_config()
 
         try:
             json_data = await self.session.get(FANATICAL_URL)
@@ -57,10 +57,10 @@ class Fanatical:
             embed.set_image(url=img_url)
             await self.channel.send(embed=embed)
 
-        await self.database.update_one(
+        await self.bot_config.update_one(
             DB_CACHE, {"$set": {"fanatical_cache": fanatical_cache}}
         )
 
-    async def _load_database(self) -> list:
-        fanatical_cache = await self.database.find_one(DB_CACHE)
+    async def _load_bot_config(self) -> list:
+        fanatical_cache = await self.bot_config.find_one(DB_CACHE)
         return fanatical_cache["fanatical_cache"]

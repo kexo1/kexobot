@@ -63,9 +63,9 @@ class Server:
 
 
 class SFDServers:
-    def __init__(self, database: AsyncIOMotorClient, session: httpx.AsyncClient):
+    def __init__(self, bot_config: AsyncIOMotorClient, session: httpx.AsyncClient):
         self.session = session
-        self.database = database
+        self.bot_config = bot_config
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
         os.makedirs(self.graphs_dir, exist_ok=True)
 
@@ -80,7 +80,7 @@ class SFDServers:
         return []
 
     async def generate_graph_week(self, timezone: str):
-        players, servers = await self._load_database_week()
+        players, servers = await self._load_bot_config_week()
         selected_timezone = ZoneInfo(TIMEZONES[timezone])
         now = datetime.datetime.now(selected_timezone)
 
@@ -101,7 +101,7 @@ class SFDServers:
         plt.close("all")
 
     async def generate_graph_day(self, timezone: str):
-        players, servers = await self._load_database_day()
+        players, servers = await self._load_bot_config_day()
         selected_timezone = ZoneInfo(TIMEZONES[timezone])
         now = datetime.datetime.now(selected_timezone)
 
@@ -133,7 +133,7 @@ class SFDServers:
         plt.grid(True)
 
     async def update_stats(self) -> tuple:
-        players_day, servers_day = await self._load_database_day()
+        players_day, servers_day = await self._load_bot_config_day()
         current_players, current_servers = await self.get_players_and_servers()
         now = datetime.datetime.now()
 
@@ -142,7 +142,7 @@ class SFDServers:
         players_day.append(current_players)
         servers_day.append(current_servers)
 
-        await self.database.update_many(
+        await self.bot_config.update_many(
             DB_SFD_ACTIVITY,
             {"$set": {"players_day": players_day, "servers_day": servers_day}},
         )
@@ -150,7 +150,7 @@ class SFDServers:
         if not (now.hour % 4 == 0 and now.minute == 0):
             return
 
-        players_week, servers_week = await self._load_database_week()
+        players_week, servers_week = await self._load_bot_config_week()
 
         # Use the last 40 ticks and split them into 10 groups of 4 ticks each.
         # This means every 4 hours will have 10 ticks that were averaged from 40 ticks.
@@ -177,17 +177,17 @@ class SFDServers:
         players_week.extend(new_players_averages)
         servers_week.extend(new_servers_averages)
 
-        await self.database.update_many(
+        await self.bot_config.update_many(
             DB_SFD_ACTIVITY,
             {"$set": {"players_week": players_week, "servers_week": servers_week}},
         )
 
-    async def _load_database_day(self) -> tuple:
-        activity = await self.database.find_one(DB_SFD_ACTIVITY)
+    async def _load_bot_config_day(self) -> tuple:
+        activity = await self.bot_config.find_one(DB_SFD_ACTIVITY)
         return activity["players_day"], activity["servers_day"]
 
-    async def _load_database_week(self) -> tuple:
-        activity = await self.database.find_one(DB_SFD_ACTIVITY)
+    async def _load_bot_config_week(self) -> tuple:
+        activity = await self.bot_config.find_one(DB_SFD_ACTIVITY)
         return activity["players_week"], activity["servers_week"]
 
     async def get_players_and_servers(self) -> tuple:

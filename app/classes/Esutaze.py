@@ -12,16 +12,16 @@ from constants import ESUTAZE_URL, ESUTAZE_ICON, DB_CACHE, DB_LISTS
 class Esutaze:
     def __init__(
         self,
-        database: AsyncIOMotorClient,
+        bot_config: AsyncIOMotorClient,
         session: httpx.AsyncClient,
         channel: discord.TextChannel,
     ) -> None:
         self.session = session
-        self.database = database
+        self.bot_config = bot_config
         self.channel = channel
 
     async def run(self) -> None:
-        to_filter, esutaze_cache = await self._load_database()
+        to_filter, esutaze_cache = await self._load_bot_config()
         esutaze_cache_upload = esutaze_cache.copy()
         articles = await self._get_articles()
 
@@ -44,7 +44,7 @@ class Esutaze:
 
             await self._send_article(article)
 
-        await self.database.update_one(
+        await self.bot_config.update_one(
             DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache_upload}}
         )
 
@@ -95,7 +95,7 @@ class Esutaze:
         soup = BeautifulSoup(html_content.content, "xml")
         return soup.find_all("item")
 
-    async def _load_database(self) -> tuple:
-        to_filter = await self.database.find_one(DB_LISTS)
-        esutaze_cache = await self.database.find_one(DB_CACHE)
+    async def _load_bot_config(self) -> tuple:
+        to_filter = await self.bot_config.find_one(DB_LISTS)
+        esutaze_cache = await self.bot_config.find_one(DB_CACHE)
         return to_filter["esutaze_exceptions"], esutaze_cache["esutaze_cache"]

@@ -5,6 +5,8 @@ from datetime import datetime
 import discord
 import httpx
 import psutil
+import wavelink
+import asyncio
 
 
 def load_text_file(name: str) -> list:
@@ -71,3 +73,41 @@ async def download_video(
     except httpx.ConnectError:
         print("Failed to connect to the server.")
         return None
+
+
+async def check_node_status(uri: str, password: str) -> Optional[wavelink.Node]:
+    node = [
+        wavelink.Node(
+            uri=uri,
+            password=password,
+            retries=1,
+            resume_timeout=0,
+        )
+    ]
+    try:
+        await asyncio.wait_for(
+            wavelink.Pool.connect(nodes=node, client=self.bot), timeout=3
+        )
+        await node[0].fetch_info()
+    except (asyncio.TimeoutError, wavelink.exceptions.NodeException):
+        return None
+    return node
+
+
+def find_track(player: wavelink.Player, to_find: str) -> Optional[int]:
+    if not to_find.isdigit():
+        for i, track in enumerate(player.queue):
+            if to_find.lower() in track.title.lower():
+                to_find = i + 1
+                break
+
+            if i != len(player.queue) - 1:
+                continue
+
+            return None
+    else:
+        to_find = int(to_find)
+        if to_find > len(player.queue):
+            return None
+
+    return to_find

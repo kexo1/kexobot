@@ -1,4 +1,5 @@
 py-cord
+pycord-multicog
 asyncpraw
 asyncprawcore
 motor

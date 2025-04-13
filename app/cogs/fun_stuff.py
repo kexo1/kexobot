@@ -35,7 +35,7 @@ from utils import load_text_file, download_video
 class FunStuff(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.database = self.bot.database
+        self.database = self.bot.bot_config
         self.session: httpx.AsyncClient = self.bot.session
 
         self.topstropscreenshot = load_text_file("topstropscreenshot")
@@ -263,7 +263,7 @@ class FunStuff(commands.Cog):
         return embed
 
     async def create_guild_dataset(self, guild_id: str) -> None:
-        await self.database.update_one(
+        await self.bot_config.update_one(
             DB_REDDIT_CACHE, {"$set": {guild_id: "1,False,,0"}}
         )
         self.bot.subbredit_cache[guild_id] = {

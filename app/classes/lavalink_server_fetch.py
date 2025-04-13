@@ -42,7 +42,9 @@ class LavalinkServerFetch:
             if server.get("version") != "v4":
                 continue
 
-            node: wavelink.Node = self._return_node(server["host"], server["port"], server["password"])
+            node: wavelink.Node = self._return_node(
+                server["host"], server["port"], server["password"]
+            )
             lavalink_servers.append(node)
 
         return lavalink_servers

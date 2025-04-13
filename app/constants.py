@@ -3,7 +3,9 @@ import logging
 from bson.objectid import ObjectId
 
 
+logging.basicConfig(level=logging.CRITICAL)
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
+logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
 
 # -------------------- Discord -------------------- #
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")

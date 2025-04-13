@@ -12,9 +12,9 @@ from discord.ext import commands
 from discord.commands import slash_command, guild_only, option
 
 from constants import XTC_SERVER, KEXO_SERVER, DB_CHOICES, SFD_TIMEZONE_CHOICE
-from classes.DatabaseManager import DatabaseManager
-from classes.SFDServers import SFDServers
-from utils import get_memory_usage, iso_to_timestamp, get_file_age
+from classes.database_manager import DatabaseManager
+from classes.sfd_servers import SFDServers
+from utils import get_memory_usage, iso_to_timestamp, get_file_age, check_node_status
 from __init__ import __version__
 
 host_authors = []
@@ -25,15 +25,23 @@ class Commands(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.database = bot.database
+        self.bot_config = bot.bot_config
         self.run_time = time.time()
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
-        self.sfd_servers = SFDServers(self.database, bot.session)
-        self.database_manager = DatabaseManager(self.database)
+        self.sfd_servers = SFDServers(self.bot_config, bot.session)
+        self.database_manager = DatabaseManager(self.bot_config)
+
+    slash_bot_config = discord.SlashCommandGroup(
+        "bot_config", "Update Bot Configuration"
+    )
+    slash_node = discord.SlashCommandGroup("node", "Commands for managing nodes.")
+    slash_sfd = discord.SlashCommandGroup(
+        "sfd", "Show Superfighters Deluxe stats and servers."
+    )
 
     # -------------------- Node Managment -------------------- #
-    @slash_command(
-        name="manual_reconnect_node", description="Manually input server info"
+    @slash_node.command(
+        name="manual_reconnect", description="Manually input server info"
     )
     @guild_only()
     @option(
@@ -54,29 +62,11 @@ class Commands(commands.Cog):
         )
         message = await ctx.respond(embed=embed)
         await ctx.trigger_typing()
+        node: wavelink.Node = await check_node_status(
+            f"http://{uri}:{str(port)}", password
+        )
 
-        node = [
-            wavelink.Node(
-                uri=f"http://{uri}:{str(port)}",
-                password=password,
-                retries=1,
-                resume_timeout=0,
-            )
-        ]
-        try:
-            await asyncio.wait_for(
-                wavelink.Pool.connect(nodes=node, client=self.bot), timeout=3
-            )
-            await node[0].fetch_info()
-        except asyncio.TimeoutError:
-            embed = discord.Embed(
-                title="",
-                description=f":x: Timed out when trying to connect to `{uri}`",
-                color=discord.Color.from_rgb(r=255, g=0, b=0),
-            )
-            await message.edit(embed=embed)
-            return
-        except wavelink.exceptions.NodeException:
+        if not node:
             embed = discord.Embed(
                 title="",
                 description=f":x: Failed to connect to `{uri}`",
@@ -88,13 +78,13 @@ class Commands(commands.Cog):
         self.bot.node = node
         embed = discord.Embed(
             title="",
-            description=f"**✅ Connected to node `{uri}`**",
+            description=f"**✅ Connected to node `{node.uri}`**",
             color=discord.Color.blue(),
         )
         await message.edit(embed=embed)
 
-    @slash_command(
-        name="reconnect_node", description="Automatically reconnect to avaiable node"
+    @slash_node.command(
+        name="reconnect", description="Automatically reconnect to avaiable node"
     )
     @guild_only()
     @commands.cooldown(1, 3, commands.BucketType.user)
@@ -116,18 +106,17 @@ class Commands(commands.Cog):
                 description=f"**✅ Connected your player to node `{self.bot.node.uri}`**",
                 color=discord.Color.blue(),
             )
-            await message.edit(embed=embed)
         else:
             embed = discord.Embed(
                 title="",
                 description=f"**✅ Connected to node `{self.bot.node.uri}`**",
                 color=discord.Color.blue(),
             )
-            await message.edit(embed=embed)
 
+        await message.edit(embed=embed)
         await self.bot.close_unused_nodes()
 
-    @slash_command(name="node_info", description="Information about connected node.")
+    @slash_node.command(name="info", description="Information about connected node.")
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
         node: wavelink.Node = self.bot.node
         node_info: wavelink.InfoResponsePayload = await node.fetch_info()
@@ -151,8 +140,8 @@ class Commands(commands.Cog):
         await ctx.respond(embed=embed)
 
     # -------------------- SFD Servers -------------------- #
-    @slash_command(
-        name="sfd_servers", description="Fetches Superfighters Deluxe servers."
+    @slash_sfd.command(
+        name="servers", description="Fetches Superfighters Deluxe servers."
     )
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def get_sfd_servers(self, ctx: discord.ApplicationContext) -> None:
@@ -181,7 +170,7 @@ class Commands(commands.Cog):
         embed.add_field(name="Players", value="\n".join(servers_dict["players"]))
         await ctx.respond(embed=embed)
 
-    @slash_command(name="sfd_server_info", description="Find searched server.")
+    @slash_sfd.command(name="server_info", description="Find searched server.")
     @option("server", description="Server name.")
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def get_sfd_server_info(
@@ -218,8 +207,8 @@ class Commands(commands.Cog):
         embed.add_field(name="Game Modeㅤㅤ", value=await server.get_game_mode())
         await ctx.respond(embed=embed)
 
-    @slash_command(
-        name="sfd_activity",
+    @slash_sfd.command(
+        name="activity",
         description="Shows graph of SFD servers activity.",
     )
     @option(
@@ -243,30 +232,23 @@ class Commands(commands.Cog):
     ) -> None:
         await ctx.trigger_typing()
         embed = discord.Embed(
-            title="",
             description="**🔄 Fetching SFD servers activity.**",
             color=discord.Color.blue(),
         )
         message = await ctx.respond(embed=embed)
 
         if graph_range == "Day":
-            image_location = os.path.join(
-                self.graphs_dir, f"sfd_activity_day_{timezone}.png"
-            )
-            if not os.path.exists(image_location):
-                await self.sfd_servers.generate_graph_day(timezone)
-            elif get_file_age(image_location) >= 3600:
-                await self.sfd_servers.generate_graph_day(timezone)
+            filename = f"sfd_activity_day_{timezone}.png"
+            generator = self.sfd_servers.generate_graph_day
         else:
-            image_location = os.path.join(
-                self.graphs_dir, f"sfd_activity_week_{timezone}.png"
-            )
-            if not os.path.exists(image_location):
-                await self.sfd_servers.generate_graph_week(timezone)
-            elif get_file_age(image_location) >= 3600:
-                await self.sfd_servers.generate_graph_week(timezone)
+            filename = f"sfd_activity_week_{timezone}.png"
+            generator = self.sfd_servers.generate_graph_week
 
-        filename = os.path.basename(image_location)
+        image_location = os.path.join(self.graphs_dir, filename)
+
+        if not os.path.exists(image_location) or get_file_age(image_location) >= 3600:
+            await generator(timezone)
+
         file = discord.File(image_location, filename=filename)
         await message.edit(files=[file], embed=None)
 
@@ -449,17 +431,17 @@ class Commands(commands.Cog):
         words = words.split()
         await ctx.respond("I chose " + "`" + str(random.choice(words)) + "`")
 
-    @slash_command(name="clear", description="Clears messages, max 50 (Admin)")
+    @slash_command(name="clear-messages", description="Clears messages, max 50 (Admin)")
     @discord.default_permissions(administrator=True)
     @option("integer", description="Max is 50.", min_value=1, max_value=50)
     async def clear(self, ctx: discord.ApplicationContext, integer: int) -> None:
         await ctx.respond(
-            f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=True
+            f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=Truenod
         )
         await ctx.channel.purge(limit=integer)
 
     # -------------------- Database Managment -------------------- #
-    @slash_command(
+    @slash_bot_config.command(
         name="add_to",
         description="Adds string to selected list.",
         guild_ids=[KEXO_SERVER],
@@ -482,7 +464,7 @@ class Commands(commands.Cog):
             f"String `{to_upload}` was added to `{collection}` :white_check_mark:"
         )
 
-    @slash_command(
+    @slash_bot_config.command(
         name="remove_from",
         description="Removes string from selected list.",
         guild_ids=[KEXO_SERVER],
@@ -506,7 +488,7 @@ class Commands(commands.Cog):
             f"String `{to_remove}` was removed from `{collection}` :white_check_mark:"
         )
 
-    @slash_command(
+    @slash_bot_config.command(
         name="show_data",
         description="Shows data from selected lists.",
         guild_ids=[KEXO_SERVER],

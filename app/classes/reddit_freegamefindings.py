@@ -25,18 +25,18 @@ from constants import (
 class RedditFreeGameFindings:
     def __init__(
         self,
-        database: AsyncIOMotorClient,
+        bot_config: AsyncIOMotorClient,
         session: httpx.AsyncClient,
         reddit: asyncpraw.Reddit,
         channel: discord.TextChannel,
     ) -> None:
-        self.database = database
+        self.bot_config = bot_config
         self.reddit = reddit
         self.session = session
         self.channel = channel
 
     async def run(self) -> None:
-        freegamefindings_cache, to_filter = await self._load_database()
+        freegamefindings_cache, to_filter = await self._load_bot_config()
         freegamefindings_cache_upload = freegamefindings_cache.copy()
         subreddit: asyncpraw.models.Subreddit = await self.reddit.subreddit(
             "FreeGameFindings"
@@ -76,7 +76,7 @@ class RedditFreeGameFindings:
             print(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
 
         if freegamefindings_cache_upload != freegamefindings_cache:
-            await self.database.update_one(
+            await self.bot_config.update_one(
                 DB_CACHE,
                 {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}},
             )
@@ -97,7 +97,7 @@ class RedditFreeGameFindings:
 
     async def _alienwarearena(self, url) -> None:
         # There might be an occurence where giveaway is not showing in alienwarearena.com
-        alienwarearena_cache = await self.database.find_one(DB_CACHE)
+        alienwarearena_cache = await self.bot_config.find_one(DB_CACHE)
         reddit_path = url[29:]
         for cached_url in alienwarearena_cache["alienwarearena_cache"]:
             if reddit_path in cached_url:
@@ -121,9 +121,9 @@ class RedditFreeGameFindings:
         )
         await self.channel.send(embed=embed)
 
-    async def _load_database(self) -> tuple:
-        freegamefindings_cache = await self.database.find_one(DB_CACHE)
-        to_filter = await self.database.find_one(DB_LISTS)
+    async def _load_bot_config(self) -> tuple:
+        freegamefindings_cache = await self.bot_config.find_one(DB_CACHE)
+        to_filter = await self.bot_config.find_one(DB_LISTS)
         return (
             freegamefindings_cache["freegamefindings_cache"],
             to_filter["freegamefindings_exceptions"],

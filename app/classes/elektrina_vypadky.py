@@ -10,16 +10,16 @@ from utils import iso_to_timestamp
 class ElektrinaVypadky:
     def __init__(
         self,
-        database: AsyncIOMotorClient,
+        bot_config: AsyncIOMotorClient,
         session: httpx.AsyncClient,
         user_kexo: discord.User,
     ) -> None:
         self.session = session
-        self.database = database
+        self.bot_config = bot_config
         self.user_kexo = user_kexo
 
     async def run(self) -> None:
-        elektrinavypadky_cache = await self._load_database()
+        elektrinavypadky_cache = await self._load_bot_config()
         try:
             html_content = await self.session.get(ELEKTRINA_URL)
         except (httpx.ReadTimeout, httpx.ConnectTimeout):
@@ -87,11 +87,11 @@ class ElektrinaVypadky:
 
             if above_limit:
                 await self.user_kexo.send(description)
-        await self.database.update_one(
+        await self.bot_config.update_one(
             DB_CACHE,
             {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache_upload}},
         )
 
-    async def _load_database(self) -> list:
-        elektrinavypadky_cache = await self.database.find_one(DB_CACHE)
+    async def _load_bot_config(self) -> list:
+        elektrinavypadky_cache = await self.bot_config.find_one(DB_CACHE)
         return elektrinavypadky_cache["elektrinavypadky_cache"]

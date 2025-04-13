@@ -52,7 +52,7 @@ class Listeners(commands.Cog):
         embed = discord.Embed(
             title="",
             description=":warning: Song got stuck, trying to connect to a new node.",
-            color=discord.Color.yellow,
+            color=discord.Colour.yellow(),
         )
         await self._manage_node(embed, payload)
 
@@ -92,11 +92,7 @@ class Listeners(commands.Cog):
             return
 
         # If member that was removed is the bot itself
-        if (
-            member == member.guild.me
-            and before.channel is not None
-            and after.channel is None
-        ):
+        if member == member.guild.me and before.channel and after.channel is None:
             player.cleanup()
 
     async def _manage_node(

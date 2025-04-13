@@ -13,21 +13,21 @@ from constants import GAME3RB_STRIP, GAME3RB_URL, GAME3RB_ICON, DB_CACHE, DB_LIS
 class Game3rb:
     def __init__(
         self,
-        database: AsyncIOMotorClient,
+        bot_config: AsyncIOMotorClient,
         session: httpx.AsyncClient,
         channel: discord.TextChannel,
         user_kexo: discord.User,
     ) -> None:
         self.session = session
-        self.database = database
+        self.bot_config = bot_config
         self.channel = channel
         self.user_kexo = user_kexo
 
     async def run(self) -> None:
-        game3rb_cache = await self.database.find_one(DB_CACHE)
+        game3rb_cache = await self.bot_config.find_one(DB_CACHE)
         game3rb_cache = game3rb_cache["game3rb_cache"]
 
-        game_list = await self.database.find_one(DB_LISTS)
+        game_list = await self.bot_config.find_one(DB_LISTS)
         game_list = "\n".join(game_list["games"])
         try:
             source = await self.session.get(GAME3RB_URL)
@@ -80,7 +80,7 @@ class Game3rb:
                         game_title.pop(game_title.index(to_remove))
                     except ValueError:
                         if full_title not in game3rb_cache not in to_upload:
-                            await self.database.update_one(
+                            await self.bot_config.update_one(
                                 DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
                             )
                             await self.user_kexo.send(
@@ -173,6 +173,6 @@ class Game3rb:
             await self.channel.send(embed=embed)
 
         if to_upload:
-            await self.database.update_one(
+            await self.bot_config.update_one(
                 DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
             )

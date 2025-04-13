@@ -3,6 +3,8 @@ from functools import wraps
 import discord
 import wavelink
 
+from utils import find_track
+
 
 def is_joined():
     def decorator(func):
@@ -60,6 +62,52 @@ def is_playing():
                     color=discord.Color.blue(),
                 )
                 await ctx.respond(embed=embed)
+
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def is_queue_empty():
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            ctx = args[1]
+            vc = ctx.voice_client
+            if not vc or not vc.queue:
+                embed = discord.Embed(
+                    title="",
+                    description=ctx.author.mention + ", queue is empty.",
+                    color=discord.Color.blue(),
+                )
+                await ctx.respond(embed=embed, ephemeral=True)
+                return
+
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def is_song_in_queue():
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            ctx = args[1]
+            to_find = kwargs["to_find"]
+            player = ctx.voice_client
+
+            if not find_track(player, to_find):
+                embed = discord.Embed(
+                    title="",
+                    description=ctx.author.mention + ", track not found in queue.",
+                    color=discord.Color.blue(),
+                )
+                await ctx.respond(embed=embed, ephemeral=True)
+                return
 
             return await func(*args, **kwargs)
 

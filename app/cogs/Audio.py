@@ -6,6 +6,7 @@ import wavelink
 from discord.ext import commands
 from discord import option
 from discord.commands import slash_command, guild_only
+from pycord.multicog import subcommand
 from decorators import is_joined
 
 
@@ -13,6 +14,7 @@ class Audio(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    @subcommand("music")
     @slash_command(name="volume", description="Sets audio volume.")
     @guild_only()
     @option(
@@ -46,6 +48,7 @@ class Audio(commands.Cog):
         )
         await ctx.respond(embed=embed)
 
+    @subcommand("music")
     @slash_command(name="speed", description="Speeds up music.")
     @guild_only()
     @option(
@@ -73,6 +76,7 @@ class Audio(commands.Cog):
         )
         await ctx.respond(embed=embed)
 
+    @subcommand("music")
     @slash_command(name="clear-effects", description="Clears all effects on player.")
     @guild_only()
     @is_joined()
