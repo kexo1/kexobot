@@ -231,12 +231,12 @@ class Commands(commands.Cog):
         graph_range: str,
         timezone: str = "New_York",
     ) -> None:
-        await ctx.trigger_typing()
         embed = discord.Embed(
             description="**🔄 Fetching SFD servers activity.**",
             color=discord.Color.blue(),
         )
         message = await ctx.respond(embed=embed)
+        await ctx.trigger_typing()
 
         if graph_range == "Day":
             filename = f"sfd_activity_day_{timezone}.png"

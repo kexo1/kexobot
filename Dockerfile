@@ -5,15 +5,8 @@ RUN apk add --no-cache \
     build-base \
     python3-dev \
     musl-dev \
-    linux-headers \
-    freetype-dev \
-    libpng-dev \
-    gcc \
-    g++ \
-    make \
-    fontconfig \
-    ttf-dejavu
-
+    linux-headers
+    
 WORKDIR /kexobot
 
 COPY requirements.txt . 

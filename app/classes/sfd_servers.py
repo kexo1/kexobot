@@ -83,21 +83,21 @@ class SFDServers:
         players, servers = await self._load_bot_config_week()
         selected_timezone = ZoneInfo(TIMEZONES[timezone])
         now = datetime.datetime.now(selected_timezone)
-
         start_time = now - timedelta(hours=168)
+
         self.generate_lines_and_effects(list(range(280)), players, servers)
 
-        num_ticks = 28
-        tick_positions = np.linspace(0, 280 - 1, num_ticks, dtype=int)
-        tick_labels = [
-            (start_time + timedelta(hours=(pos / (280 - 1)) * 168)).strftime("%a %#I%p")
-            for pos in tick_positions
-        ]
-        
-        plt.switch_backend('Agg')
-        
-        plt.xticks(tick_positions, tick_labels, rotation=45)
-        plt.subplots_adjust(bottom=0.1)
+        time_labels = []
+        for i in range(28):
+            time = start_time + timedelta(hours=i*6)
+            day_str = time.strftime("%a")
+            hour = int(time.strftime("%I"))
+            ampm = time.strftime("%p")
+            time_labels.append(f"{day_str} {hour}{ampm}")
+
+        time_positions = [i * 10 + 5 for i in range(28)]
+        plt.xticks(time_positions, time_labels, rotation=45)
+        plt.subplots_adjust(bottom=0.2)
         plt.savefig(
             os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"), 
             dpi=300,
@@ -127,6 +127,7 @@ class SFDServers:
 
     @staticmethod
     def generate_lines_and_effects(x_positions, players, servers):
+        plt.switch_backend('Agg')
         plt.figure(figsize=(14, 7))
         plt.plot(x_positions, players, color="cyan", label="Players")
         plt.plot(x_positions, servers, color="magenta", label="Servers")
