@@ -82,15 +82,15 @@ REDDIT_FREEGAME_EMBEDS = {
     "Gleam": {
         "title": "Gleam",
         "description": "**Gleam** - keys from this site __disappear really fast__"
-                       " so you should get it fast!",
+        " so you should get it fast!",
         "icon": "https://static-00.iconduck.com/assets.00/gleam-icon-512x512-vxvvbmg8.png",
     },
     "AlienwareArena": {
         "title": "AlienwareArena",
         "description": "**AlienwareArena** - "
-                       "keys from this site __disappear really fast__ so you should get it fast!",
+        "keys from this site __disappear really fast__ so you should get it fast!",
         "icon": "https://play-lh.googleusercontent.com"
-                "/X3K4HfYdxmascX5mRFikhuv8w8BYvg1Ny_R4ndNhF1C7GgjPeIKfROvbcOcjhafFmLdl",
+        "/X3K4HfYdxmascX5mRFikhuv8w8BYvg1Ny_R4ndNhF1C7GgjPeIKfROvbcOcjhafFmLdl",
     },
 }
 REDDIT_FREEGAME_MAX_POSTS = 5

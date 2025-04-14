@@ -245,7 +245,9 @@ class KexoBOT:
         self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
-    async def connect_node(self, guild_id: int = KEXO_SERVER) -> Optional[wavelink.Node]:
+    async def connect_node(
+        self, guild_id: int = KEXO_SERVER
+    ) -> Optional[wavelink.Node]:
         """Connect to lavalink node."""
         if not self.lavalink_servers:
             print("No lavalink servers found.")
@@ -265,8 +267,8 @@ class KexoBOT:
                 print(f"Node {node.uri} is not responding, trying next...")
                 continue
             except (
-                    wavelink.exceptions.LavalinkException,
-                    wavelink.exceptions.NodeException,
+                wavelink.exceptions.LavalinkException,
+                wavelink.exceptions.NodeException,
             ):
                 print(f"Failed to connect to {node.uri}, trying next...")
                 continue
@@ -447,7 +449,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required permissions to use this command."
-                        f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
@@ -457,7 +459,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 I don't have the required permissions to use this command."
-                        f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.send(embed=embed)
@@ -467,7 +469,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required role to use this command."
-                        f"\nRequired role: `{error.missing_role}`",
+            f"\nRequired role: `{error.missing_role}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
@@ -477,7 +479,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required role to use this command."
-                        f"\nRequired role: `{', '.join(error.missing_roles)}`",
+            f"\nRequired role: `{', '.join(error.missing_roles)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)

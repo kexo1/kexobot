@@ -89,7 +89,7 @@ class SFDServers:
 
         time_labels = []
         for i in range(28):
-            time = start_time + timedelta(hours=i*6)
+            time = start_time + timedelta(hours=i * 6)
             day_str = time.strftime("%a")
             hour = int(time.strftime("%I"))
             ampm = time.strftime("%p")
@@ -99,9 +99,9 @@ class SFDServers:
         plt.xticks(time_positions, time_labels, rotation=45)
         plt.subplots_adjust(bottom=0.2)
         plt.savefig(
-            os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"), 
+            os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"),
             dpi=300,
-            bbox_inches='tight'
+            bbox_inches="tight",
         )
         plt.close("all")
 
@@ -127,7 +127,7 @@ class SFDServers:
 
     @staticmethod
     def generate_lines_and_effects(x_positions, players, servers):
-        plt.switch_backend('Agg')
+        plt.switch_backend("Agg")
         plt.figure(figsize=(14, 7))
         plt.plot(x_positions, players, color="cyan", label="Players")
         plt.plot(x_positions, servers, color="magenta", label="Servers")

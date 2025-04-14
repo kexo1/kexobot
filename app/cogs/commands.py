@@ -90,16 +90,10 @@ class Commands(commands.Cog):
     @guild_only()
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def recconect_node(self, ctx: discord.ApplicationContext) -> None:
-        await ctx.trigger_typing()
-        embed = discord.Embed(
-            title="",
-            description="**:globe_with_meridians:  Searching for Lavalink server.**",
-            color=discord.Color.blue(),
-        )
-        message = await ctx.respond(embed=embed)
+        await ctx.defer()
         node: wavelink.Node = await self.bot.connect_node()
-
         player: wavelink.Player = ctx.voice_client
+
         if player:
             await player.switch_node(node)
             embed = discord.Embed(
@@ -114,7 +108,7 @@ class Commands(commands.Cog):
                 color=discord.Color.blue(),
             )
 
-        await message.edit(embed=embed)
+        await ctx.respond(embed=embed)
         await self.bot.close_unused_nodes()
 
     @slash_node.command(name="info", description="Information about connected node.")
@@ -231,12 +225,7 @@ class Commands(commands.Cog):
         graph_range: str,
         timezone: str = "New_York",
     ) -> None:
-        embed = discord.Embed(
-            description="**🔄 Fetching SFD servers activity.**",
-            color=discord.Color.blue(),
-        )
-        message = await ctx.respond(embed=embed)
-        await ctx.trigger_typing()
+        await ctx.defer()
 
         if graph_range == "Day":
             filename = f"sfd_activity_day_{timezone}.png"
@@ -251,7 +240,7 @@ class Commands(commands.Cog):
             await generator(timezone)
 
         file = discord.File(image_location, filename=filename)
-        await message.edit(files=[file], embed=None)
+        await ctx.respond(files=[file], embed=None)
 
     # -------------------- SFD Hosting -------------------- #
     @slash_command(

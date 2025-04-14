@@ -52,7 +52,7 @@ def get_memory_usage():
 
 
 async def download_video(
-        session: httpx.AsyncClient, url: str, nsfw: bool
+    session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> Optional[discord.File]:
     video_folder = os.path.join(os.getcwd(), "video")
     os.makedirs(video_folder, exist_ok=True)
@@ -114,6 +114,4 @@ def find_track(player: wavelink.Player, to_find: str) -> Optional[int]:
 
 
 def generate_temp_guild_data() -> dict:
-    return {
-        "lavalink_server_pos": 0
-    }
+    return {"lavalink_server_pos": 0}
