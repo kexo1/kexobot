@@ -30,7 +30,7 @@ class Listeners(commands.Cog):
     async def on_wavelink_node_disconnected(
         self, payload: NodeDisconnectedEventPayload
     ) -> None:
-        if self.bot.get_online_nodes() < 1:
+        if self.bot.get_online_nodes() > 1:
             print(f"Node {payload.node.uri} is disconnected, fetching new node...")
             await self.bot.connect_node()
 

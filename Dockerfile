@@ -5,7 +5,14 @@ RUN apk add --no-cache \
     build-base \
     python3-dev \
     musl-dev \
-    linux-headers
+    linux-headers \
+    freetype-dev \
+    libpng-dev \
+    gcc \
+    g++ \
+    make \
+    fontconfig \
+    ttf-dejavu
 
 WORKDIR /kexobot
 
@@ -16,6 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY . .
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/kexobot
 
 CMD ["python", "app/main.py"]

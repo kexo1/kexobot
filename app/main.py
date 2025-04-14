@@ -30,8 +30,9 @@ from constants import (
     ESUTAZE_CHANNEL,
     GAME_UPDATES_CHANNEL,
     FREE_STUFF_CHANNEL,
+    KEXO_SERVER,
 )
-from utils import return_dict
+from utils import return_dict, generate_temp_guild_data
 
 from classes.esutaze import Esutaze
 from classes.online_fix import OnlineFix
@@ -65,9 +66,9 @@ class KexoBOT:
         self.user_kexo = None | discord.User
         self.session = None | httpx.AsyncClient
         self.subreddit_cache = None | dict
-        self.which_lavalink_server = -1
         self.main_loop_counter = 0
         self.lavalink_servers = []
+        self.guild_temp_data = {}
 
         database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]
         self.bot_config = database["BotConfig"]
@@ -90,6 +91,7 @@ class KexoBOT:
         bot.connect_node = self.connect_node
         bot.close_unused_nodes = self.close_unused_nodes
         bot.get_online_nodes = self.get_online_nodes
+        bot.guild_temp_data = self.guild_temp_data
 
         self.onlinefix = None | OnlineFix
         self.game3rb = None | Game3rb
@@ -243,14 +245,14 @@ class KexoBOT:
         self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
-    async def connect_node(self) -> Optional[wavelink.Node]:
+    async def connect_node(self, guild_id: int = KEXO_SERVER) -> Optional[wavelink.Node]:
         """Connect to lavalink node."""
         if not self.lavalink_servers:
             print("No lavalink servers found.")
             return None
 
         for _ in range(len(self.lavalink_servers)):
-            node: wavelink.Node = self.get_node()
+            node: wavelink.Node = self.get_node(guild_id)
             if not node:
                 return None
 
@@ -258,12 +260,13 @@ class KexoBOT:
                 await asyncio.wait_for(
                     wavelink.Pool.connect(nodes=[node], client=bot), timeout=3
                 )
+                await node.fetch_info()  # Some fucking nodes secretly don't respond, I've played these games before!!!
             except asyncio.TimeoutError:
                 print(f"Node {node.uri} is not responding, trying next...")
                 continue
             except (
-                wavelink.exceptions.LavalinkException,
-                wavelink.exceptions.NodeException,
+                    wavelink.exceptions.LavalinkException,
+                    wavelink.exceptions.NodeException,
             ):
                 print(f"Failed to connect to {node.uri}, trying next...")
                 continue
@@ -271,17 +274,19 @@ class KexoBOT:
             bot.node = node
             return node
 
-    def get_node(self) -> wavelink.Node:
-        """Get the next lavalink node."""
-        if not self.lavalink_servers:
-            print("No lavalink servers found.")
-            return None
+    def get_node(self, guild_id: int) -> wavelink.Node:
+        """Get the next lavalink node, cycling is guild based."""
+        lavalink_server_pos = self.guild_temp_data.get(guild_id)
+        if not lavalink_server_pos:
+            self.guild_temp_data[guild_id] = generate_temp_guild_data()
+        lavalink_server_pos = self.guild_temp_data[guild_id]["lavalink_server_pos"]
 
-        self.which_lavalink_server += 1
-        if self.which_lavalink_server >= len(self.lavalink_servers):
-            self.which_lavalink_server = 0
+        lavalink_server_pos += 1
+        if lavalink_server_pos >= len(self.lavalink_servers):
+            lavalink_server_pos = 0
 
-        node: wavelink.Node = self.lavalink_servers[self.which_lavalink_server]
+        self.guild_temp_data[guild_id]["lavalink_server_pos"] = lavalink_server_pos
+        node: wavelink.Node = self.lavalink_servers[lavalink_server_pos]
         return node
 
     @staticmethod
@@ -289,14 +294,16 @@ class KexoBOT:
         """Clear unused lavalink nodes."""
         nodes: list[wavelink.Node] = wavelink.Pool.nodes.values()
         for node in nodes:
+            print(node.uri)
+            print(len(wavelink.Pool.nodes))
             if len(wavelink.Pool.nodes) == 1:
                 break
 
             if len(node.players) == 0:
                 print(f"Node {node.uri} is empty, removing...")
                 # noinspection PyProtectedMember
-                await node._pool_closer()  # Node is not properly closed
-                await node.close()
+                # await node._pool_closer()  # Node is not properly closed
+                await node.close(eject=True)
 
     @staticmethod
     def get_online_nodes() -> int:
@@ -333,7 +340,6 @@ class KexoBOT:
 
     async def update_reddit_cache(self, now: datetime) -> None:
         """Update the reddit cache in the database."""
-
         update = {}
         for guild_id, cache in bot.subbredit_cache.items():
             # If midnight, set search_level to 0
@@ -361,14 +367,12 @@ kexobot = KexoBOT()
 
 def create_cog_session() -> None:
     """Create a httpx session for the cogs."""
-
     bot.session = httpx.AsyncClient()
     bot.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
 
 
 def setup_cogs() -> None:
     """Load all cogs for the bot."""
-
     cogs_list = [
         "play",
         "listeners",
@@ -432,7 +436,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
     if isinstance(error, commands.CommandOnCooldown):
         embed = discord.Embed(
             title="",
-            description=f"🚫 You're sending too much!, try again in `{error.retry_after}`.",
+            description=f"🚫 You're sending too much!, try again in `{round(error.retry_after, 1)}s`.",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
@@ -443,7 +447,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required permissions to use this command."
-            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+                        f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
@@ -453,7 +457,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 I don't have the required permissions to use this command."
-            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+                        f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.send(embed=embed)
@@ -463,7 +467,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required role to use this command."
-            f"\nRequired role: `{error.missing_role}`",
+                        f"\nRequired role: `{error.missing_role}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
@@ -473,7 +477,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required role to use this command."
-            f"\nRequired role: `{', '.join(error.missing_roles)}`",
+                        f"\nRequired role: `{', '.join(error.missing_roles)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)

@@ -11,14 +11,14 @@ import numpy as np
 
 from bs4 import BeautifulSoup
 from motor.motor_asyncio import AsyncIOMotorClient
-from constants import (
+from app.constants import (
     SFD_SERVER_URL,
     SFD_REQUEST,
     SFD_HEADERS,
     DB_SFD_ACTIVITY,
     TIMEZONES,
 )
-from utils import average
+from app.utils import average
 
 
 plt.style.use("cyberpunk")
@@ -93,10 +93,15 @@ class SFDServers:
             (start_time + timedelta(hours=(pos / (280 - 1)) * 168)).strftime("%a %#I%p")
             for pos in tick_positions
         ]
+        
+        plt.switch_backend('Agg')
+        
         plt.xticks(tick_positions, tick_labels, rotation=45)
         plt.subplots_adjust(bottom=0.1)
         plt.savefig(
-            os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"), dpi=300
+            os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"), 
+            dpi=300,
+            bbox_inches='tight'
         )
         plt.close("all")
 

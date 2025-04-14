@@ -4,12 +4,12 @@ import time
 import sys
 import os
 
-import asyncio
 import discord
 import wavelink
 
 from discord.ext import commands
 from discord.commands import slash_command, guild_only, option
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from constants import XTC_SERVER, KEXO_SERVER, DB_CHOICES, SFD_TIMEZONE_CHOICE
 from classes.database_manager import DatabaseManager
@@ -25,10 +25,11 @@ class Commands(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.bot_config = bot.bot_config
+        self.bot_config: AsyncIOMotorClient = self.bot.bot_config
+        self.guild_temp_data: dict = self.bot.guild_temp_data
         self.run_time = time.time()
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
-        self.sfd_servers = SFDServers(self.bot_config, bot.session)
+        self.sfd_servers = SFDServers(self.bot_config, self.bot.session)
         self.database_manager = DatabaseManager(self.bot_config)
 
     slash_bot_config = discord.SlashCommandGroup(
@@ -52,7 +53,7 @@ class Commands(commands.Cog):
     @option("port", description="Lavalink server port.", required=True)
     @option("password", description="Lavalink server password.", required=True)
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def manual_recconect_node(
+    async def manual_connect(
         self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
     ) -> None:
         embed = discord.Embed(
@@ -92,7 +93,7 @@ class Commands(commands.Cog):
         await ctx.trigger_typing()
         embed = discord.Embed(
             title="",
-            description="**🔄 Getting Lavalink server.**",
+            description="**:globe_with_meridians:  Searching for Lavalink server.**",
             color=discord.Color.blue(),
         )
         message = await ctx.respond(embed=embed)
@@ -436,7 +437,7 @@ class Commands(commands.Cog):
     @option("integer", description="Max is 50.", min_value=1, max_value=50)
     async def clear(self, ctx: discord.ApplicationContext, integer: int) -> None:
         await ctx.respond(
-            f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=Truenod
+            f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=True
         )
         await ctx.channel.purge(limit=integer)
 
