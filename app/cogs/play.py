@@ -5,7 +5,7 @@ import wavelink
 
 from discord import option
 from discord.ext import commands
-from discord.commands import slash_command, guild_only
+from discord.commands import guild_only
 from wavelink.exceptions import LavalinkLoadException, NodeException
 
 from app.decorators import is_joined, is_playing, is_song_in_queue, is_queue_empty

@@ -11,11 +11,11 @@ from discord.ext import commands
 from discord.commands import slash_command, guild_only, option
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from constants import XTC_SERVER, KEXO_SERVER, DB_CHOICES, SFD_TIMEZONE_CHOICE
-from classes.database_manager import DatabaseManager
-from classes.sfd_servers import SFDServers
-from utils import get_memory_usage, iso_to_timestamp, get_file_age, check_node_status
-from __init__ import __version__
+from app.constants import XTC_SERVER, KEXO_SERVER, DB_CHOICES, SFD_TIMEZONE_CHOICE
+from app.classes.database_manager import DatabaseManager
+from app.classes.sfd_servers import SFDServers
+from app.utils import get_memory_usage, iso_to_timestamp, get_file_age, check_node_status
+from app.__init__ import __version__
 
 host_authors = []
 
@@ -35,14 +35,15 @@ class Commands(commands.Cog):
     slash_bot_config = discord.SlashCommandGroup(
         "bot_config", "Update Bot Configuration"
     )
-    slash_node = discord.SlashCommandGroup("node", "Commands for managing nodes.")
+    slash_node = discord.SlashCommandGroup("node", "Commands for managing nodes")
+    slash_reddit = discord.SlashCommandGroup("reddit", "Commands for reddit posts")
     slash_sfd = discord.SlashCommandGroup(
-        "sfd", "Show Superfighters Deluxe stats and servers."
+        "sfd", "Show Superfighters Deluxe stats and servers"
     )
 
     # -------------------- Node Managment -------------------- #
     @slash_node.command(
-        name="manual_reconnect", description="Manually input server info"
+        name="manual_connect", description="Manually input Lavalink adress"
     )
     @guild_only()
     @option(

@@ -17,7 +17,7 @@ class LavalinkServerFetch:
             for url in LAVAINFO_API_URLS:
                 json_data = await self.session.get(url, timeout=10)
                 lavalink_servers += await self._lavainfo_fetch(json_data.json())
-        except (httpx.TimeoutException, httpx.ReadTimeout):
+        except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
             print(f"The request to {LAVAINFO_API_URLS[0]} timed out.")
         except json.decoder.JSONDecodeError:
             print(f"Failed to decode JSON from {LAVAINFO_API_URLS[0]}")
@@ -25,7 +25,7 @@ class LavalinkServerFetch:
         try:
             json_data = await self.session.get(LAVALIST_URL, timeout=10)
             lavalink_servers += await self._lavalist_fetch(json_data.json())
-        except (httpx.TimeoutException, httpx.ReadTimeout):
+        except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
             print(f"The request to {LAVALIST_URL} timed out.")
         except json.decoder.JSONDecodeError:
             print(f"Failed to decode JSON from {LAVALIST_URL}")

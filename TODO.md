@@ -4,7 +4,6 @@
 
 ## Features
 - [ ] Save players volume
-- [ ] Make node cycling guild specific
 
 ## Improvements
 - [ ] Make Game3rb more readable

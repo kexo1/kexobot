@@ -4,8 +4,10 @@ import asyncio
 from datetime import datetime
 from typing import Optional
 
+import asyncprawcore.exceptions
 import discord
 import asyncpraw
+import asyncpraw.models
 import httpx
 import dns.resolver
 import wavelink
@@ -24,15 +26,16 @@ from constants import (
     REDDIT_USER_AGENT,
     REDDIT_USERNAME,
     REDDIT_CLIENT_ID,
+    SHITPOST_SUBREDDITS_ALL,
     HUMOR_SECRET,
     CLEAR_CACHE_HOUR,
-    DB_REDDIT_CACHE,
+    DB_CACHE,
     ESUTAZE_CHANNEL,
     GAME_UPDATES_CHANNEL,
     FREE_STUFF_CHANNEL,
     KEXO_SERVER,
 )
-from utils import return_dict, generate_temp_guild_data
+from utils import generate_temp_guild_data
 
 from classes.esutaze import Esutaze
 from classes.online_fix import OnlineFix
@@ -40,8 +43,7 @@ from classes.game3rb import Game3rb
 from classes.alienware_arena import AlienwareArena
 from classes.lavalink_server_fetch import LavalinkServerFetch
 from classes.elektrina_vypadky import ElektrinaVypadky
-from classes.reddit_crack_watch import RedditCrackWatch
-from classes.reddit_freegamefindings import RedditFreeGameFindings
+from classes.reddit_fetcher import RedditFetcher
 from classes.fanatical import Fanatical
 from classes.sfd_servers import SFDServers
 
@@ -75,7 +77,7 @@ class KexoBOT:
         self.user_data = database["UserData"]
         self.guild_data = database["GuildData"]
 
-        self.reddit = asyncpraw.Reddit(
+        self.reddit_agent = asyncpraw.Reddit(
             client_id=REDDIT_CLIENT_ID,
             client_secret=REDDIT_SECRET,
             user_agent=REDDIT_USER_AGENT,
@@ -84,10 +86,14 @@ class KexoBOT:
         )
 
         # Attach bot, so we can use it in cogs
+        # Database
+        bot.user_data_loaded = {}
+        bot.temp_user_data = {}
         bot.bot_config = self.bot_config
         bot.user_data = self.user_data
         bot.guild_data = self.guild_data
-        bot.reddit = self.reddit
+        # Functions
+        bot.reddit_agent = self.reddit_agent
         bot.connect_node = self.connect_node
         bot.close_unused_nodes = self.close_unused_nodes
         bot.get_online_nodes = self.get_online_nodes
@@ -95,8 +101,7 @@ class KexoBOT:
 
         self.onlinefix = None | OnlineFix
         self.game3rb = None | Game3rb
-        self.reddit_freegamefindings = None | RedditFreeGameFindings
-        self.reddit_crackwatch = None | RedditCrackWatch
+        self.reddit_fetcher = None | RedditFetcher
         self.elektrina_vypadky = None | ElektrinaVypadky
         self.esutaze = None | Esutaze
         self.lavalink_fetch = None | LavalinkServerFetch
@@ -111,12 +116,10 @@ class KexoBOT:
         """Initialize the bot and fetch all channels and users."""
         await self._fetch_users()
         await self._fetch_channels()
+        await self._fetch_subreddit_icons()
         self._create_session()
         self._define_classes()
         await self._generate_graphs()
-        bot.subbredit_cache = return_dict(
-            await self.bot_config.find_one(DB_REDDIT_CACHE, {"_id": False})
-        )
         bot.sfd_servers = self.sfd_servers
 
     @staticmethod
@@ -143,6 +146,13 @@ class KexoBOT:
         await self.sfd_servers.generate_graph_week("New_York")
         print("Graphs generated.")
 
+    async def _fetch_subreddit_icons(self) -> None:
+        """Fetch subreddit icons for the bot."""
+        subreddit_icons = await self.bot_config.find_one(DB_CACHE)
+        bot.subreddit_icons = subreddit_icons["subreddit_icons"]
+        print("Subreddit icons fetched.")
+        return subreddit_icons["subreddit_icons"]
+
     def _define_classes(self) -> None:
         """Define classes for the bot."""
         self.onlinefix = self._initialize_class(
@@ -161,22 +171,18 @@ class KexoBOT:
         self.fanatical = self._initialize_class(
             Fanatical, self.bot_config, self.session, self.free_stuff_channel
         )
-        self.reddit_freegamefindings = self._initialize_class(
-            RedditFreeGameFindings,
+        self.reddit_fetcher = self._initialize_class(
+            RedditFetcher,
             self.bot_config,
+            self.user_data,
             self.session,
-            self.reddit,
+            self.reddit_agent,
+            self.user_kexo,
             self.free_stuff_channel,
+            self.game_updates_channel,
         )
         self.sfd_servers = self._initialize_class(
             SFDServers, self.bot_config, self.session
-        )
-        self.reddit_crackwatch = self._initialize_class(
-            RedditCrackWatch,
-            self.bot_config,
-            self.reddit,
-            self.game_updates_channel,
-            self.user_kexo,
         )
         self.elektrina_vypadky = self._initialize_class(
             ElektrinaVypadky, self.bot_config, self.session, self.user_kexo
@@ -195,7 +201,7 @@ class KexoBOT:
         now = datetime.now()
         if self.main_loop_counter == 0:
             self.main_loop_counter = 1
-            await self.reddit_freegamefindings.run()
+            await self.reddit_fetcher.freegamefindings()
 
         elif self.main_loop_counter == 1:
             self.main_loop_counter = 2
@@ -211,7 +217,7 @@ class KexoBOT:
 
         elif self.main_loop_counter == 4:
             self.main_loop_counter = 5
-            await self.reddit_crackwatch.run()
+            await self.reddit_fetcher.crackwatch()
 
         elif self.main_loop_counter == 5:
             self.main_loop_counter = 6
@@ -232,11 +238,13 @@ class KexoBOT:
         It also updates the reddit cache and fetches lavalink servers.
         """
         now = datetime.now()
+        if now.day == 6 and now.hour == 0:
+            await self._refresh_subreddit_icons()
+
         if now.hour == 0:
             await self.set_joke()
 
         self.lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
-        await self.update_reddit_cache(now)
         await self.elektrina_vypadky.run()
 
     def _create_session(self) -> None:
@@ -291,20 +299,37 @@ class KexoBOT:
         node: wavelink.Node = self.lavalink_servers[lavalink_server_pos]
         return node
 
+    async def _refresh_subreddit_icons(self) -> None:
+        """Refreshes subreddit icons on Sunday."""
+        subreddit_icons = {}
+        for subreddit in SHITPOST_SUBREDDITS_ALL:
+            subreddit: asyncpraw.models.Subreddit = await self.reddit_agent.subreddit(subreddit)
+            try:
+                await subreddit.load()
+            except asyncprawcore.exceptions.NotFound:
+                pass
+
+            if not subreddit.icon_img:
+                subreddit_icons[subreddit.display_name] = ("https://www.pngkit.com/png/full/207-2074270_reddit-icon"
+                                                           "-png.png")
+                continue
+            subreddit_icons[subreddit.display_name] = subreddit.icon_img
+
+        print("Subreddit icons refreshed.")
+        await self.bot_config.update_one(DB_CACHE, {"$set": {"subreddit_icons": subreddit_icons}})
+
     @staticmethod
     async def close_unused_nodes() -> None:
         """Clear unused lavalink nodes."""
         nodes: list[wavelink.Node] = wavelink.Pool.nodes.values()
         for node in nodes:
-            print(node.uri)
-            print(len(wavelink.Pool.nodes))
             if len(wavelink.Pool.nodes) == 1:
                 break
 
             if len(node.players) == 0:
                 print(f"Node {node.uri} is empty, removing...")
                 # noinspection PyProtectedMember
-                # await node._pool_closer()  # Node is not properly closed
+                await node._pool_closer()  # Node is not properly closed
                 await node.close(eject=True)
 
     @staticmethod
@@ -339,29 +364,6 @@ class KexoBOT:
         """Fetch users for the bot."""
         self.user_kexo = await bot.fetch_user(402221830930432000)
         print(f"User {self.user_kexo.name} fetched.")
-
-    async def update_reddit_cache(self, now: datetime) -> None:
-        """Update the reddit cache in the database."""
-        update = {}
-        for guild_id, cache in bot.subbredit_cache.items():
-            # If midnight, set search_level to 0
-            to_upload = [
-                "0" if now.hour == CLEAR_CACHE_HOUR else str(cache["search_level"]),
-                str(cache.get("nsfw")),
-                cache.get("urls"),
-                str(cache.get("which_subreddit")),
-            ]
-            # Remove urls at midnight
-            reddit_urls = [
-                reddit_url
-                for reddit_url in to_upload[2].split("\n")
-                if not reddit_url or reddit_url.split("*")[1] != str(now.hour)
-            ]
-            to_upload[2] = "\n".join(reddit_urls)
-            update[guild_id] = ",".join(to_upload)
-
-        await self.bot_config.update_many(DB_REDDIT_CACHE, {"$set": update})
-        bot.subbredit_cache = return_dict(update)
 
 
 kexobot = KexoBOT()

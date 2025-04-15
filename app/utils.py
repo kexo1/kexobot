@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Optional
 from datetime import datetime
 
@@ -7,23 +8,13 @@ import httpx
 import psutil
 import wavelink
 import asyncio
+import asyncpraw
+import asyncpraw.models
 
 
 def load_text_file(name: str) -> list:
     with open(f"text_files/{name}.txt", encoding="utf8") as f:
         return f.read().split("\n")
-
-
-def return_dict(subbredit_cache) -> dict:
-    for key in subbredit_cache:
-        search_level, nsfw, urls, which_subreddit = subbredit_cache[key].split(",")
-        subbredit_cache[key] = {
-            "search_level": int(search_level),
-            "nsfw": bool(nsfw),
-            "urls": urls,
-            "which_subreddit": int(which_subreddit),
-        }
-    return subbredit_cache
 
 
 def iso_to_timestamp(iso_time: str) -> datetime:
@@ -52,7 +43,7 @@ def get_memory_usage():
 
 
 async def download_video(
-    session: httpx.AsyncClient, url: str, nsfw: bool
+        session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> Optional[discord.File]:
     video_folder = os.path.join(os.getcwd(), "video")
     os.makedirs(video_folder, exist_ok=True)
@@ -115,3 +106,36 @@ def find_track(player: wavelink.Player, to_find: str) -> Optional[int]:
 
 def generate_temp_guild_data() -> dict:
     return {"lavalink_server_pos": 0}
+
+
+def generate_guild_data() -> dict:
+    return {
+        "autoplay_mode": wavelink.AutoPlayMode.partial,
+        "volume": 100,
+    }
+
+
+async def generate_temp_user_data(
+        reddit_agent: asyncpraw.Reddit,
+        subreddits: list,
+        user_id: int
+) -> dict:
+    multireddit: asyncpraw.models.Multireddit = await reddit_agent.multireddit(name=str(user_id), redditor="KexoBOT")
+    for subreddit in subreddits:
+        try:
+            await multireddit.add(await reddit_agent.subreddit(subreddit))
+        except asyncpraw.exceptions.RedditAPIException:
+            pass
+    return {
+        "viewed_posts": set(),
+        "search_limit": 2,
+        "last_used": time.time(),
+        "multireddit": multireddit,
+    }
+
+
+def generate_user_data() -> dict:
+    return {
+        "subreddits": SHITPOST_SUBREDDITS_DEFAULT,
+        "nsfw_posts": False,
+    }

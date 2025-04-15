@@ -7,7 +7,7 @@ from discord.ext import commands
 from discord import option
 from discord.commands import slash_command, guild_only
 from pycord.multicog import subcommand
-from decorators import is_joined
+from app.decorators import is_joined
 
 
 class Audio(commands.Cog):

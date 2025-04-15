@@ -2,9 +2,9 @@ import os
 import logging
 from bson.objectid import ObjectId
 
-# logging.basicConfig(level=logging.CRITICAL)
-# logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
-# logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
+logging.basicConfig(level=logging.CRITICAL)
+logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
+logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
 
 # -------------------- Discord -------------------- #
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -184,13 +184,26 @@ KYS_MESSAGES = (
     "Choď pobozkať kolajnice keď príde vlak",
     "Zec mi kar",
 )
-SHITPOST_SUBREDDITS = (
+SHITPOST_SUBREDDITS_DEFAULT = (
+    "discordVideos",
+    "okbuddyretard",
+    "shitposting",
+    "MemeVideos",
+    "whenthe",
+)
+SHITPOST_SUBREDDITS_ALL = (
     "discordVideos",
     "okbuddyretard",
     "MemeVideos",
     "doodoofard",
     "dankvideos",
     "whenthe",
+    "ihaveihaveihavereddit",
+    "memes",
+    "simpsonsshitposting",
+    "shitposting",
+    "clamworks",
+    "197",
 )
 REDDIT_VIDEO_STRIP = ("DASH_360", "DASH_480", "DASH_720", "DASH_1080")
 CLEAR_CACHE_HOUR = 0

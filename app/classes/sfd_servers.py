@@ -7,7 +7,6 @@ from typing import Union
 import httpx
 import matplotlib.pyplot as plt
 import mplcyberpunk
-import numpy as np
 
 from bs4 import BeautifulSoup
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -83,20 +82,19 @@ class SFDServers:
         players, servers = await self._load_bot_config_week()
         selected_timezone = ZoneInfo(TIMEZONES[timezone])
         now = datetime.datetime.now(selected_timezone)
-        start_time = now - timedelta(hours=168)
 
-        self.generate_lines_and_effects(list(range(280)), players, servers)
-
-        time_labels = []
-        for i in range(28):
-            time = start_time + timedelta(hours=i * 6)
+        hours = []
+        for i in range(27, -1, -1):
+            time = now - timedelta(hours=i * 6)
             day_str = time.strftime("%a")
             hour = int(time.strftime("%I"))
             ampm = time.strftime("%p")
-            time_labels.append(f"{day_str} {hour}{ampm}")
+            hours.append(f"{day_str} {hour}{ampm}")
+
+        self.generate_lines_and_effects(list(range(280)), players, servers)
 
         time_positions = [i * 10 + 5 for i in range(28)]
-        plt.xticks(time_positions, time_labels, rotation=45)
+        plt.xticks(time_positions, hours, rotation=45)
         plt.subplots_adjust(bottom=0.2)
         plt.savefig(
             os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"),
