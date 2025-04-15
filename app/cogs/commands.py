@@ -14,7 +14,12 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from app.constants import XTC_SERVER, KEXO_SERVER, DB_CHOICES, SFD_TIMEZONE_CHOICE
 from app.classes.database_manager import DatabaseManager
 from app.classes.sfd_servers import SFDServers
-from app.utils import get_memory_usage, iso_to_timestamp, get_file_age, check_node_status
+from app.utils import (
+    get_memory_usage,
+    iso_to_timestamp,
+    get_file_age,
+    check_node_status,
+)
 from app.__init__ import __version__
 
 host_authors = []

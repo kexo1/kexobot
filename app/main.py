@@ -303,20 +303,25 @@ class KexoBOT:
         """Refreshes subreddit icons on Sunday."""
         subreddit_icons = {}
         for subreddit in SHITPOST_SUBREDDITS_ALL:
-            subreddit: asyncpraw.models.Subreddit = await self.reddit_agent.subreddit(subreddit)
+            subreddit: asyncpraw.models.Subreddit = await self.reddit_agent.subreddit(
+                subreddit
+            )
             try:
                 await subreddit.load()
             except asyncprawcore.exceptions.NotFound:
                 pass
 
             if not subreddit.icon_img:
-                subreddit_icons[subreddit.display_name] = ("https://www.pngkit.com/png/full/207-2074270_reddit-icon"
-                                                           "-png.png")
+                subreddit_icons[subreddit.display_name] = (
+                    "https://www.pngkit.com/png/full/207-2074270_reddit-icon-png.png"
+                )
                 continue
             subreddit_icons[subreddit.display_name] = subreddit.icon_img
 
         print("Subreddit icons refreshed.")
-        await self.bot_config.update_one(DB_CACHE, {"$set": {"subreddit_icons": subreddit_icons}})
+        await self.bot_config.update_one(
+            DB_CACHE, {"$set": {"subreddit_icons": subreddit_icons}}
+        )
 
     @staticmethod
     async def close_unused_nodes() -> None:

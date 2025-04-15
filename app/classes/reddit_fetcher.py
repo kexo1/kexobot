@@ -27,14 +27,14 @@ from app.constants import (
 
 class RedditFetcher:
     def __init__(
-            self,
-            bot_config: AsyncIOMotorClient,
-            user_data: AsyncIOMotorClient,
-            session: httpx.AsyncClient,
-            reddit_agent: asyncpraw.Reddit,
-            free_stuff: discord.TextChannel,
-            game_updates: discord.TextChannel,
-            user_kexo: discord.User,
+        self,
+        bot_config: AsyncIOMotorClient,
+        user_data: AsyncIOMotorClient,
+        session: httpx.AsyncClient,
+        reddit_agent: asyncpraw.Reddit,
+        free_stuff: discord.TextChannel,
+        game_updates: discord.TextChannel,
+        user_kexo: discord.User,
     ) -> None:
         self.bot_config = bot_config
         self.user_data = user_data
@@ -45,7 +45,9 @@ class RedditFetcher:
         self.game_updates = game_updates
 
     async def crackwatch(self) -> None:
-        crackwatch_cache, to_filter = await self._load_bot_config("crackwatch_cache", "crackwatch_exceptions")
+        crackwatch_cache, to_filter = await self._load_bot_config(
+            "crackwatch_cache", "crackwatch_exceptions"
+        )
         crackwatch_cache_upload = crackwatch_cache.copy()
         subreddit: asyncpraw.models.Subreddit = await self.reddit_agent.subreddit(
             "CrackWatch"

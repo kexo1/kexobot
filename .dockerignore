@@ -1,0 +1,7 @@
+graphs/
+video/
+__pycache__/
+*.pyc
+.env
+.git
+.gitignore 

@@ -29,7 +29,12 @@ from app.constants import (
     KEXO_SERVER,
     SISKA_GANG_SERVER,
 )
-from app.utils import load_text_file, download_video, generate_user_data, generate_temp_user_data
+from app.utils import (
+    load_text_file,
+    download_video,
+    generate_user_data,
+    generate_temp_user_data,
+)
 
 
 class FunStuff(commands.Cog):
@@ -80,7 +85,7 @@ class FunStuff(commands.Cog):
     @commands.cooldown(1, 50, commands.BucketType.user)
     @option("integer", description="Max is 50.", min_value=1, max_value=50)
     async def spam(
-            self, ctx: discord.ApplicationContext, word: str, integer: int
+        self, ctx: discord.ApplicationContext, word: str, integer: int
     ) -> None:
         await ctx.respond(word)
         for _ in range(integer - 1):
@@ -93,7 +98,7 @@ class FunStuff(commands.Cog):
     )
     @commands.cooldown(1, 30, commands.BucketType.user)
     async def kys(
-            self, ctx: discord.ApplicationContext, member: discord.Member
+        self, ctx: discord.ApplicationContext, member: discord.Member
     ) -> None:
         meme_img = await self.generate_meme(ctx, member)
 
@@ -122,9 +127,7 @@ class FunStuff(commands.Cog):
     )
     @option("nsfw", bool, description="Turn on/off NSFW posts.", required=False)
     @commands.cooldown(1, 5, commands.BucketType.user)
-    async def shitpost(
-            self, ctx: discord.ApplicationContext
-    ) -> None:
+    async def shitpost(self, ctx: discord.ApplicationContext) -> None:
         await self.process_shitpost(ctx)
 
     async def process_shitpost(self, ctx: discord.ApplicationContext) -> None:
@@ -137,7 +140,9 @@ class FunStuff(commands.Cog):
         try:
             async for submission in multireddit.hot(limit=limit):
                 # If post is locked, or is stickied, or it's a poll, skip it
-                is_valid = await self._is_valid_submission(submission, user_data, temp_user_data)
+                is_valid = await self._is_valid_submission(
+                    submission, user_data, temp_user_data
+                )
                 if not is_valid:
                     continue
 
@@ -160,23 +165,17 @@ class FunStuff(commands.Cog):
         except (AsyncPrawcoreException, RequestException, ResponseException):
             await self.reddit_unresponsive_msg(ctx)
 
-    def _update_temp_user_data(
-            self, user_id: int, submission_url: str
-    ) -> None:
+    def _update_temp_user_data(self, user_id: int, submission_url: str) -> None:
         self.temp_user_data[user_id]["viewed_posts"].add(submission_url)
         self.temp_user_data[user_id]["search_limit"] += 1
 
     @staticmethod
     async def _is_valid_submission(
-            submission: asyncpraw.models.Submission,
-            user_data: dict,
-            temp_user_data: dict,
+        submission: asyncpraw.models.Submission,
+        user_data: dict,
+        temp_user_data: dict,
     ) -> bool:
-        if (
-                submission.locked
-                or submission.stickied
-                or hasattr(submission, "poll_data")
-        ):
+        if submission.locked or submission.stickied or hasattr(submission, "poll_data"):
             return False
 
         if submission.permalink in temp_user_data["viewed_posts"]:
@@ -206,7 +205,9 @@ class FunStuff(commands.Cog):
             )
         else:
             user_data = generate_user_data()  # Create new user data
-            print("Creating new user data for user:", await self.bot.fetch_user(user_id))
+            print(
+                "Creating new user data for user:", await self.bot.fetch_user(user_id)
+            )
 
             await self.user_data.insert_one({"_id": user_id, "reddit": user_data})
             self.user_data_loaded[user_id] = {"reddit": user_data}
@@ -219,7 +220,7 @@ class FunStuff(commands.Cog):
         return user_data, temp_user_data
 
     async def generate_meme(
-            self, ctx: discord.ApplicationContext, member: discord.Member
+        self, ctx: discord.ApplicationContext, member: discord.Member
     ) -> str:
         text = random.choice(
             (
@@ -240,21 +241,18 @@ class FunStuff(commands.Cog):
 
     @staticmethod
     async def send_multiple_images(
-            ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission
+        ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission
     ) -> None:
         for images in submission.gallery_data["items"]:
             await ctx.send(f"https://i.redd.it/{images['media_id']}.jpg")
 
     @staticmethod
-    async def post_video(
-            ctx: discord.ApplicationContext, submission_url: str
-    ) -> None:
+    async def post_video(ctx: discord.ApplicationContext, submission_url: str) -> None:
         video_url = submission_url.split("/")[4]
         await ctx.send(f"https://rxddit.com/{video_url}/", suppress=False)
 
     async def create_reddit_embed(
-            self,
-            submission: asyncpraw.reddit.Submission
+        self, submission: asyncpraw.reddit.Submission
     ) -> discord.Embed:
         subreddit: asyncpraw.models.Subreddit = submission.subreddit
 
@@ -275,7 +273,7 @@ class FunStuff(commands.Cog):
         embed = discord.Embed(
             title="",
             description="🚫 Reddit didn't respond, try again in a minute.\nWhat could cause "
-                        "error? - Reddit is down, Subreddit is locked, API might be overloaded",
+            "error? - Reddit is down, Subreddit is locked, API might be overloaded",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")

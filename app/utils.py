@@ -43,7 +43,7 @@ def get_memory_usage():
 
 
 async def download_video(
-        session: httpx.AsyncClient, url: str, nsfw: bool
+    session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> Optional[discord.File]:
     video_folder = os.path.join(os.getcwd(), "video")
     os.makedirs(video_folder, exist_ok=True)
@@ -116,11 +116,11 @@ def generate_guild_data() -> dict:
 
 
 async def generate_temp_user_data(
-        reddit_agent: asyncpraw.Reddit,
-        subreddits: list,
-        user_id: int
+    reddit_agent: asyncpraw.Reddit, subreddits: list, user_id: int
 ) -> dict:
-    multireddit: asyncpraw.models.Multireddit = await reddit_agent.multireddit(name=str(user_id), redditor="KexoBOT")
+    multireddit: asyncpraw.models.Multireddit = await reddit_agent.multireddit(
+        name=str(user_id), redditor="KexoBOT"
+    )
     for subreddit in subreddits:
         try:
             await multireddit.add(await reddit_agent.subreddit(subreddit))
