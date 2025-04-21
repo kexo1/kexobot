@@ -72,7 +72,7 @@ class Commands(commands.Cog):
     @option("password", description="Lavalink server password.", required=True)
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def manual_connect(
-        self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
+            self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
     ) -> None:
         embed = discord.Embed(
             title="",
@@ -153,32 +153,51 @@ class Commands(commands.Cog):
 
     @slash_node.command(name="players", description="Information about node players.")
     async def node_players(self, ctx: discord.ApplicationContext) -> None:
-        node: wavelink.Node = self.bot.node
-        players: wavelink.PlayerResponsePayload = await node.fetch_players()
+        nodes = wavelink.Pool.nodes.values()
 
-        if not players:
+        if not nodes:
             embed = discord.Embed(
                 title="",
-                description=":x: There are no players connected to this node.",
+                description=":x: There are no nodes connected.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed)
             return
 
-        embed = discord.Embed(
-            title="Node Players",
-            color=discord.Color.blue(),
-        )
-
         server_name = []
         playing = []
-        for player in players:
-            guild: discord.Guild = await self.bot.fetch_guild(player.guild_id)
-            server_name.append(guild.name)
-            playing.append(player.track.title)
+        node_uri = []
 
-        embed.add_field(name="Server:", value="\n".join(server_name))
-        embed.add_field(name="Playing:", value="\n".join(playing))
+        for node in nodes:
+            players: wavelink.PlayerResponsePayload = await node.fetch_players()
+
+            if not players:
+                continue
+
+            embed = discord.Embed(
+                title="Node Players",
+                color=discord.Color.blue(),
+            )
+
+            for player in players:
+                guild: discord.Guild = await self.bot.fetch_guild(player.guild_id)
+                server_name.append(guild.name)
+                playing.append(player.track.title)
+                node_uri.append(node.uri)
+
+        if not server_name:
+            embed = discord.Embed(
+                title="",
+                description=":x: There are no players connected.",
+                color=discord.Color.blue(),
+            )
+            await ctx.respond(embed=embed)
+            return
+
+        embed.add_field(name="Server:ㅤㅤ", value="\n".join(server_name))
+        embed.add_field(name="Playing:ㅤㅤ", value="\n".join(playing))
+        embed.add_field(name="Node:", value="\n".join(node_uri))
+
         embed.set_footer(text=f"Total players: {len(players)}")
         await ctx.respond(embed=embed)
 
@@ -217,14 +236,14 @@ class Commands(commands.Cog):
     @option("server", description="Server name.")
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def get_sfd_server_info(
-        self, ctx: discord.ApplicationContext, search: str
+            self, ctx: discord.ApplicationContext, search: str
     ) -> None:
         server = self.sfd_servers.get_server(search)
         if not server:
             embed = discord.Embed(
                 title="",
                 description=":x: Server you searched for is not in the list,\n"
-                "make sure you parsed correct server name.",
+                            "make sure you parsed correct server name.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await ctx.respond(
@@ -268,10 +287,10 @@ class Commands(commands.Cog):
     )
     @commands.cooldown(1, 60, commands.BucketType.user)
     async def get_sfd_graph(
-        self,
-        ctx: discord.ApplicationContext,
-        graph_range: str,
-        timezone: str = "New_York",
+            self,
+            ctx: discord.ApplicationContext,
+            graph_range: str,
+            timezone: str = "New_York",
     ) -> None:
         await ctx.defer()
 
@@ -341,18 +360,18 @@ class Commands(commands.Cog):
     )
     @commands.cooldown(1, 300, commands.BucketType.user)
     async def host(
-        self,
-        ctx: discord.ApplicationContext,
-        server_name: str,
-        duration: str,
-        branch: str,
-        version: str,
-        password: str,
-        region: str,
-        scripts: str,
-        slots: int = 8,
-        ping: bool = True,
-        image: str = None,
+            self,
+            ctx: discord.ApplicationContext,
+            server_name: str,
+            duration: str,
+            branch: str,
+            version: str,
+            password: str,
+            region: str,
+            scripts: str,
+            slots: int = 8,
+            ping: bool = True,
+            image: str = None,
     ) -> None:
         author = ctx.author
 
@@ -454,7 +473,7 @@ class Commands(commands.Cog):
 
     @slash_command(name="random_number", description="Choose number between intervals.")
     async def random_number(
-        self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
+            self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
     ) -> None:
         if ineteger1 > ineteger2:
             ineteger2, ineteger1 = ineteger1, ineteger2
@@ -574,7 +593,7 @@ class Commands(commands.Cog):
         embed = discord.Embed(
             title="Select Subreddits",
             description="Select the subreddits you want to see in shitpost command."
-            " Currently selected subreddits are pre-checked.",
+                        " Currently selected subreddits are pre-checked.",
             color=discord.Color.blue(),
         )
 
@@ -591,7 +610,7 @@ class HostView(discord.ui.View):
         style=discord.ButtonStyle.gray, label="I stopped hosting.", emoji="📣"
     )
     async def button_callback(
-        self, button: discord.Button, interaction: discord.Interaction
+            self, button: discord.Button, interaction: discord.Interaction
     ) -> None:
         if interaction.user.name in host_authors:
             embed = await self.disable_embed()
@@ -615,17 +634,17 @@ class HostView(discord.ui.View):
         await self.message.edit(embed=embed, view=None)
         await self.author.send(
             f"**You forgot to click button in {self.message.jump_url} you {
-                random.choice(
-                    (
-                        'dumbass',
-                        'retard',
-                        'nitwit',
-                        'prick',
-                        'cunt',
-                        'pillock',
-                        'twat',
-                    )
+            random.choice(
+                (
+                    'dumbass',
+                    'retard',
+                    'nitwit',
+                    'prick',
+                    'cunt',
+                    'pillock',
+                    'twat',
                 )
+            )
             }.**"
         )
         host_authors.pop(host_authors.index(self.author.name))
