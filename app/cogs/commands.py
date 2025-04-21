@@ -155,19 +155,31 @@ class Commands(commands.Cog):
     async def node_players(self, ctx: discord.ApplicationContext) -> None:
         node: wavelink.Node = self.bot.node
         players: wavelink.PlayerResponsePayload = await node.fetch_players()
+
+        if not players:
+            embed = discord.Embed(
+                title="",
+                description=":x: There are no players connected to this node.",
+                color=discord.Color.blue(),
+            )
+            await ctx.respond(embed=embed)
+            return
+
         embed = discord.Embed(
             title="Node Players",
             color=discord.Color.blue(),
         )
-        embed.add_field(
-            name="Servers:",
-            value="\n".join(f"{player.guild.name}" for player in players),
-        )
-        embed.add_field(
-            name="Playing:",
-            value="\n".join(f"{player.current.title}" for player in players),
-        )
 
+        server_name = []
+        playing = []
+        for player in players:
+            guild: discord.Guild = await self.bot.fetch_guild(player.guild_id)
+            server_name.append(guild.name)
+            playing.append(player.track.title)
+
+        embed.add_field(name="Server:", value="\n".join(server_name))
+        embed.add_field(name="Playing:", value="\n".join(playing))
+        embed.set_footer(text=f"Total players: {len(players)}")
         await ctx.respond(embed=embed)
 
     # -------------------- SFD Servers -------------------- #

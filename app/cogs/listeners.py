@@ -74,10 +74,9 @@ class Listeners(commands.Cog):
         before: discord.VoiceState,
         after: discord.VoiceState,
     ) -> None:
-        # If member that was removed is the bot itself
+
         if member == member.guild.me and before.channel and after.channel is None:
             print(f"Kicked from {before.channel.name}")
-            # Try to get the player before it's gone
             try:
                 player: wavelink.Player = before.channel.guild.voice_client
                 player.cleanup()
