@@ -4,6 +4,7 @@ import time
 import sys
 import os
 
+import asyncpraw.models
 import discord
 import wavelink
 
@@ -11,7 +12,13 @@ from discord.ext import commands
 from discord.commands import slash_command, guild_only, option
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from app.constants import XTC_SERVER, KEXO_SERVER, DB_CHOICES, SFD_TIMEZONE_CHOICE
+from app.constants import (
+    XTC_SERVER,
+    KEXO_SERVER,
+    DB_CHOICES,
+    SFD_TIMEZONE_CHOICE,
+    SHITPOST_SUBREDDITS_ALL,
+)
 from app.classes.database_manager import DatabaseManager
 from app.classes.sfd_servers import SFDServers
 from app.utils import (
@@ -19,6 +26,7 @@ from app.utils import (
     iso_to_timestamp,
     get_file_age,
     check_node_status,
+    generate_user_data,
 )
 from app.__init__ import __version__
 
@@ -31,7 +39,11 @@ class Commands(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.bot_config: AsyncIOMotorClient = self.bot.bot_config
+        self.user_data_db: AsyncIOMotorClient = self.bot.user_data_db
+        self.user_data: dict = self.bot.user_data
+        self.temp_user_data: dict = self.bot.temp_user_data
         self.guild_temp_data: dict = self.bot.guild_temp_data
+
         self.run_time = time.time()
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
         self.sfd_servers = SFDServers(self.bot_config, self.bot.session)
@@ -70,7 +82,7 @@ class Commands(commands.Cog):
         message = await ctx.respond(embed=embed)
         await ctx.trigger_typing()
         node: wavelink.Node = await check_node_status(
-            f"http://{uri}:{str(port)}", password
+            self.bot, f"http://{uri}:{str(port)}", password
         )
 
         if not node:
@@ -97,7 +109,7 @@ class Commands(commands.Cog):
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def recconect_node(self, ctx: discord.ApplicationContext) -> None:
         await ctx.defer()
-        node: wavelink.Node = await self.bot.connect_node()
+        node: wavelink.Node = await self.bot.connect_node(ctx.guild_id)
         player: wavelink.Player = ctx.voice_client
 
         if player:
@@ -115,7 +127,6 @@ class Commands(commands.Cog):
             )
 
         await ctx.respond(embed=embed)
-        await self.bot.close_unused_nodes()
 
     @slash_node.command(name="info", description="Information about connected node.")
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
@@ -138,6 +149,25 @@ class Commands(commands.Cog):
             inline=False,
         )
         embed.set_footer(text=node.uri)
+        await ctx.respond(embed=embed)
+
+    @slash_node.command(name="players", description="Information about node players.")
+    async def node_players(self, ctx: discord.ApplicationContext) -> None:
+        node: wavelink.Node = self.bot.node
+        players: wavelink.PlayerResponsePayload = await node.fetch_players()
+        embed = discord.Embed(
+            title="Node Players",
+            color=discord.Color.blue(),
+        )
+        embed.add_field(
+            name="Servers:",
+            value="\n".join(f"{player.guild.name}" for player in players),
+        )
+        embed.add_field(
+            name="Playing:",
+            value="\n".join(f"{player.current.title}" for player in players),
+        )
+
         await ctx.respond(embed=embed)
 
     # -------------------- SFD Servers -------------------- #
@@ -501,6 +531,43 @@ class Commands(commands.Cog):
         )
         await ctx.respond(embed=embed)
 
+    @slash_reddit.command(
+        name="settings",
+        description="Change your list of subreddits.",
+    )
+    async def edit_subreddit(self, ctx: discord.ApplicationContext) -> None:
+        user_id = ctx.author.id
+        user_data = await self.user_data_db.find_one({"_id": user_id})
+
+        if not user_data:
+            user_data = generate_user_data()
+            await self.user_data_db.insert_one(
+                {"_id": user_id, "reddit": user_data["reddit"]}
+            )
+
+            embed = discord.Embed(
+                title="",
+                description="**✅ Generated user data.**",
+                color=discord.Color.blue(),
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            self.user_data[user_id] = user_data
+        else:
+            self.user_data.setdefault(user_id, {})["reddit"] = user_data["reddit"]
+
+        current_subreddits = user_data["reddit"]["subreddits"]
+        # Create a view with select menu for all available subreddits
+        view = SubredditSelectorView(current_subreddits, self.bot, user_id)
+
+        embed = discord.Embed(
+            title="Select Subreddits",
+            description="Select the subreddits you want to see in shitpost command."
+            " Currently selected subreddits are pre-checked.",
+            color=discord.Color.blue(),
+        )
+
+        await ctx.respond(embed=embed, view=view, ephemeral=True)
+
 
 class HostView(discord.ui.View):
     def __init__(self, author: discord.Member):
@@ -567,6 +634,130 @@ class HostView(discord.ui.View):
         timestamp = embed.fields[2].value.replace("R", "t")
         embed.set_field_at(2, name="Hosted atㅤ", value=timestamp)
         return embed
+
+
+class SubredditSelectorView(discord.ui.View):
+    def __init__(self, current_subreddits: set, bot: discord.Bot, user_id: int) -> None:
+        super().__init__(timeout=600)
+        self.current_subreddits = current_subreddits
+        self.selected_subreddits = set()
+        self.bot = bot
+        self.user_id = user_id
+
+        self._user_data = self.bot.user_data
+        self._user_data_db = self.bot.user_data_db
+        self._temp_user_data = self.bot.temp_user_data
+
+        self.select = SubredditSelect(current_subreddits)
+        self.save_button = discord.ui.Button(
+            label="Save Changes",
+            style=discord.ButtonStyle.green,
+            custom_id="save_changes",
+        )
+        self.save_button.callback = self.save_changes
+
+        nsfw_status = self._user_data[user_id]["reddit"]["nsfw_posts"]
+        self.nsfw_button = discord.ui.Button(
+            label="NSFW ON" if not nsfw_status else "NSFW OFF",
+            style=discord.ButtonStyle.green
+            if not nsfw_status
+            else discord.ButtonStyle.red,
+            custom_id="nsfw_posts",
+        )
+        self.nsfw_button.callback = self.nsfw_posts
+
+        self.add_item(self.select)
+        self.add_item(self.save_button)
+        self.add_item(self.nsfw_button)
+
+    async def nsfw_posts(self, interaction: discord.Interaction) -> None:
+        nsfw_status = not self._user_data[self.user_id]["reddit"]["nsfw_posts"]
+
+        self._user_data[self.user_id]["reddit"]["nsfw_posts"] = nsfw_status
+        await self._user_data_db.update_one(
+            {"_id": self.user_id}, {"$set": self._user_data[self.user_id]}
+        )
+
+        self.nsfw_button.label = "NSFW ON" if nsfw_status else "NSFW OFF"
+        self.nsfw_button.style = (
+            discord.ButtonStyle.green if not nsfw_status else discord.ButtonStyle.red
+        )
+
+        await interaction.response.edit_message(view=self)
+
+    async def save_changes(self, interaction: discord.Interaction) -> None:
+        self._user_data[self.user_id]["reddit"]["subreddits"] = list(
+            self.selected_subreddits
+        )
+
+        await self._user_data_db.update_one(
+            {"_id": self.user_id}, {"$set": self._user_data[self.user_id]}
+        )
+
+        if self.user_id in self._temp_user_data:
+            await self._update_multireddit()
+
+        embed = discord.Embed(
+            title="Changes Saved",
+            description=f"Successfully updated your subreddit list to `{len(self.selected_subreddits)}` subreddits.",
+            color=discord.Color.green(),
+        )
+        embed.set_footer(text="Message will be deleted in 20 seconds.")
+        await interaction.response.edit_message(embed=embed, view=None, delete_after=20)
+
+    async def on_timeout(self) -> None:
+        self.disable_all_items()
+        self.stop()
+
+    async def _update_multireddit(self) -> None:
+        multireddit: asyncpraw.models.Multireddit = self._temp_user_data[self.user_id][
+            "reddit"
+        ]["multireddit"]
+        await multireddit.load()
+        added_subreddits = set()
+
+        for subreddit in multireddit.subreddits:
+            if subreddit.display_name not in self.selected_subreddits:
+                await multireddit.remove(subreddit)
+                continue
+            added_subreddits.add(subreddit.display_name)
+
+        for subreddit in self.selected_subreddits:
+            if subreddit in added_subreddits:
+                continue
+
+            try:
+                await multireddit.add(await self.bot.reddit_agent.subreddit(subreddit))
+            except asyncpraw.exceptions.RedditAPIException:
+                print(f"Failed to add subreddit `{subreddit}`")
+                pass
+
+        self._temp_user_data[self.user_id]["reddit"]["multireddit"] = multireddit
+
+
+class SubredditSelect(discord.ui.Select):
+    def __init__(self, current_subreddits: set):
+        options = [
+            discord.SelectOption(
+                label=f"r/{subreddit}",
+                value=subreddit,
+                default=subreddit in current_subreddits,
+                description=f"Select to {'remove' if subreddit in current_subreddits else 'add'} this subreddit",
+            )
+            for subreddit in SHITPOST_SUBREDDITS_ALL
+        ]
+
+        super().__init__(
+            placeholder="Select subreddits to toggle",
+            max_values=len(SHITPOST_SUBREDDITS_ALL),
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        self.view.selected_subreddits = set()
+        for subreddit in self.values:
+            self.view.selected_subreddits.add(subreddit)
+        await interaction.response.defer()
 
 
 def setup(bot: commands.Bot):

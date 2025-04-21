@@ -8,6 +8,7 @@ import httpx
 import discord
 
 from motor.motor_asyncio import AsyncIOMotorClient
+from urllib.parse import urlparse
 from asyncprawcore.exceptions import (
     AsyncPrawcoreException,
     ResponseException,
@@ -29,18 +30,14 @@ class RedditFetcher:
     def __init__(
         self,
         bot_config: AsyncIOMotorClient,
-        user_data: AsyncIOMotorClient,
         session: httpx.AsyncClient,
         reddit_agent: asyncpraw.Reddit,
         free_stuff: discord.TextChannel,
         game_updates: discord.TextChannel,
-        user_kexo: discord.User,
     ) -> None:
         self.bot_config = bot_config
-        self.user_data = user_data
         self.session = session
         self.reddit_agent = reddit_agent
-        self.user_kexo = user_kexo
         self.free_stuff = free_stuff
         self.game_updates = game_updates
 
@@ -187,7 +184,7 @@ class RedditFetcher:
         elif "alienwarearena" in submission.url:
             await self._alienwarearena(submission.url)
         else:
-            title_stripped = re.sub(r"\[.*?]|\(.*?\)", "", text).strip()
+            title_stripped = re.sub(r"\[.*?]|\(.*?\)", "", submission.title).strip()
             feeegame_embeds["Default"]["title"] = title_stripped
             await self._create_embed(feeegame_embeds["Default"], submission.url)
 
@@ -215,7 +212,7 @@ class RedditFetcher:
             text="I took it from - r/FreeGameFindings",
             icon_url=REDDIT_FREEGAME_ICON,
         )
-        await self.channel.send(embed=embed)
+        await self.free_stuff.send(embed=embed)
 
     @staticmethod
     async def _create_embed_crackwatch(

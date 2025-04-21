@@ -4,6 +4,7 @@ graphs/
 
 desktop.ini
 fly.toml
+secret.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

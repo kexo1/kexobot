@@ -35,7 +35,7 @@ from constants import (
     FREE_STUFF_CHANNEL,
     KEXO_SERVER,
 )
-from utils import generate_temp_guild_data
+from utils import generate_temp_guild_data, is_older_than
 
 from classes.esutaze import Esutaze
 from classes.online_fix import OnlineFix
@@ -74,8 +74,8 @@ class KexoBOT:
 
         database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]
         self.bot_config = database["BotConfig"]
-        self.user_data = database["UserData"]
-        self.guild_data = database["GuildData"]
+        self.user_data_db = database["UserData"]
+        self.guild_data_db = database["GuildData"]
 
         self.reddit_agent = asyncpraw.Reddit(
             client_id=REDDIT_CLIENT_ID,
@@ -87,11 +87,11 @@ class KexoBOT:
 
         # Attach bot, so we can use it in cogs
         # Database
-        bot.user_data_loaded = {}
+        bot.user_data = {}
         bot.temp_user_data = {}
         bot.bot_config = self.bot_config
-        bot.user_data = self.user_data
-        bot.guild_data = self.guild_data
+        bot.user_data_db = self.user_data_db
+        bot.guild_data_db = self.guild_data_db
         # Functions
         bot.reddit_agent = self.reddit_agent
         bot.connect_node = self.connect_node
@@ -119,7 +119,6 @@ class KexoBOT:
         await self._fetch_subreddit_icons()
         self._create_session()
         self._define_classes()
-        await self._generate_graphs()
         bot.sfd_servers = self.sfd_servers
 
     @staticmethod
@@ -139,12 +138,6 @@ class KexoBOT:
         self.game_updates_channel = await self._fetch_channel(GAME_UPDATES_CHANNEL)
         self.free_stuff_channel = await self._fetch_channel(FREE_STUFF_CHANNEL)
         print("Channels fetched.")
-
-    async def _generate_graphs(self) -> None:
-        """Generate graphs for the bot."""
-        await self.sfd_servers.generate_graph_day("New_York")
-        await self.sfd_servers.generate_graph_week("New_York")
-        print("Graphs generated.")
 
     async def _fetch_subreddit_icons(self) -> None:
         """Fetch subreddit icons for the bot."""
@@ -174,10 +167,8 @@ class KexoBOT:
         self.reddit_fetcher = self._initialize_class(
             RedditFetcher,
             self.bot_config,
-            self.user_data,
             self.session,
             self.reddit_agent,
-            self.user_kexo,
             self.free_stuff_channel,
             self.game_updates_channel,
         )
@@ -228,6 +219,7 @@ class KexoBOT:
             await self.esutaze.run()
 
         if now.minute % 6 == 0:
+            self._clear_temp_reddit_data()
             await self.sfd_servers.update_stats()
 
     async def hourly_loop(self) -> None:
@@ -241,8 +233,11 @@ class KexoBOT:
         if now.day == 6 and now.hour == 0:
             await self._refresh_subreddit_icons()
 
+        if now.hour % 5 == 0:
+            self._clear_temp_reddit_data()
+
         if now.hour == 0:
-            await self.set_joke()
+            await self._set_joke()
 
         self.lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
         await self.elektrina_vypadky.run()
@@ -283,6 +278,7 @@ class KexoBOT:
 
             bot.node = node
             return node
+        return None
 
     def get_node(self, guild_id: int) -> wavelink.Node:
         """Get the next lavalink node, cycling is guild based."""
@@ -298,6 +294,61 @@ class KexoBOT:
         self.guild_temp_data[guild_id]["lavalink_server_pos"] = lavalink_server_pos
         node: wavelink.Node = self.lavalink_servers[lavalink_server_pos]
         return node
+
+    @staticmethod
+    async def close_unused_nodes() -> None:
+        """Clear unused lavalink nodes."""
+        nodes: dict[str, wavelink.Node] = wavelink.Pool.nodes.values()
+        for node in nodes:
+            if len(wavelink.Pool.nodes) == 1:
+                break
+
+            if len(node.players) == 0:
+                print(f"Node {node.uri} is empty, removing...")
+                # noinspection PyProtectedMember
+                await node._pool_closer()  # Node is not properly closed
+                await node.close(eject=True)
+
+    @staticmethod
+    def get_online_nodes() -> int:
+        """Get the number of online lavalink nodes."""
+        return len(
+            [
+                node
+                for node in wavelink.Pool.nodes.values()
+                if node.status == NodeStatus.CONNECTED
+            ]
+        )
+
+    @staticmethod
+    def _clear_temp_reddit_data() -> None:
+        """Clear the temporary user reddit data."""
+        for user_id in bot.temp_user_data:
+            last_used = bot.temp_user_data[user_id]["reddit"]["last_used"]
+            if not last_used:
+                continue
+
+            if is_older_than(5, last_used):
+                bot.temp_user_data[user_id]["reddit"]["last_used"] = None
+                bot.temp_user_data[user_id]["reddit"]["viewed_posts"] = set()
+                bot.temp_user_data[user_id]["reddit"]["search_limit"] = 3
+
+    async def _set_joke(self) -> None:
+        """Set a random joke as the bot's activity."""
+        joke_categroy = random.choice(("jewish", "racist"))
+        try:
+            joke = await self.session.get(
+                f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
+                f"{joke_categroy}&api-key={HUMOR_SECRET}"
+            )
+        except httpx.ReadTimeout:
+            print("Couldn't fetch joke: Timeout")
+            return
+
+        joke = joke.json().get("joke")
+        await bot.change_presence(
+            activity=discord.Activity(type=discord.ActivityType.watching, name=joke)
+        )
 
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""
@@ -323,48 +374,6 @@ class KexoBOT:
             DB_CACHE, {"$set": {"subreddit_icons": subreddit_icons}}
         )
 
-    @staticmethod
-    async def close_unused_nodes() -> None:
-        """Clear unused lavalink nodes."""
-        nodes: list[wavelink.Node] = wavelink.Pool.nodes.values()
-        for node in nodes:
-            if len(wavelink.Pool.nodes) == 1:
-                break
-
-            if len(node.players) == 0:
-                print(f"Node {node.uri} is empty, removing...")
-                # noinspection PyProtectedMember
-                await node._pool_closer()  # Node is not properly closed
-                await node.close(eject=True)
-
-    @staticmethod
-    def get_online_nodes() -> int:
-        """Get the number of online lavalink nodes."""
-        return len(
-            [
-                node
-                for node in wavelink.Pool.nodes.values()
-                if node.status == NodeStatus.CONNECTED
-            ]
-        )
-
-    async def set_joke(self) -> None:
-        """Set a random joke as the bot's activity."""
-        joke_categroy = random.choice(("jewish", "racist"))
-        try:
-            joke = await self.session.get(
-                f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
-                f"{joke_categroy}&api-key={HUMOR_SECRET}"
-            )
-        except httpx.ReadTimeout:
-            print("Couldn't fetch joke: Timeout")
-            return
-
-        joke = joke.json().get("joke")
-        await bot.change_presence(
-            activity=discord.Activity(type=discord.ActivityType.watching, name=joke)
-        )
-
     async def _fetch_users(self) -> None:
         """Fetch users for the bot."""
         self.user_kexo = await bot.fetch_user(402221830930432000)
@@ -383,12 +392,12 @@ def create_cog_session() -> None:
 def setup_cogs() -> None:
     """Load all cogs for the bot."""
     cogs_list = [
+        "commands",
         "play",
         "listeners",
         "queue",
         "audio",
         "fun_stuff",
-        "commands",
     ]
 
     create_cog_session()
@@ -400,7 +409,7 @@ def setup_cogs() -> None:
 setup_cogs()
 
 
-@tasks.loop(minutes=2)
+@tasks.loop(minutes=1)
 async def main_loop_task() -> None:
     await kexobot.main_loop()
 
@@ -482,14 +491,18 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         await ctx.respond(embed=embed, ephemeral=True)
         return
 
-    if isinstance(error, commands.BotMissingRole):
+    if isinstance(error, discord.errors.NotFound) and "Unknown interaction" in str(
+        error
+    ):
         embed = discord.Embed(
             title="",
-            description=f"🚫 You don't have the required role to use this command."
-            f"\nRequired role: `{', '.join(error.missing_roles)}`",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
+            description="⚠️ Discord API is not responding. Please try again in a minute.",
+            color=discord.Color.from_rgb(r=255, g=165, b=0),
         )
-        await ctx.respond(embed=embed, ephemeral=True)
+        try:
+            await ctx.channel.send(embed=embed, delete_after=20)
+        except discord.Forbidden:
+            pass
         return
 
     raise error

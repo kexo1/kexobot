@@ -2,9 +2,13 @@ import os
 import logging
 from bson.objectid import ObjectId
 
+
 logging.basicConfig(level=logging.CRITICAL)
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
+
+# from dotenv import load_dotenv
+# load_dotenv(os.getenv("SECRET_PATH"))
 
 # -------------------- Discord -------------------- #
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -54,6 +58,7 @@ MONGO_DB_URL = (
     f"@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
     f"=majority"
 )
+
 DB_CACHE = {"_id": ObjectId("617958fae4043ee4a3f073f2")}
 DB_LISTS = {"_id": ObjectId("6178211ec5f5c08c699b8fd3")}
 DB_REDDIT_CACHE = {"_id": ObjectId("61795a8950149bebf7666e55")}
@@ -189,7 +194,7 @@ SHITPOST_SUBREDDITS_DEFAULT = (
     "okbuddyretard",
     "shitposting",
     "MemeVideos",
-    "whenthe",
+    "doodoofard",
 )
 SHITPOST_SUBREDDITS_ALL = (
     "discordVideos",

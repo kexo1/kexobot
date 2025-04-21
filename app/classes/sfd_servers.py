@@ -17,8 +17,7 @@ from app.constants import (
     DB_SFD_ACTIVITY,
     TIMEZONES,
 )
-from app.utils import average
-
+from app.utils import average, is_older_than
 
 plt.style.use("cyberpunk")
 
@@ -68,30 +67,54 @@ class SFDServers:
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
         os.makedirs(self.graphs_dir, exist_ok=True)
 
-    async def load_sfd_servers(self) -> str:
-        try:
-            response = await self.session.post(
-                SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS
-            )
-            return response.text
-        except (httpx.ReadTimeout, httpx.ConnectTimeout):
-            print("SFD Servers: Request timed out")
-        return []
+    async def generate_graph_day(self, timezone: str):
+        activity = await self._load_sfd_activity_data()
+        players, servers = activity["players_day"], activity["servers_day"]
 
-    async def generate_graph_week(self, timezone: str):
-        players, servers = await self._load_bot_config_week()
         selected_timezone = ZoneInfo(TIMEZONES[timezone])
         now = datetime.datetime.now(selected_timezone)
 
+        hours = [
+            (now - timedelta(hours=i)).strftime("%I%p").lstrip("0")
+            for i in range(23, -1, -1)
+        ]
+
+        self._generate_lines_and_effects(list(range(240)), players, servers)
+
+        # One time position per hour
+        time_positions = [i * 10 + 5 for i in range(24)]
+        plt.xticks(time_positions, hours)
+        plt.savefig(
+            os.path.join(self.graphs_dir, f"sfd_activity_day_{timezone}.png"), dpi=300
+        )
+        plt.close("all")
+
+    async def generate_graph_week(self, timezone: str):
+        activity = await self._load_sfd_activity_data()
+        players, servers = activity["players_week"], activity["servers_week"]
+        selected_timezone = ZoneInfo(TIMEZONES[timezone])
+
+        now = datetime.datetime.now(selected_timezone)
+        hours_since_six = now.hour % 6
+        minutes = now.minute
+        seconds = now.second
+
+        last_update = now - timedelta(
+            hours=hours_since_six,
+            minutes=minutes,
+            seconds=seconds,
+        )
+
         hours = []
+        # Generate 28 labels (one for each 6-hour period, going backwards)
         for i in range(27, -1, -1):
-            time = now - timedelta(hours=i * 6)
+            time = last_update - timedelta(hours=i * 6)
             day_str = time.strftime("%a")
             hour = int(time.strftime("%I"))
             ampm = time.strftime("%p")
             hours.append(f"{day_str} {hour}{ampm}")
 
-        self.generate_lines_and_effects(list(range(280)), players, servers)
+        self._generate_lines_and_effects(list(range(280)), players, servers)
 
         time_positions = [i * 10 + 5 for i in range(28)]
         plt.xticks(time_positions, hours, rotation=45)
@@ -103,70 +126,48 @@ class SFDServers:
         )
         plt.close("all")
 
-    async def generate_graph_day(self, timezone: str):
-        players, servers = await self._load_bot_config_day()
-        selected_timezone = ZoneInfo(TIMEZONES[timezone])
-        now = datetime.datetime.now(selected_timezone)
-
-        hours = [
-            (now - timedelta(hours=i)).strftime("%I%p").lstrip("0")
-            for i in range(23, -1, -1)
-        ]
-
-        self.generate_lines_and_effects(list(range(240)), players, servers)
-
-        # One time position per hour
-        time_positions = [i * 10 + 5 for i in range(24)]
-        plt.xticks(time_positions, hours)
-        plt.savefig(
-            os.path.join(self.graphs_dir, f"sfd_activity_day_{timezone}.png"), dpi=300
-        )
-        plt.close("all")
-
-    @staticmethod
-    def generate_lines_and_effects(x_positions, players, servers):
-        plt.switch_backend("Agg")
-        plt.figure(figsize=(14, 7))
-        plt.plot(x_positions, players, color="cyan", label="Players")
-        plt.plot(x_positions, servers, color="magenta", label="Servers")
-        plt.legend(loc="upper center", fontsize=12, bbox_to_anchor=(0.5, 1.05), ncol=2)
-
-        mplcyberpunk.add_glow_effects()
-        mplcyberpunk.add_gradient_fill(alpha_gradientglow=0.5)
-        plt.tight_layout()
-        plt.grid(True)
-
-    async def update_stats(self) -> tuple:
-        players_day, servers_day = await self._load_bot_config_day()
-        current_players, current_servers = await self.get_players_and_servers()
-        now = datetime.datetime.now()
+    async def update_stats(self) -> None:
+        activity = await self._load_sfd_activity_data()
+        players_day, servers_day = activity["players_day"], activity["servers_day"]
+        current_players, current_servers = await self._get_players_and_servers()
 
         players_day.pop(0)
         servers_day.pop(0)
         players_day.append(current_players)
         servers_day.append(current_servers)
 
+        # Update daily stats
         await self.bot_config.update_many(
             DB_SFD_ACTIVITY,
-            {"$set": {"players_day": players_day, "servers_day": servers_day}},
+            {
+                "$set": {
+                    "players_day": players_day,
+                    "servers_day": servers_day,
+                }
+            },
         )
 
-        if not (now.hour % 4 == 0 and now.minute == 0):
+        now = datetime.datetime.now()
+        last_update_week = activity["last_update_week"]
+
+        if not is_older_than(6, last_update_week):
             return
 
-        players_week, servers_week = await self._load_bot_config_week()
+        time_diff = now - last_update_week
+        hours_diff = time_diff.total_seconds() / 3600
+        update_count = min(4, max(1, int(hours_diff // 6)))
+        print(f"Updating weekly stats: {update_count} updates")
+        players_week, servers_week = activity["players_week"], activity["servers_week"]
 
-        # Use the last 40 ticks and split them into 10 groups of 4 ticks each.
-        # This means every 4 hours will have 10 ticks that were averaged from 40 ticks.
-        recent_players = players_day[-40:]
-        recent_servers = servers_day[-40:]
+        recent_players = players_day[-60 * update_count :]
+        recent_servers = servers_day[-60 * update_count :]
 
         new_players_averages = []
         new_servers_averages = []
 
-        for group in range(10):
-            start_index = group * 4
-            end_index = (group + 1) * 4
+        for group in range(10 * update_count):
+            start_index = group * 6
+            end_index = (group + 1) * 6
 
             players_group = recent_players[start_index:end_index]
             servers_group = recent_servers[start_index:end_index]
@@ -174,7 +175,7 @@ class SFDServers:
             new_players_averages.append(round(average(players_group)))
             new_servers_averages.append(round(average(servers_group)))
 
-        for _ in range(10):
+        for _ in range(10 * update_count):
             players_week.pop(0)
             servers_week.pop(0)
 
@@ -183,26 +184,17 @@ class SFDServers:
 
         await self.bot_config.update_many(
             DB_SFD_ACTIVITY,
-            {"$set": {"players_week": players_week, "servers_week": servers_week}},
+            {
+                "$set": {
+                    "players_week": players_week,
+                    "servers_week": servers_week,
+                    "last_update_week": now,
+                }
+            },
         )
 
-    async def _load_bot_config_day(self) -> tuple:
-        activity = await self.bot_config.find_one(DB_SFD_ACTIVITY)
-        return activity["players_day"], activity["servers_day"]
-
-    async def _load_bot_config_week(self) -> tuple:
-        activity = await self.bot_config.find_one(DB_SFD_ACTIVITY)
-        return activity["players_week"], activity["servers_week"]
-
-    async def get_players_and_servers(self) -> tuple:
-        servers = await self._parse_servers(None)
-        players = 0
-        for server in servers:
-            players += server.players
-        return players, len(servers)
-
     async def get_servers_info(self) -> tuple:
-        servers = await self._parse_servers(None)
+        servers = await self._parse_servers()
         servers_dict = {"server_name": [], "maps": [], "players": []}
         all_players = 0
 
@@ -219,14 +211,34 @@ class SFDServers:
         return servers_dict, all_players
 
     async def get_servers(self) -> list:
-        servers = await self._parse_servers(None)
+        servers = await self._parse_servers()
         return servers
 
     async def get_server(self, search: str) -> Server:
         return await self._parse_servers(search)
 
-    async def _parse_servers(self, search: str) -> Union[list, Server]:
-        response = await self.load_sfd_servers()
+    async def _load_sfd_servers(self) -> str:
+        try:
+            response = await self.session.post(
+                SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS
+            )
+            return response.text
+        except (httpx.ReadTimeout, httpx.ConnectTimeout):
+            print("SFD Servers: Request timed out")
+        return ""
+
+    async def _get_players_and_servers(self) -> tuple:
+        servers = await self._parse_servers()
+        players = 0
+        for server in servers:
+            players += server.players
+        return players, len(servers)
+
+    async def _load_sfd_activity_data(self) -> dict:
+        return await self.bot_config.find_one(DB_SFD_ACTIVITY)
+
+    async def _parse_servers(self, search: str = None) -> Union[list, Server]:
+        response = await self._load_sfd_servers()
         if not response:
             return []
 
@@ -318,3 +330,16 @@ class SFDServers:
         if search:
             return None
         return servers
+
+    @staticmethod
+    def _generate_lines_and_effects(x_positions, players, servers):
+        plt.switch_backend("Agg")
+        plt.figure(figsize=(14, 7))
+        plt.plot(x_positions, players, color="cyan", label="Players")
+        plt.plot(x_positions, servers, color="magenta", label="Servers")
+        plt.legend(loc="upper center", fontsize=12, bbox_to_anchor=(0.5, 1.05), ncol=2)
+
+        mplcyberpunk.add_glow_effects()
+        mplcyberpunk.add_gradient_fill(alpha_gradientglow=0.5)
+        plt.tight_layout()
+        plt.grid(True)

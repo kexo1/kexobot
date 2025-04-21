@@ -67,7 +67,6 @@ class Listeners(commands.Cog):
         )
         await player.text_channel.send(embed=embed)
 
-    # noinspection PyUnusedLocal
     @commands.Cog.listener()
     async def on_voice_state_update(
         self,
@@ -75,6 +74,19 @@ class Listeners(commands.Cog):
         before: discord.VoiceState,
         after: discord.VoiceState,
     ) -> None:
+        # If member that was removed is the bot itself
+        if member == member.guild.me and before.channel and after.channel is None:
+            print(f"Kicked from {before.channel.name}")
+            # Try to get the player before it's gone
+            try:
+                player: wavelink.Player = before.channel.guild.voice_client
+                player.cleanup()
+                await player.disconnect()
+            except Exception as e:
+                print(f"Error during cleanup after kick: {e}")
+            return
+
+        # For other cases, check if there's a player
         player: wavelink.Player = member.guild.voice_client
         if player is None:
             return
@@ -90,10 +102,6 @@ class Listeners(commands.Cog):
             player.cleanup()
             await player.disconnect()
             return
-
-        # If member that was removed is the bot itself
-        if member == member.guild.me and before.channel and after.channel is None:
-            player.cleanup()
 
     async def _manage_node(
         self,
@@ -126,7 +134,6 @@ class Listeners(commands.Cog):
             node: wavelink.Node = await self.bot.connect_node()
             await player.switch_node(node)
             await player.play(player.temp_current)
-            await self.bot.close_unused_nodes()
             print(f"Node switched to {node.uri}")
             return True
         except RuntimeError:
