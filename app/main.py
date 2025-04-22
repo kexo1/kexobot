@@ -18,7 +18,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from wavelink.enums import NodeStatus
 from pycord.multicog import Bot
 
-from constants import (
+from app.constants import (
     DISCORD_TOKEN,
     MONGO_DB_URL,
     REDDIT_PASSWORD,
@@ -28,24 +28,23 @@ from constants import (
     REDDIT_CLIENT_ID,
     SHITPOST_SUBREDDITS_ALL,
     HUMOR_SECRET,
-    CLEAR_CACHE_HOUR,
     DB_CACHE,
     ESUTAZE_CHANNEL,
     GAME_UPDATES_CHANNEL,
     FREE_STUFF_CHANNEL,
     KEXO_SERVER,
 )
-from utils import generate_temp_guild_data, is_older_than
+from app.utils import generate_temp_guild_data, is_older_than
 
-from classes.esutaze import Esutaze
-from classes.online_fix import OnlineFix
-from classes.game3rb import Game3rb
-from classes.alienware_arena import AlienwareArena
-from classes.lavalink_server_fetch import LavalinkServerFetch
-from classes.elektrina_vypadky import ElektrinaVypadky
-from classes.reddit_fetcher import RedditFetcher
-from classes.fanatical import Fanatical
-from classes.sfd_servers import SFDServers
+from app.classes.esutaze import Esutaze
+from app.classes.online_fix import OnlineFix
+from app.classes.game3rb import Game3rb
+from app.classes.alienware_arena import AlienwareArena
+from app.classes.lavalink_server_fetch import LavalinkServerFetch
+from app.classes.elektrina_vypadky import ElektrinaVypadky
+from app.classes.reddit_fetcher import RedditFetcher
+from app.classes.fanatical import Fanatical
+from app.classes.sfd_servers import SFDServers
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
@@ -265,7 +264,8 @@ class KexoBOT:
                 await asyncio.wait_for(
                     wavelink.Pool.connect(nodes=[node], client=bot), timeout=3
                 )
-                await node.fetch_info()  # Some fucking nodes secretly don't respond, I've played these games before!!!
+                await node.fetch_info()  # Some fucking nodes secretly don't respond,
+            # I've played these games before!!!
             except asyncio.TimeoutError:
                 print(f"Node {node.uri} is not responding, trying next...")
                 continue
@@ -506,6 +506,22 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         return
 
     raise error
+
+
+@bot.event
+async def on_error(event, *args, **kwargs) -> None:
+    """Event that runs when the bot joins a new guild.
+    This event is responsible for creating the guild data in the database.
+    """
+    print(f"Error in event: {event}, args: {args}, kwargs: {kwargs}")
+
+
+@bot.event
+async def on_guild_join(guild: discord.Guild) -> None:
+    """Event that runs when the bot joins a new guild.
+    This event is responsible for creating the guild data in the database.
+    """
+    print(f"Joined new guild: {guild.name}")
 
 
 bot.run(DISCORD_TOKEN)

@@ -72,7 +72,7 @@ class Commands(commands.Cog):
     @option("password", description="Lavalink server password.", required=True)
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def manual_connect(
-            self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
+        self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
     ) -> None:
         embed = discord.Embed(
             title="",
@@ -153,7 +153,7 @@ class Commands(commands.Cog):
 
     @slash_node.command(name="players", description="Information about node players.")
     async def node_players(self, ctx: discord.ApplicationContext) -> None:
-        nodes = wavelink.Pool.nodes.values()
+        nodes: dict[str, wavelink.Node] = wavelink.Pool.nodes.values()
 
         if not nodes:
             embed = discord.Embed(
@@ -182,7 +182,7 @@ class Commands(commands.Cog):
             for player in players:
                 guild: discord.Guild = await self.bot.fetch_guild(player.guild_id)
                 server_name.append(guild.name)
-                playing.append(player.track.title)
+                playing.append(player.track.title if player.track else "Nothing")
                 node_uri.append(node.uri)
 
         if not server_name:
@@ -194,7 +194,7 @@ class Commands(commands.Cog):
             await ctx.respond(embed=embed)
             return
 
-        embed.add_field(name="Server:ㅤㅤ", value="\n".join(server_name))
+        embed.add_field(name="Server:ㅤㅤㅤㅤ", value="\n".join(server_name))
         embed.add_field(name="Playing:ㅤㅤ", value="\n".join(playing))
         embed.add_field(name="Node:", value="\n".join(node_uri))
 
@@ -236,14 +236,14 @@ class Commands(commands.Cog):
     @option("server", description="Server name.")
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def get_sfd_server_info(
-            self, ctx: discord.ApplicationContext, search: str
+        self, ctx: discord.ApplicationContext, search: str
     ) -> None:
         server = self.sfd_servers.get_server(search)
         if not server:
             embed = discord.Embed(
                 title="",
                 description=":x: Server you searched for is not in the list,\n"
-                            "make sure you parsed correct server name.",
+                "make sure you parsed correct server name.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await ctx.respond(
@@ -287,10 +287,10 @@ class Commands(commands.Cog):
     )
     @commands.cooldown(1, 60, commands.BucketType.user)
     async def get_sfd_graph(
-            self,
-            ctx: discord.ApplicationContext,
-            graph_range: str,
-            timezone: str = "New_York",
+        self,
+        ctx: discord.ApplicationContext,
+        graph_range: str,
+        timezone: str = "New_York",
     ) -> None:
         await ctx.defer()
 
@@ -360,18 +360,18 @@ class Commands(commands.Cog):
     )
     @commands.cooldown(1, 300, commands.BucketType.user)
     async def host(
-            self,
-            ctx: discord.ApplicationContext,
-            server_name: str,
-            duration: str,
-            branch: str,
-            version: str,
-            password: str,
-            region: str,
-            scripts: str,
-            slots: int = 8,
-            ping: bool = True,
-            image: str = None,
+        self,
+        ctx: discord.ApplicationContext,
+        server_name: str,
+        duration: str,
+        branch: str,
+        version: str,
+        password: str,
+        region: str,
+        scripts: str,
+        slots: int = 8,
+        ping: bool = True,
+        image: str = None,
     ) -> None:
         author = ctx.author
 
@@ -473,7 +473,7 @@ class Commands(commands.Cog):
 
     @slash_command(name="random_number", description="Choose number between intervals.")
     async def random_number(
-            self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
+        self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
     ) -> None:
         if ineteger1 > ineteger2:
             ineteger2, ineteger1 = ineteger1, ineteger2
@@ -593,7 +593,7 @@ class Commands(commands.Cog):
         embed = discord.Embed(
             title="Select Subreddits",
             description="Select the subreddits you want to see in shitpost command."
-                        " Currently selected subreddits are pre-checked.",
+            " Currently selected subreddits are pre-checked.",
             color=discord.Color.blue(),
         )
 
@@ -610,7 +610,7 @@ class HostView(discord.ui.View):
         style=discord.ButtonStyle.gray, label="I stopped hosting.", emoji="📣"
     )
     async def button_callback(
-            self, button: discord.Button, interaction: discord.Interaction
+        self, button: discord.Button, interaction: discord.Interaction
     ) -> None:
         if interaction.user.name in host_authors:
             embed = await self.disable_embed()
@@ -634,17 +634,17 @@ class HostView(discord.ui.View):
         await self.message.edit(embed=embed, view=None)
         await self.author.send(
             f"**You forgot to click button in {self.message.jump_url} you {
-            random.choice(
-                (
-                    'dumbass',
-                    'retard',
-                    'nitwit',
-                    'prick',
-                    'cunt',
-                    'pillock',
-                    'twat',
+                random.choice(
+                    (
+                        'dumbass',
+                        'retard',
+                        'nitwit',
+                        'prick',
+                        'cunt',
+                        'pillock',
+                        'twat',
+                    )
                 )
-            )
             }.**"
         )
         host_authors.pop(host_authors.index(self.author.name))
@@ -689,7 +689,7 @@ class SubredditSelectorView(discord.ui.View):
 
         nsfw_status = self._user_data[user_id]["reddit"]["nsfw_posts"]
         self.nsfw_button = discord.ui.Button(
-            label="NSFW ON" if not nsfw_status else "NSFW OFF",
+            label="NSFW ON" if nsfw_status else "NSFW OFF",
             style=discord.ButtonStyle.green
             if not nsfw_status
             else discord.ButtonStyle.red,
@@ -717,16 +717,17 @@ class SubredditSelectorView(discord.ui.View):
         await interaction.response.edit_message(view=self)
 
     async def save_changes(self, interaction: discord.Interaction) -> None:
-        self._user_data[self.user_id]["reddit"]["subreddits"] = list(
-            self.selected_subreddits
-        )
+        if self.selected_subreddits:
+            self._user_data[self.user_id]["reddit"]["subreddits"] = list(
+                self.selected_subreddits
+            )
 
-        await self._user_data_db.update_one(
-            {"_id": self.user_id}, {"$set": self._user_data[self.user_id]}
-        )
+            await self._user_data_db.update_one(
+                {"_id": self.user_id}, {"$set": self._user_data[self.user_id]}
+            )
 
-        if self.user_id in self._temp_user_data:
-            await self._update_multireddit()
+            if self.user_id in self._temp_user_data:
+                await self._update_multireddit()
 
         embed = discord.Embed(
             title="Changes Saved",
@@ -761,7 +762,6 @@ class SubredditSelectorView(discord.ui.View):
                 await multireddit.add(await self.bot.reddit_agent.subreddit(subreddit))
             except asyncpraw.exceptions.RedditAPIException:
                 print(f"Failed to add subreddit `{subreddit}`")
-                pass
 
         self._temp_user_data[self.user_id]["reddit"]["multireddit"] = multireddit
 

@@ -35,53 +35,46 @@ class Play(commands.Cog):
     async def play(
         self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
     ) -> None:
-        try:
-            if not ctx.voice_client:
-                joined: bool = await self._join_channel(ctx)
-                if not joined:
-                    return
-                await self._prepare_wavelink(ctx)
-
-            is_moved: bool = await self._should_move_to_channel(ctx)
-            if not is_moved:
+        if not ctx.voice_client:
+            joined: bool = await self._join_channel(ctx)
+            if not joined:
                 return
+            await self._prepare_wavelink(ctx)
 
-            await ctx.trigger_typing()
+        is_moved: bool = await self._should_move_to_channel(ctx)
+        if not is_moved:
+            return
 
-            track = await self._fetch_track(ctx, search)
-            if not track:
-                return
+        await ctx.trigger_typing()
 
-            player: wavelink.Player = ctx.voice_client
+        track = await self._fetch_track(ctx, search)
+        if not track:
+            return
 
-            if player.playing:
-                if play_next:
-                    player.queue.put_at(0, track)
-                else:
-                    player.queue.put(track)
-                await ctx.respond(embed=self._queue_embed(track))
-                return
+        player: wavelink.Player = ctx.voice_client
 
-            if player.queue.is_empty:
-                player.should_respond = True
+        if player.playing:
+            if play_next:
+                player.queue.put_at(0, track)
+            else:
+                player.queue.put(track)
+            await ctx.respond(embed=self._queue_embed(track))
+            return
 
-            if player.just_joined:
-                player.should_respond = False
-                player.just_joined = False
+        if player.queue.is_empty:
+            player.should_respond = True
 
-            playing: bool = await self._play_track(ctx, track)
-            if not playing:
-                return
+        if player.just_joined:
+            player.should_respond = False
+            player.just_joined = False
 
-            if player.should_respond:
-                await ctx.respond(embed=self._playing_embed(track))
-                player.should_respond = False
-        except discord.errors.InteractionResponded:
-            # Interaction has already been responded to, ignore
-            pass
-        except discord.errors.NotFound:
-            # Interaction has expired, ignore
-            pass
+        playing: bool = await self._play_track(ctx, track)
+        if not playing:
+            return
+
+        if player.should_respond:
+            await ctx.respond(embed=self._playing_embed(track))
+            player.should_respond = False
 
     @music.command(name="skip", description="Skip playing song.")
     @guild_only()
@@ -205,6 +198,7 @@ class Play(commands.Cog):
         player: wavelink.Player = ctx.voice_client
         # If it's a playlist
         if isinstance(tracks, wavelink.Playlist):
+            await ctx.defer()
             for track in tracks:
                 track.requester = ctx.author
 
@@ -233,8 +227,6 @@ class Play(commands.Cog):
     async def _search_tracks(
         ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
-        player: wavelink.Player = ctx.voice_client
-        player.should_respond = True
         try:
             tracks: wavelink.Search = await wavelink.Playable.search(search)
         except LavalinkLoadException:

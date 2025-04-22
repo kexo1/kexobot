@@ -1,7 +1,14 @@
 graphs/
 video/
 __pycache__/
+.ruff_cache/
+.idea/
+
 *.pyc
 .env
 .git
 .gitignore 
+
+secret.env
+TODO.md
+README.md

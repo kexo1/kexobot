@@ -74,18 +74,6 @@ class Listeners(commands.Cog):
         before: discord.VoiceState,
         after: discord.VoiceState,
     ) -> None:
-
-        if member == member.guild.me and before.channel and after.channel is None:
-            print(f"Kicked from {before.channel.name}")
-            try:
-                player: wavelink.Player = before.channel.guild.voice_client
-                player.cleanup()
-                await player.disconnect()
-            except Exception as e:
-                print(f"Error during cleanup after kick: {e}")
-            return
-
-        # For other cases, check if there's a player
         player: wavelink.Player = member.guild.voice_client
         if player is None:
             return
