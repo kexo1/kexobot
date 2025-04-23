@@ -1,13 +1,15 @@
 # TODO List
 ## Bugs
-- [ ] Fix unclosed `aiohttp.ClientSession` warnings.
 
 ## Features
 - [ ] Save players volume
 
 ## Improvements
 - [ ] Make Game3rb more readable
-- [ ] Redo Reddit DB, make user settings
 - [ ] Merge some files together
 - [ ] Split code into more functions
 - [ ] Add docstrings
+- [ ] Make session handler from timeouts
+- [ ] Use strip text function
+- [ ] Lavalink fetch fix protocols
+- [ ] Use wavelink search spotify

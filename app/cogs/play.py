@@ -1,7 +1,10 @@
 from typing import Union, Optional
+import random
+import re
 
 import discord
 import wavelink
+import httpx
 
 from discord import option
 from discord.ext import commands
@@ -9,14 +12,18 @@ from discord.commands import guild_only
 from wavelink.exceptions import LavalinkLoadException, NodeException
 
 from app.decorators import is_joined, is_playing, is_song_in_queue, is_queue_empty
-from app.utils import find_track
+from app.constants import COUNTRIES, SONG_STRIP
+from app.utils import find_track, strip_text
 
 
 class Play(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.session = self.bot.session
+        self.radiomap_response = []
 
     music = discord.SlashCommandGroup("music", "All music commands")
+    radio = discord.SlashCommandGroup("radio", "All radio commands")
 
     @music.command(name="play", description="Plays song.")
     @guild_only()
@@ -24,16 +31,15 @@ class Play(commands.Cog):
     @option(
         "search",
         description="You can either put a url or a name of the song,"
-        " both youtube and spotify are supported.",
+                    " both youtube and spotify are supported.",
     )
     @option(
         "play_next",
         description="If you want to play this song next in queue, set this to true.",
-        required=False,
         type=bool,
     )
     async def play(
-        self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
+            self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
     ) -> None:
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
@@ -76,6 +82,114 @@ class Play(commands.Cog):
             await ctx.respond(embed=self._playing_embed(track))
             player.should_respond = False
 
+    @radio.command(
+        name="search",
+        description="Search radio from RadioGarden"
+    )
+    @guild_only()
+    @option("station", description="Name of the radio station.")
+    @option(
+        "play_next",
+        description="If you want to play this song next in queue, set this to true.",
+        type=bool,
+    )
+    @option(
+        "country",
+        description="Select one of the countries to narrow down the search.",
+        choices=COUNTRIES,
+    )
+    async def play_radio(
+            self,
+            ctx: discord.ApplicationContext,
+            station: str,
+            country: str = None,
+            play_next: bool = False,
+    ) -> None:
+        encoded_station = discord.utils.escape_markdown(station)
+        try:
+            response = await self.session.get(
+                f"https://radio.garden/api/search?q={encoded_station}",
+                headers={"accept": "application/json"},
+            )
+            response = response.json()
+        except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
+            await ctx.respond(embed=self._unresponsive_radiomap_embed())
+            return
+
+        if not response["hits"]["hits"]:
+            embed = discord.Embed(
+                title="",
+                description=f":x: No stations were found for `{station}`.",
+                color=discord.Color.blue(),
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            return
+
+        for station in response["hits"]["hits"]:
+            station = station["_source"]
+            if country and station["page"]["country"]["title"] != country:
+                continue
+
+            station = station["stream"].replace(";", "")
+            break
+
+        await self.play(ctx, station, play_next)
+
+    @radio.command(name="random", description="Gets random radio from RadioMap.")
+    @guild_only()
+    @option("play_next", description="If you want to play this song next in queue, set this to true.")
+    async def radio_random(self, ctx: discord.ApplicationContext, play_next: bool = False) -> None:
+        await ctx.defer()
+        try:
+            response = await self.session.get(
+                "https://radio.garden/api/ara/content/places",
+                headers={"accept": "application/json"},
+            )
+            response = response.json()
+        except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
+            await ctx.respond(embed=self._unresponsive_radiomap_embed())
+            return
+
+        if not self.radiomap_response:
+            if 'data' in response and 'list' in response['data']:
+                for item in response['data']['list']:
+                    if 'url' in item:
+                        place_id = item['url'].split('/')[-1]
+                        self.radiomap_response.append(place_id)
+
+        place_id = random.choice(self.radiomap_response)
+
+        try:
+            response = await self.session.get(
+                f"https://radio.garden/api/ara/content/page/{place_id}/channels",
+                headers={"accept": "application/json"},
+            )
+            response = response.json()
+        except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
+            await ctx.respond(embed=self._unresponsive_radiomap_embed())
+            return
+
+        station_id = response["data"]["content"][0]["items"][0]["page"]["url"].split("/")[-1]
+
+        try:
+            response = await self.session.get(
+                f"https://radio.garden/api/ara/content/listen/{station_id}/channel.mp3",
+                headers={"accept": "application/json"},
+            )
+        except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
+            await ctx.respond(embed=self._unresponsive_radiomap_embed())
+            return
+
+        response_text = response.text
+        url_match = re.search(r'href="(https://[^"]+)"', response_text)
+        if url_match:
+            station = url_match.group(1)
+        else:
+            await ctx.respond(embed=self._unresponsive_radiomap_embed())
+            return
+
+        await self.play(ctx, station, play_next)
+
     @music.command(name="skip", description="Skip playing song.")
     @guild_only()
     @is_playing()
@@ -99,7 +213,7 @@ class Play(commands.Cog):
     @is_queue_empty()
     @is_song_in_queue()
     async def skip_to_command(
-        self, ctx: discord.ApplicationContext, to_find: str
+            self, ctx: discord.ApplicationContext, to_find: str
     ) -> None:
         player: wavelink.Player = ctx.voice_client
         track_pos = find_track(player, to_find)
@@ -166,7 +280,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention},"
-                f" join the voice channel the bot is playing in to disconnect it.",
+                            f" join the voice channel the bot is playing in to disconnect it.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -183,7 +297,7 @@ class Play(commands.Cog):
 
     # ----------------------- Helper functions ------------------------ #
     async def _fetch_track(
-        self, ctx: discord.ApplicationContext, search: str
+            self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
         if tracks:
@@ -192,13 +306,15 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _fetch_first_track(
-        ctx: discord.ApplicationContext,
-        tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
+            ctx: discord.ApplicationContext,
+            tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
     ) -> wavelink.Playable:
         player: wavelink.Player = ctx.voice_client
         # If it's a playlist
         if isinstance(tracks, wavelink.Playlist):
-            await ctx.defer()
+            if player.should_respond:
+                await ctx.defer()
+
             for track in tracks:
                 track.requester = ctx.author
 
@@ -208,7 +324,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"Added the playlist **`{tracks.name}`**"
-                f" ({song_count} songs) to the queue.",
+                            f" ({song_count} songs) to the queue.",
                 color=discord.Color.blue(),
             )
             if player.should_respond:
@@ -225,17 +341,29 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _search_tracks(
-        ctx: discord.ApplicationContext, search: str
+            ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
         try:
             tracks: wavelink.Search = await wavelink.Playable.search(search)
-        except LavalinkLoadException:
+        except LavalinkLoadException as e:
+            if e.error == "Something went wrong while looking up the track.":
+                embed = discord.Embed(
+                    title="",
+                    description=":x: Failed to load tracks, youtube plugin might be disabled,"
+                                " or version is outdated. Try `/reconnect_node`. If issue persists,"
+                                " it means YouTube updated their site and getting tracks"
+                                " won't work until youtube plugin gets fixed.",
+                    color=discord.Color.from_rgb(r=220, g=0, b=0),
+                )
+                await ctx.respond(embed=embed, ephemeral=True)
+                return
+
             embed = discord.Embed(
                 title="",
                 description=":x: Failed to load tracks, you probably inputted"
-                " wrong link or this Lavalink server "
-                "doesn't have necessary plugins."
-                " To fix this, use command `/reconnect_node`",
+                            " wrong link or this Lavalink server "
+                            "doesn't have necessary plugins."
+                            " To fix this, use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=220, g=0, b=0),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -270,7 +398,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention}, I'm playing in another channel,"
-                f" wait till song finishes.",
+                            f" wait till song finishes.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed)
@@ -292,7 +420,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention},"
-                f" you're not in a voice channel. Type `/play` from vc.",
+                            f" you're not in a voice channel. Type `/play` from vc.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -313,7 +441,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=":x: No nodes are currently assigned to the bot."
-                "\nTo fix this, use command `/reconnect_node`",
+                            "\nTo fix this, use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -323,7 +451,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=":x: Failed to connect to the voice channel,"
-                " was bot moved manually? If yes disconnect it and try again.",
+                            " was bot moved manually? If yes disconnect it and try again.",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
             vc: wavelink.Player = ctx.guild.voice_client
@@ -334,7 +462,7 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _play_track(
-        ctx: discord.ApplicationContext, track: wavelink.Playable
+            ctx: discord.ApplicationContext, track: wavelink.Playable
     ) -> None:
         player: wavelink.Player = ctx.voice_client
 
@@ -344,8 +472,8 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=":x: Failed to connect to send request to the node."
-                "\nError might be caused by Discord serers not responding,"
-                " give it a minute or use command `/reconnect_node`",
+                            "\nError might be caused by Discord serers not responding,"
+                            " give it a minute or use command `/reconnect_node`",
                 color=discord.Color.from_rgb(r=220, g=0, b=0),
             )
             await ctx.respond(embed=embed)
@@ -366,7 +494,7 @@ class Play(commands.Cog):
         embed = discord.Embed(
             title="",
             description=f"**✅ Joined to <#{player.channel.id}>"
-            f" and set text channel to <#{ctx.channel.id}>.**",
+                        f" and set text channel to <#{ctx.channel.id}>.**",
             color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
@@ -375,19 +503,19 @@ class Play(commands.Cog):
     def _queue_embed(track: wavelink.Playable) -> discord.Embed:
         return discord.Embed(
             title="",
-            description=f"**Added to queue:\n [{track.title}]({track.uri})**",
+            description=f"**Added to queue:\n [{strip_text(track.title, SONG_STRIP)}]({track.uri})**",
             color=discord.Color.blue(),
         )
 
     @staticmethod
-    def _playing_embed(track) -> discord.Embed:
+    def _playing_embed(track: wavelink.Playable) -> discord.Embed:
         author_pfp = None
         if hasattr(track.requester.avatar, "url"):
             author_pfp = track.requester.avatar.url
 
         embed = discord.Embed(
             title="Now playing",
-            description=f"[**{track.title}**]({track.uri})",
+            description=f"[**{strip_text(track.title, SONG_STRIP)}**]({track.uri})",
             color=discord.Colour.green(),
         )
         embed.set_footer(
@@ -395,6 +523,14 @@ class Play(commands.Cog):
         )
         embed.set_thumbnail(url=track.artwork)
         return embed
+
+    @staticmethod
+    def _unresponsive_radiomap_embed() -> discord.Embed:
+        return discord.Embed(
+            title="",
+            description=":x: Failed to get response from RadioMap API, try again later.",
+            color=discord.Color.from_rgb(r=220, g=0, b=0),
+        )
 
 
 def setup(bot: commands.Bot) -> None:

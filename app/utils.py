@@ -3,6 +3,7 @@ from typing import Optional
 from datetime import datetime
 
 import discord
+import aiohttp
 import httpx
 import psutil
 import wavelink
@@ -44,7 +45,7 @@ def get_memory_usage():
 
 
 async def download_video(
-    session: httpx.AsyncClient, url: str, nsfw: bool
+        session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> Optional[discord.File]:
     video_folder = os.path.join(os.getcwd(), "video")
     os.makedirs(video_folder, exist_ok=True)
@@ -68,7 +69,7 @@ async def download_video(
 
 
 async def check_node_status(
-    bot: discord.Bot, uri: str, password: str
+        bot: discord.Bot, uri: str, password: str
 ) -> Optional[wavelink.Node]:
     node = [
         wavelink.Node(
@@ -81,9 +82,20 @@ async def check_node_status(
     try:
         await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=3)
         await node[0].fetch_info()
-    except (asyncio.TimeoutError, wavelink.exceptions.NodeException):
+    except (
+            asyncio.TimeoutError,
+            wavelink.exceptions.NodeException,
+            wavelink.LavalinkException,
+            aiohttp.NonHttpUrlClientError,
+    ):
         return None
     return node
+
+
+def strip_text(text: str, to_strip: tuple) -> str:
+    for char in to_strip:
+        text = text.replace(char, "")
+    return text.strip()
 
 
 def is_older_than(hours: int, custom_datetime: datetime) -> bool:
@@ -123,7 +135,7 @@ def generate_guild_data() -> dict:
 
 
 async def generate_temp_user_data(
-    reddit_agent: asyncpraw.Reddit, subreddits: list, user_id: int
+        reddit_agent: asyncpraw.Reddit, subreddits: list, user_id: int
 ) -> dict:
     multireddit: asyncpraw.models.Multireddit = await reddit_agent.multireddit(
         name=str(user_id), redditor="KexoBOT"
@@ -161,7 +173,7 @@ def generate_user_data() -> dict:
 
 
 async def get_selected_user_data(
-    bot: discord.Bot, ctx: discord.ApplicationContext, selected_data: str
+        bot: discord.Bot, ctx: discord.ApplicationContext, selected_data: str
 ) -> tuple:
     user_id = ctx.author.id
     user_data: dict = bot.user_data.get(user_id)

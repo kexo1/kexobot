@@ -143,7 +143,6 @@ class KexoBOT:
         subreddit_icons = await self.bot_config.find_one(DB_CACHE)
         bot.subreddit_icons = subreddit_icons["subreddit_icons"]
         print("Subreddit icons fetched.")
-        return subreddit_icons["subreddit_icons"]
 
     def _define_classes(self) -> None:
         """Define classes for the bot."""
@@ -506,14 +505,6 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         return
 
     raise error
-
-
-@bot.event
-async def on_error(event, *args, **kwargs) -> None:
-    """Event that runs when the bot joins a new guild.
-    This event is responsible for creating the guild data in the database.
-    """
-    print(f"Error in event: {event}, args: {args}, kwargs: {kwargs}")
 
 
 @bot.event

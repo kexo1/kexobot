@@ -2,7 +2,7 @@ import json
 import httpx
 import wavelink
 
-from constants import LAVALIST_URL, LAVAINFO_API_URLS
+from app.constants import LAVALIST_URL, LAVAINFO_API_URLS
 
 
 class LavalinkServerFetch:
@@ -30,6 +30,9 @@ class LavalinkServerFetch:
         except json.decoder.JSONDecodeError:
             print(f"Failed to decode JSON from {LAVALIST_URL}")
 
+        if not lavalink_servers:
+            lavalink_servers = [self._return_node("lavalink.kexoservers.online", "443", "kexobot", secure=True)]
+
         return lavalink_servers
 
     async def _lavalist_fetch(self, json_data: list) -> list[wavelink.Node]:
@@ -53,6 +56,10 @@ class LavalinkServerFetch:
         lavalink_servers = []
 
         for server in json_data:
+            if "error" in server:
+                print("Error in lavainfo response: ", json_data.get("error"))
+                return []
+
             if server["isConnected"] is False:
                 continue
 
@@ -85,9 +92,14 @@ class LavalinkServerFetch:
         return lavalink_servers
 
     @staticmethod
-    def _return_node(host: str, port: int, password: str) -> wavelink.Node:
+    def _return_node(host: str, port: int, password: str, secure: bool = False) -> wavelink.Node:
+        if secure:
+            protocol = "https://"
+        else:
+            protocol = "http://"
+
         return wavelink.Node(
-            uri=f"http://{host}:{port}",
+            uri=f"{protocol}{host}:{port}",
             password=password,
             retries=1,
             inactive_player_timeout=600,

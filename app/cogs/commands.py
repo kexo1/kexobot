@@ -13,13 +13,14 @@ from discord.commands import slash_command, guild_only, option
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.constants import (
+    DB_LISTS,
     XTC_SERVER,
     KEXO_SERVER,
+    DUCK_CULT,
     DB_CHOICES,
     SFD_TIMEZONE_CHOICE,
     SHITPOST_SUBREDDITS_ALL,
 )
-from app.classes.database_manager import DatabaseManager
 from app.classes.sfd_servers import SFDServers
 from app.utils import (
     get_memory_usage,
@@ -47,7 +48,6 @@ class Commands(commands.Cog):
         self.run_time = time.time()
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
         self.sfd_servers = SFDServers(self.bot_config, self.bot.session)
-        self.database_manager = DatabaseManager(self.bot_config)
 
     slash_bot_config = discord.SlashCommandGroup(
         "bot_config", "Update Bot Configuration"
@@ -65,7 +65,7 @@ class Commands(commands.Cog):
     @guild_only()
     @option(
         "uri",
-        description="Lavalink server URL (without http:// at start)",
+        description="Lavalink server full URL",
         required=True,
     )
     @option("port", description="Lavalink server port.", required=True)
@@ -74,15 +74,9 @@ class Commands(commands.Cog):
     async def manual_connect(
         self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
     ) -> None:
-        embed = discord.Embed(
-            title="",
-            description=f"**🔄 Connecting to `{uri}`**",
-            color=discord.Color.blue(),
-        )
-        message = await ctx.respond(embed=embed)
-        await ctx.trigger_typing()
+        await ctx.defer()
         node: wavelink.Node = await check_node_status(
-            self.bot, f"http://{uri}:{str(port)}", password
+            self.bot, f"{uri}:{str(port)}", password
         )
 
         if not node:
@@ -91,16 +85,16 @@ class Commands(commands.Cog):
                 description=f":x: Failed to connect to `{uri}`",
                 color=discord.Color.from_rgb(r=255, g=0, b=0),
             )
-            await message.edit(embed=embed)
+            await ctx.respond(embed=embed)
             return
 
         self.bot.node = node
         embed = discord.Embed(
             title="",
-            description=f"**✅ Connected to node `{node.uri}`**",
+            description=f"**✅ Connected to node `{node[0].uri}`**",
             color=discord.Color.blue(),
         )
-        await message.edit(embed=embed)
+        await ctx.respond(embed=embed)
 
     @slash_node.command(
         name="reconnect", description="Automatically reconnect to avaiable node"
@@ -499,68 +493,36 @@ class Commands(commands.Cog):
 
     # -------------------- Database Managment -------------------- #
     @slash_bot_config.command(
-        name="add_to",
+        name="add",
         description="Adds string to selected list.",
         guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
-    @option("collection", description="Choose database", choices=DB_CHOICES)
+    @option("collection", description="Choose database", choices=DB_CHOICES.keys())
     @option("to_upload", description="String to upload.")
-    async def add_to(self, ctx, collection: str, to_upload: str) -> None:
-        db_list = await self.database_manager.get_database(collection)
-
-        if to_upload in db_list:
-            return await ctx.respond(
-                f"{ctx.author.mention} string `{to_upload}` "
-                f"is already in the database, use `/show_data`"
-            )
-
-        db_list.append(to_upload)
-        await self.database_manager.update_database(collection, db_list)
-        await ctx.respond(
-            f"String `{to_upload}` was added to `{collection}` :white_check_mark:"
-        )
+    async def bot_config_add(self, ctx, collection: str, to_upload: str) -> None:
+        await self._add_to_bot_config(ctx, collection, to_upload)
 
     @slash_bot_config.command(
-        name="remove_from",
+        name="remove",
         description="Removes string from selected list.",
         guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
-    @option("collection", description="Choose database", choices=DB_CHOICES)
+    @option("collection", description="Choose database", choices=DB_CHOICES.keys())
     @option("to_remove", description="String to remove.")
-    async def remove(self, ctx, collection: str, to_remove: str) -> None:
-        db_list = await self.database_manager.get_database(collection)
-
-        if to_remove not in db_list:
-            await ctx.respond(
-                f"{ctx.author.mention}, string `{to_remove}`"
-                f" is not in the database, use `/show_data`"
-            )
-            return
-        db_list.pop(db_list.index(to_remove))
-
-        await self.database_manager.update_database(collection, db_list)
-        await ctx.respond(
-            f"String `{to_remove}` was removed from `{collection}` :white_check_mark:"
-        )
+    async def bot_config_remove(self, ctx, collection: str, to_remove: str) -> None:
+        await self._remove_from_bot_config(ctx, collection, to_remove)
 
     @slash_bot_config.command(
-        name="show_data",
+        name="show",
         description="Shows data from selected lists.",
         guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
-    @option("collection", description="Choose database", choices=DB_CHOICES)
-    async def show_data(self, ctx, collection: str) -> None:
-        listing = await self.database_manager.get_database(collection)
-
-        embed = discord.Embed(title=collection, color=discord.Color.blue())
-        embed.add_field(
-            name=f"_{len(listing)} items_",
-            value="\n".join(f"{i + 1}. {listing[i]}" for i in range(len(listing))),
-        )
-        await ctx.respond(embed=embed)
+    @option("collection", description="Choose database", choices=DB_CHOICES.keys())
+    async def bot_config_show(self, ctx, collection: str) -> None:
+        await self._show_bot_config(ctx, collection)
 
     @slash_reddit.command(
         name="settings",
@@ -598,6 +560,75 @@ class Commands(commands.Cog):
         )
 
         await ctx.respond(embed=embed, view=view, ephemeral=True)
+
+    async def _show_bot_config(self, ctx, collection: str) -> None:
+        bot_config: dict = await self.bot_config.find_one(DB_LISTS)
+        collection_name = collection
+        collection: list = bot_config[DB_CHOICES[collection]]
+
+        embed = discord.Embed(title=collection_name, color=discord.Color.blue())
+        embed.add_field(
+            name=f"_{len(collection)} items_",
+            value="\n".join(
+                f"{i + 1}. {collection[i]}" for i in range(len(collection))
+            ),
+        )
+        await ctx.respond(embed=embed)
+
+    async def _add_to_bot_config(self, ctx, collection: str, to_upload: str) -> None:
+        bot_config: dict = await self.bot_config.find_one(DB_LISTS)
+        collection_name = collection
+        collection_db_name = DB_CHOICES[collection]
+        collection: list = bot_config[collection_db_name]
+
+        if to_upload in collection:
+            embed = discord.Embed(
+                title="",
+                description=f":x: String `{to_upload}` is already in the list, use `/bot_config show`",
+                color=discord.Color.blue(),
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            return
+
+        collection.append(to_upload)
+        await self.bot_config.update_one(
+            DB_LISTS, {"$set": {collection_db_name: collection}}
+        )
+        embed = discord.Embed(
+            title="",
+            description=f":white_check_mark: String `{to_upload}` was added to `{collection_name}`",
+            color=discord.Color.blue(),
+        )
+        await ctx.respond(embed=embed)
+
+    async def _remove_from_bot_config(
+        self, ctx, collection: str, to_remove: str
+    ) -> None:
+        bot_config: dict = await self.bot_config.find_one(DB_LISTS)
+        collection_name = collection
+        collection_db_name = DB_CHOICES[collection]
+        collection: list = bot_config[collection_db_name]
+
+        if to_remove not in collection:
+            embed = discord.Embed(
+                title="",
+                description=f":x: String `{to_remove}` is not in the list, use `/bot_config show`",
+                color=discord.Color.blue(),
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            return
+
+        del collection[collection.index(to_remove)]
+
+        await self.bot_config.update_one(
+            DB_LISTS, {"$set": {collection_db_name: collection}}
+        )
+        embed = discord.Embed(
+            title="",
+            description=f":white_check_mark: String `{to_remove}` was removed from `{collection_name}`",
+            color=discord.Color.blue(),
+        )
+        await ctx.respond(embed=embed)
 
 
 class HostView(discord.ui.View):

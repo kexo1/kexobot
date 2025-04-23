@@ -12,12 +12,14 @@ logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
 
 # -------------------- Discord -------------------- #
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+# DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
 ESUTAZE_CHANNEL = 1302271245919981638
 GAME_UPDATES_CHANNEL = 882185054174994462
 FREE_STUFF_CHANNEL = 1081883673902714953
 KEXO_SERVER = 692810367851692032
 SISKA_GANG_SERVER = 765262686908186654
 XTC_SERVER = 723197287861583885
+DUCK_CULT = 484047204202446858
 
 # -------------------- Lavalink -------------------- #
 LAVAINFO_API_URLS = [
@@ -63,13 +65,13 @@ DB_CACHE = {"_id": ObjectId("617958fae4043ee4a3f073f2")}
 DB_LISTS = {"_id": ObjectId("6178211ec5f5c08c699b8fd3")}
 DB_REDDIT_CACHE = {"_id": ObjectId("61795a8950149bebf7666e55")}
 DB_SFD_ACTIVITY = {"_id": ObjectId("67eaab02440fd08b31d39a89")}
-DB_CHOICES = (
-    "Games",
-    "r/FreeGameFindings Exceptions",
-    "r/CrackWatch Exceptions",
-    "Esutaze Exceptions",
-    "AlienwareArena Exceptions",
-)
+DB_CHOICES = {
+    "Games": "games",
+    "r/FreeGameFindings Exceptions": "freegamefindings_exceptions",
+    "r/CrackWatch Exceptions": "crackwatch_exceptions",
+    "Esutaze Exceptions": "esutaze_exceptions",
+    "AlienwareArena Exceptions": "alienwarearena_exceptions",
+}
 
 # -------------------- Reddit -------------------- #
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
@@ -210,4 +212,38 @@ SHITPOST_SUBREDDITS_ALL = (
     "clamworks",
     "197",
 )
-REDDIT_VIDEO_STRIP = ("DASH_360", "DASH_480", "DASH_720", "DASH_1080")
+
+# -------------------- Music -------------------- #
+COUNTRIES = (
+    "United States",
+    "United Kingdom",
+    "Germany",
+    "France",
+    "Russia",
+    "China",
+    "Japan",
+    "India",
+    "Brazil",
+    "Australia",
+    "Canada",
+    "South Korea",
+    "Italy",
+    "Spain",
+    "Mexico",
+    "Turkey",
+    "Egypt",
+    "South Africa",
+    "Argentina",
+    "Indonesia",
+    "Sweden",
+    "Finland",
+    "Hungary",
+    "Slovakia",
+    "Czech Republic",
+)
+SONG_STRIP = (
+    ";",
+    "*",
+    "https://",
+    "http://",
+)

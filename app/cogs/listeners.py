@@ -11,13 +11,15 @@ from wavelink import (
     TrackExceptionEventPayload,
     TrackStuckEventPayload,
 )
+from app.constants import SONG_STRIP
+from app.utils import strip_text
 
 
 class Listeners(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.Cog.listener()
+    @commands.Cog.listener()  # noinspection PyUnusedLocal
     async def on_wavelink_track_start(self, payload: TrackStartEventPayload) -> None:
         if not payload.player.should_respond:
             await payload.player.text_channel.send(embed=self._playing_embed(payload))
@@ -25,12 +27,14 @@ class Listeners(commands.Cog):
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
         print(f"Node {payload.node.uri} is ready!")
+        if self.bot.get_online_nodes() > 1:
+            await self.bot.close_unused_nodes()
 
     @commands.Cog.listener()
     async def on_wavelink_node_disconnected(
         self, payload: NodeDisconnectedEventPayload
     ) -> None:
-        if self.bot.get_online_nodes() > 1:
+        if self.bot.get_online_nodes() == 0:
             print(f"Node {payload.node.uri} is disconnected, fetching new node...")
             await self.bot.connect_node()
 
@@ -67,6 +71,7 @@ class Listeners(commands.Cog):
         )
         await player.text_channel.send(embed=embed)
 
+    # noinspection PyUnusedLocal
     @commands.Cog.listener()
     async def on_voice_state_update(
         self,
@@ -123,14 +128,15 @@ class Listeners(commands.Cog):
             await player.play(player.temp_current)
             print(f"Node switched to {node.uri}")
             return True
-        except RuntimeError:
+        except (RuntimeError, wavelink.LavalinkException):
             return False
 
     def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
+
         embed = discord.Embed(
             color=discord.Colour.green(),
             title="Now playing",
-            description=f"[**{payload.track.title}**]({payload.track.uri})",
+            description=f"[**{strip_text(payload.track.title, SONG_STRIP)}**]({payload.track.uri})",
         )
         embed.set_footer(
             text=f"Requested by {payload.player.current.requester.name}",
