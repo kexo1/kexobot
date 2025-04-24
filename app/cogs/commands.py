@@ -624,7 +624,7 @@ class HostView(discord.ui.View):
             host_authors.pop(host_authors.index(self.author.name))
             return
 
-        await send_error(ctx, "NOT_EMBED_AUTHOR")
+        await send_error(interaction, "NOT_EMBED_AUTHOR")
 
     async def on_timeout(self) -> None:
         embed = await self.disable_embed()
@@ -687,9 +687,11 @@ class SubredditSelectorView(discord.ui.View):
         nsfw_status = self._user_data[user_id]["reddit"]["nsfw_posts"]
         self.nsfw_button = discord.ui.Button(
             label="NSFW ON" if nsfw_status else "NSFW OFF",
-            style=discord.ButtonStyle.green
-            if not nsfw_status
-            else discord.ButtonStyle.red,
+            style=(
+                discord.ButtonStyle.green
+                if not nsfw_status
+                else discord.ButtonStyle.red
+            ),
             custom_id="nsfw_posts",
         )
         self.nsfw_button.callback = self.nsfw_posts

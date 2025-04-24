@@ -3,7 +3,7 @@ import httpx
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup
-from constants import (
+from app.constants import (
     DB_CACHE,
     DB_LISTS,
     ALIENWAREARENA_MAX_POSTS,
@@ -43,9 +43,9 @@ class AlienwareArena:
             if url in alienwarearena_cache:
                 break
 
-            title = giveaway["title"].lower()
+            title = giveaway["title"]
 
-            is_filtered = [k for k in to_filter if k in title]
+            is_filtered = [k for k in to_filter if k in title.lower()]
             if is_filtered:
                 continue
 
@@ -56,9 +56,19 @@ class AlienwareArena:
             alienwarearena_cache.append(url)
 
             soup = BeautifulSoup(giveaway["description"], "html.parser")
-            strong_element = soup.find("strong")
-            strong_text = strong_element.text if strong_element else ""
-            description = strong_text + f"\n\n**[eu.alienwarearena.com]({url})**"
+
+            about_section = soup.find("p", string=lambda text: text and "About" in text)
+            if about_section:
+                result = []
+                current = about_section
+                while current:
+                    result.append(current.get_text(strip=True))
+                    current = current.find_next_sibling("p")
+                description = "\n".join(result)
+            else:
+                strong_element = soup.find("strong")
+                strong_text = strong_element.text if strong_element else ""
+                description = strong_text + f"\n\n**[eu.alienwarearena.com]({url})**"
 
             embed = discord.Embed(
                 title=title, description=description, colour=discord.Colour.dark_theme()
@@ -73,6 +83,7 @@ class AlienwareArena:
     async def _load_bot_config(self) -> tuple:
         alienwarearena_cache = await self.bot_config.find_one(DB_CACHE)
         to_filter = await self.bot_config.find_one(DB_LISTS)
-        return alienwarearena_cache["alienwarearena_cache"], to_filter[
-            "alienwarearena_exceptions"
-        ]
+        return (
+            alienwarearena_cache["alienwarearena_cache"],
+            to_filter["alienwarearena_exceptions"],
+        )

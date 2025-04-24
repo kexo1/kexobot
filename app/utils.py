@@ -89,7 +89,7 @@ async def check_node_status(
         aiohttp.NonHttpUrlClientError,
     ):
         return None
-    return node
+    return node[0]
 
 
 def strip_text(text: str, to_strip: tuple) -> str:
@@ -99,11 +99,11 @@ def strip_text(text: str, to_strip: tuple) -> str:
 
 
 def fix_audio_title(track: wavelink.Playable) -> str:
-    if not track.title:
-        title = track.uri
-    else:
+    if track.title and track.title != "Unknown title":
         title = track.title
-
+    else:
+        title = track.uri
+        
     for char in SONG_STRIP:
         title = title.replace(char, "")
     return title.strip()
@@ -111,6 +111,9 @@ def fix_audio_title(track: wavelink.Playable) -> str:
 
 def is_older_than(hours: int, custom_datetime: datetime) -> bool:
     current_time = datetime.now()
+
+    #if custom_datetime.tzinfo is not None and current_time.tzinfo is None:
+    #    current_time = current_time.replace(tzinfo=custom_datetime.tzinfo)
     time_difference = current_time - custom_datetime
     return time_difference.total_seconds() > hours * 3600
 
@@ -247,7 +250,7 @@ async def make_http_request(
         try:
             response = await session.get(url, headers=headers, timeout=timeout)
             # Don't raise for status for MP3 files as they might return 302 redirects
-            if not url.endswith('.mp3'):
+            if not url.endswith(".mp3"):
                 response.raise_for_status()
             return response
         except (
@@ -257,7 +260,7 @@ async def make_http_request(
             httpx.HTTPError,
         ):
             if attempt == retries - 1:
-                print('Failed to fetch URL after retries:', url)
+                print("Failed to fetch URL after retries:", url)
                 return None
             await asyncio.sleep(1 * (attempt + 1))
     return None

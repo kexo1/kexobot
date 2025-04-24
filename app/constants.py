@@ -213,6 +213,7 @@ SHITPOST_SUBREDDITS_ALL = (
 )
 
 # -------------------- Music -------------------- #
+DISCORD_LOGO = "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
 COUNTRIES = (
     "United States",
     "United Kingdom",
@@ -247,3 +248,9 @@ SONG_STRIP = (
     "http:",
     "/",
 )
+
+# -------------------- RadioGarden -------------------- #
+RADIOGARDEN_PLACES_URL = "https://radio.garden/api/ara/content/places"
+RADIOGARDEN_PAGE_URL = "https://radio.garden/api/ara/content/page/"
+RADIOGARDEN_SEARCH_URL = "https://radio.garden/api/search?q="
+RADIOGARDEN_LISTEN_URl = "https://radio.garden/api/ara/content/listen/"

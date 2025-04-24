@@ -1,7 +1,7 @@
 from typing import Dict, Callable, Any
 import discord
 
-ErrorHandler = Callable[[discord.ApplicationContext, ...], discord.Embed]
+ErrorHandler = Callable[[discord.ApplicationContext], discord.Embed]
 
 ERROR_CODES: Dict[str, ErrorHandler] = {
     "NO_VOICE_CHANNEL": lambda ctx: discord.Embed(
@@ -24,6 +24,11 @@ ERROR_CODES: Dict[str, ErrorHandler] = {
         description=f":x: I'm not playing anything. Type `/play` from vc.",
         color=discord.Color.blue(),
     ),
+    "NO_TRACK_FOUND": lambda ctx, **kwargs: discord.Embed(
+        title="",
+        description=f":x: No tracks with index {kwargs.get('to_find')} were found in the queue. Type `/queue` to see the list of tracks.",
+        color=discord.Color.blue(),
+    ),
     "NO_PERMISSIONS": lambda ctx: discord.Embed(
         title="",
         description=":x: I don't have permissions to join your channel.",
@@ -37,7 +42,7 @@ ERROR_CODES: Dict[str, ErrorHandler] = {
     "CONNECTION_TIMEOUT": lambda ctx: discord.Embed(
         title="",
         description=":x: Failed to connect to the voice channel, was bot moved manually? If yes disconnect it and try "
-                    "again.",
+        "again.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NODE_UNRESPONSIVE": lambda ctx: discord.Embed(
@@ -45,9 +50,9 @@ ERROR_CODES: Dict[str, ErrorHandler] = {
         description=":x: Node is unresponsive, please use command `/reconnect_node`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
-    "NO_TRACKS": lambda ctx, search: discord.Embed(
+    "NO_TRACKS": lambda ctx, **kwargs: discord.Embed(
         title="",
-        description=f":x: No tracks were found for `{search}`.",
+        description=f":x: No tracks were found for `{kwargs.get('search')}`.",
         color=discord.Color.blue(),
     ),
     "NO_TRACKS_IN_QUEUE": lambda ctx: discord.Embed(
@@ -63,20 +68,20 @@ ERROR_CODES: Dict[str, ErrorHandler] = {
     "YOUTUBE_ERROR": lambda ctx: discord.Embed(
         title="",
         description=":x: Failed to load tracks, youtube plugin might be disabled, or version is outdated. Try "
-                    "`/reconnect_node`.\nIf issue persists, it means YouTube updated their site and getting tracks "
-                    "won't work until youtube plugin gets fixed.",
+        "`/reconnect_node`.\nIf issue persists, it means YouTube updated their site and getting tracks "
+        "won't work until youtube plugin gets fixed.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "LAVALINK_ERROR": lambda ctx: discord.Embed(
         title="",
         description=":x: Failed to load tracks, you probably inputted wrong link or this Lavalink server doesn't have "
-                    "necessary plugins.\nTo fix this, use command `/reconnect_node`",
+        "necessary plugins.\nTo fix this, use command `/reconnect_node`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NODE_REQUEST_ERROR": lambda ctx: discord.Embed(
         title="",
         description=":x: Failed to connect to send request to the node.\nError might be caused by Discord servers not "
-                    "responding, give it a minute or use command `/reconnect_node`",
+        "responding, give it a minute or use command `/reconnect_node`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "RADIOMAP_ERROR": lambda ctx: discord.Embed(
@@ -87,25 +92,25 @@ ERROR_CODES: Dict[str, ErrorHandler] = {
     "CHANNEL_NOT_NSF": lambda ctx: discord.Embed(
         title="",
         description=":x: You have set NSFW posts to true, yet the channel you requested in is not NSFW,"
-                    " skipping shitpost.",
+        " skipping shitpost.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "REDDIT_REQUEST_ERROR": lambda ctx: discord.Embed(
         title="",
         description=":x: Reddit didn't respond, try again in a minute.\nWhat could cause "
-                    "error? - Reddit is down, Subreddit is locked, API might be overloaded",
+        "error? - Reddit is down, Subreddit is locked, API might be overloaded",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "SFD_SERVER_NOT_FOUND": lambda ctx: discord.Embed(
         title="",
         description=":x: Server you searched for is not in the list, "
-                    " make sure you parsed correct server name.",
+        " make sure you parsed correct server name.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "CANT_PING_ROLE": lambda ctx: discord.Embed(
         title="",
         description=":x: I can't ping Exotic role, please check if role exists or"
-                    " if I have permission to ping it.",
+        " if I have permission to ping it.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NOT_EMBED_AUTHOR": lambda ctx: discord.Embed(
@@ -113,14 +118,14 @@ ERROR_CODES: Dict[str, ErrorHandler] = {
         description=":x: You are not author of this embed.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
-    "DB_ALREADY_IN_LIST": lambda ctx, to_upload: discord.Embed(
+    "DB_ALREADY_IN_LIST": lambda ctx, **kwargs: discord.Embed(
         title="",
-        description=f":x: String `{to_upload}` is already in the list, use `/bot_config show`",
+        description=f":x: String `{kwargs.get('to_upload')}` is already in the list, use `/bot_config show`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
-    "DB_NOT_IN_LIST": lambda ctx, to_remove: discord.Embed(
+    "DB_NOT_IN_LIST": lambda ctx, **kwargs: discord.Embed(
         title="",
-        description=f":x: String `{to_remove}` is not in the list, use `/bot_config show`",
+        description=f":x: String `{kwargs.get('to_remove')}` is not in the list, use `/bot_config show`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
 }

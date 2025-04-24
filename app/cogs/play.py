@@ -10,8 +10,14 @@ from discord.ext import commands
 from discord.commands import guild_only
 from wavelink.exceptions import LavalinkLoadException, NodeException
 
-from app.decorators import is_joined, is_playing, is_song_in_queue, is_queue_empty
-from app.constants import COUNTRIES
+from app.decorators import is_joined, is_playing, is_queue_empty
+from app.constants import (
+    COUNTRIES,
+    RADIOGARDEN_PLACES_URL,
+    RADIOGARDEN_PAGE_URL,
+    RADIOGARDEN_SEARCH_URL,
+    RADIOGARDEN_LISTEN_URl,
+)
 from app.utils import find_track, fix_audio_title, make_http_request
 from app.errors import send_error
 
@@ -31,7 +37,7 @@ class Play(commands.Cog):
     @option(
         "search",
         description="You can either put a url or a name of the song,"
-                    " both youtube and spotify are supported.",
+        " both youtube and spotify are supported.",
     )
     @option(
         "play_next",
@@ -39,7 +45,7 @@ class Play(commands.Cog):
         type=bool,
     )
     async def play(
-            self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
+        self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
     ) -> None:
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
@@ -88,7 +94,7 @@ class Play(commands.Cog):
         description="If you want to play this song next in queue, set this to true.",
     )
     async def radio_random(
-            self, ctx: discord.ApplicationContext, play_next: bool = False
+        self, ctx: discord.ApplicationContext, play_next: bool = False
     ) -> None:
         await ctx.defer()
 
@@ -101,8 +107,8 @@ class Play(commands.Cog):
 
         response = await make_http_request(
             self.session,
-            f"https://radio.garden/api/ara/content/page/{place_id}/channels",
-            headers={"accept": "application/json"}
+            f"{RADIOGARDEN_PAGE_URL}{place_id}/channels",
+            headers={"accept": "application/json"},
         )
         if not response:
             await send_error(ctx, "RADIOMAP_ERROR")
@@ -118,8 +124,8 @@ class Play(commands.Cog):
             return
         response = await make_http_request(
             self.session,
-            f"https://radio.garden/api/ara/content/listen/{station_id}/channel.mp3",
-            headers={"accept": "application/json"}
+            f"{RADIOGARDEN_LISTEN_URl}{station_id}/channel.mp3",
+            headers={"accept": "application/json"},
         )
         if not response:
             await send_error(ctx, "RADIOMAP_ERROR")
@@ -153,23 +159,24 @@ class Play(commands.Cog):
         choices=COUNTRIES,
     )
     async def play_radio(
-            self,
-            ctx: discord.ApplicationContext,
-            station: str,
-            country: str = None,
-            play_next: bool = False,
+        self,
+        ctx: discord.ApplicationContext,
+        station: str,
+        country: str = "",
+        play_next: bool = False,
     ) -> None:
         encoded_station = discord.utils.escape_markdown(station)
         response = await make_http_request(
-            self.session, f"https://radio.garden/api/search?q={encoded_station}",
-            headers={"accept": "application/json"}
+            self.session,
+            f"{RADIOGARDEN_SEARCH_URL}{encoded_station}",
+            headers={"accept": "application/json"},
         )
         if not response:
             await send_error(ctx, "RADIOMAP_ERROR")
             return
 
         try:
-            data = await response.json()
+            data = response.json()
             if not data["hits"]["hits"]:
                 await send_error(ctx, "NO_TRACKS", search=station)
                 return
@@ -209,12 +216,15 @@ class Play(commands.Cog):
     )
     @is_playing()
     @is_queue_empty()
-    @is_song_in_queue()
     async def skip_to_command(
-            self, ctx: discord.ApplicationContext, to_find: str
+        self, ctx: discord.ApplicationContext, to_find: str
     ) -> None:
         player: wavelink.Player = ctx.voice_client
+
         track_pos = find_track(player, to_find)
+        if not track_pos:
+            await send_error(ctx, "NO_TRACK_FOUND", search=to_find)
+            return
 
         track = player.queue[track_pos - 1]
         player.queue.put_at(0, track)
@@ -278,7 +288,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention},"
-                            f" join the voice channel the bot is playing in to disconnect it.",
+                f" join the voice channel the bot is playing in to disconnect it.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed, ephemeral=True)
@@ -295,7 +305,7 @@ class Play(commands.Cog):
 
     # ----------------------- Helper functions ------------------------ #
     async def _fetch_track(
-            self, ctx: discord.ApplicationContext, search: str
+        self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
         if tracks:
@@ -304,8 +314,8 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _fetch_first_track(
-            ctx: discord.ApplicationContext,
-            tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
+        ctx: discord.ApplicationContext,
+        tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
     ) -> wavelink.Playable:
         player: wavelink.Player = ctx.voice_client
         # If it's a playlist
@@ -322,7 +332,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"Added the playlist **`{tracks.name}`**"
-                            f" ({song_count} songs) to the queue.",
+                f" ({song_count} songs) to the queue.",
                 color=discord.Color.blue(),
             )
             if player.should_respond:
@@ -339,7 +349,7 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _search_tracks(
-            ctx: discord.ApplicationContext, search: str
+        ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
         try:
             tracks: wavelink.Search = await wavelink.Playable.search(search)
@@ -360,7 +370,7 @@ class Play(commands.Cog):
         return tracks
 
     @staticmethod
-    async def _should_move_to_channel(ctx: discord.ApplicationContext) -> None:
+    async def _should_move_to_channel(ctx: discord.ApplicationContext) -> bool:
         player: wavelink.Player = ctx.voice_client
         if player and player.channel.id == ctx.author.voice.channel.id:
             return True
@@ -369,7 +379,7 @@ class Play(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"{ctx.author.mention}, I'm playing in another channel,"
-                            f" wait till song finishes.",
+                f" wait till song finishes.",
                 color=discord.Color.blue(),
             )
             await ctx.respond(embed=embed)
@@ -408,7 +418,7 @@ class Play(commands.Cog):
 
     @staticmethod
     async def _play_track(
-            ctx: discord.ApplicationContext, track: wavelink.Playable
+        ctx: discord.ApplicationContext, track: wavelink.Playable
     ) -> bool:
         player: wavelink.Player = ctx.voice_client
 
@@ -433,7 +443,7 @@ class Play(commands.Cog):
         embed = discord.Embed(
             title="",
             description=f"**✅ Joined to <#{player.channel.id}>"
-                        f" and set text channel to <#{ctx.channel.id}>.**",
+            f" and set text channel to <#{ctx.channel.id}>.**",
             color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
@@ -469,19 +479,17 @@ class Play(commands.Cog):
             return self.radiomap_cache
 
         response = await make_http_request(
-            self.session,
-            "https://radio.garden/api/ara/content/places",
-            headers={"accept": "application/json"}
+            self.session, RADIOGARDEN_PLACES_URL, headers={"accept": "application/json"}
         )
         if not response:
             return self.radiomap_cache
 
         data = response.json()
-        if 'data' in data and 'list' in data['data']:
+        if "data" in data and "list" in data["data"]:
             place_ids = [
-                item['url'].split('/')[-1]
-                for item in data['data']['list']
-                if 'url' in item
+                item["url"].split("/")[-1]
+                for item in data["data"]["list"]
+                if "url" in item
             ]
             self.radiomap_cache = place_ids
             return place_ids

@@ -188,7 +188,7 @@ class KexoBOT:
         fetch data from different sources.
         It runs the classes in a round-robin fashion.
         """
-        now = datetime.now(ZoneInfo('Europe/Bratislava'))
+        now = datetime.now(ZoneInfo("Europe/Bratislava"))
         if self.main_loop_counter == 0:
             self.main_loop_counter = 1
             await self.reddit_fetcher.freegamefindings()
@@ -218,7 +218,7 @@ class KexoBOT:
             await self.esutaze.run()
 
         if now.minute % 6 == 0:
-            await self.sfd_servers.update_stats()
+            await self.sfd_servers.update_stats(now)
 
     async def hourly_loop(self) -> None:
         """Hourly loop for the bot.
@@ -227,7 +227,7 @@ class KexoBOT:
         It runs the classes in a round-robin fashion.
         It also updates the reddit cache and fetches lavalink servers.
         """
-        now = datetime.now(ZoneInfo('Europe/Bratislava'))
+        now = datetime.now(ZoneInfo("Europe/Bratislava"))
         if now.day == 6 and now.hour == 0:
             await self._refresh_subreddit_icons()
 
@@ -247,12 +247,22 @@ class KexoBOT:
         print("Httpx session initialized.")
 
     async def connect_node(
-        self, guild_id: int = KEXO_SERVER
+            self, guild_id: int = KEXO_SERVER
     ) -> Optional[wavelink.Node]:
         """Connect to lavalink node."""
         if not self.lavalink_servers:
             print("No lavalink servers found.")
             return None
+
+        if len(self.lavalink_servers) == 1 and not hasattr(bot, "node"):
+            await asyncio.wait_for(
+                wavelink.Pool.connect(nodes=[self.lavalink_servers[0]], client=bot), timeout=3
+            )
+            bot.node = self.lavalink_servers[0]
+            print("Only one lavalink server found.")
+
+        if len(self.lavalink_servers) == 1:
+            return self.lavalink_servers[0]
 
         for _ in range(len(self.lavalink_servers)):
             node: wavelink.Node = self.get_node(guild_id)
@@ -269,8 +279,8 @@ class KexoBOT:
                 print(f"Node {node.uri} is not responding, trying next...")
                 continue
             except (
-                wavelink.exceptions.LavalinkException,
-                wavelink.exceptions.NodeException,
+                    wavelink.exceptions.LavalinkException,
+                    wavelink.exceptions.NodeException,
             ):
                 print(f"Failed to connect to {node.uri}, trying next...")
                 continue
@@ -297,7 +307,7 @@ class KexoBOT:
     @staticmethod
     async def close_unused_nodes() -> None:
         """Clear unused lavalink nodes."""
-        nodes: dict[str, wavelink.Node] = wavelink.Pool.nodes.values()
+        nodes: list[wavelink.Node] = wavelink.Pool.nodes.values()
         for node in nodes:
             if len(wavelink.Pool.nodes) == 1:
                 break
@@ -352,9 +362,9 @@ class KexoBOT:
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""
         subreddit_icons = {}
-        for subreddit in SHITPOST_SUBREDDITS_ALL:
+        for subreddit_name in SHITPOST_SUBREDDITS_ALL:
             subreddit: asyncpraw.models.Subreddit = await self.reddit_agent.subreddit(
-                subreddit
+                subreddit_name
             )
             try:
                 await subreddit.load()
@@ -464,7 +474,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required permissions to use this command."
-            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+                        f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
@@ -474,7 +484,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 I don't have the required permissions to use this command."
-            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+                        f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.send(embed=embed)
@@ -484,14 +494,14 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required role to use this command."
-            f"\nRequired role: `{error.missing_role}`",
+                        f"\nRequired role: `{error.missing_role}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
         return
 
     if isinstance(error, discord.errors.NotFound) and "Unknown interaction" in str(
-        error
+            error
     ):
         embed = discord.Embed(
             title="",

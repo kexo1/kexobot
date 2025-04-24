@@ -11,6 +11,7 @@ from wavelink import (
     TrackExceptionEventPayload,
     TrackStuckEventPayload,
 )
+from app.constants import DISCORD_LOGO
 from app.utils import fix_audio_title
 
 
@@ -151,7 +152,7 @@ class Listeners(commands.Cog):
     def _has_pfp(member: discord.Member) -> str:
         if hasattr(member.avatar, "url"):
             return member.avatar.url
-        return None
+        return DISCORD_LOGO
 
 
 def setup(bot: commands.Bot) -> None:

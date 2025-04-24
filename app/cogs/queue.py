@@ -7,7 +7,7 @@ from discord.ext import commands
 from discord.commands import slash_command, option, guild_only
 from pycord.multicog import subcommand
 
-from app.decorators import is_playing, is_joined, is_queue_empty, is_song_in_queue
+from app.decorators import is_playing, is_joined, is_queue_empty
 from app.utils import find_track, fix_audio_title
 from app.errors import send_error
 
@@ -80,10 +80,13 @@ class Queue(commands.Cog):
     )
     @is_joined()
     @is_queue_empty()
-    @is_song_in_queue()
     async def remove(self, ctx: discord.ApplicationContext, to_find: str):
         player: wavelink.Player = ctx.voice_client
         track_pos = find_track(player, to_find)
+        if track_pos is None:
+            print(f"Track not found: {to_find}")
+            await send_error(ctx, "NO_TRACK_FOUND", to_find=to_find)
+            return
 
         track = player.queue[track_pos - 1]
         del player.queue[track_pos - 1]

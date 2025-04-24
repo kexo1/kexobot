@@ -3,7 +3,7 @@ import os
 
 from datetime import timedelta
 from zoneinfo import ZoneInfo
-from typing import Union
+from typing import Union, cast
 
 import httpx
 import matplotlib.pyplot as plt
@@ -127,7 +127,7 @@ class SFDServers:
         )
         plt.close("all")
 
-    async def update_stats(self) -> None:
+    async def update_stats(self, now) -> None:
         activity = await self._load_sfd_activity_data()
         players_day, servers_day = activity["players_day"], activity["servers_day"]
         current_players, current_servers = await self._get_players_and_servers()
@@ -148,8 +148,12 @@ class SFDServers:
             },
         )
 
-        now = datetime.now(ZoneInfo('Europe/Bratislava'))
         last_update_week = activity["last_update_week"]
+        # Convert last_update_week to the same timezone as now
+        if last_update_week.tzinfo is None:
+            last_update_week = last_update_week.replace(tzinfo=now.tzinfo)
+        elif last_update_week.tzinfo != now.tzinfo:
+            last_update_week = last_update_week.astimezone(now.tzinfo)
 
         if not is_older_than(6, last_update_week):
             return
@@ -183,6 +187,10 @@ class SFDServers:
         players_week.extend(new_players_averages)
         servers_week.extend(new_servers_averages)
 
+        # Ensure now is in the correct timezone before storing
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=ZoneInfo("Europe/Bratislava"))
+
         await self.bot_config.update_many(
             DB_SFD_ACTIVITY,
             {
@@ -195,8 +203,8 @@ class SFDServers:
         )
 
     async def get_servers_info(self) -> tuple:
-        servers = await self._parse_servers()
-        servers_dict = {"server_name": [], "maps": [], "players": []}
+        servers: list[Server] = cast(list[Server], await self._parse_servers())
+        servers_dict: dict = {"server_name": [], "maps": [], "players": []}
         all_players = 0
 
         for server in servers:
@@ -211,8 +219,8 @@ class SFDServers:
 
         return servers_dict, all_players
 
-    async def get_servers(self) -> list:
-        servers = await self._parse_servers()
+    async def get_servers(self) -> list[Server]:
+        servers: list[Server] = await self._parse_servers()
         return servers
 
     async def get_server(self, search: str) -> Server:
@@ -238,7 +246,7 @@ class SFDServers:
     async def _load_sfd_activity_data(self) -> dict:
         return await self.bot_config.find_one(DB_SFD_ACTIVITY)
 
-    async def _parse_servers(self, search: str = None) -> Union[list, Server]:
+    async def _parse_servers(self, search: str = None) -> Union[list[Server], Server, None]:
         response = await self._load_sfd_servers()
         if not response:
             return []
@@ -323,13 +331,12 @@ class SFDServers:
                 version,
             )
 
-            if search and search.lower() in server_name.lower():
-                return server
-
             servers.append(server)
 
         if search:
-            return None
+            filtered_servers = [s for s in servers if s.server_name and search.lower() in s.server_name.lower()]
+            return filtered_servers
+
         return servers
 
     @staticmethod
