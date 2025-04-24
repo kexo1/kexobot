@@ -29,6 +29,7 @@ from app.utils import (
     check_node_status,
     generate_user_data,
 )
+from app.errors import send_error
 from app.__init__ import __version__
 
 host_authors = []
@@ -234,17 +235,7 @@ class Commands(commands.Cog):
     ) -> None:
         server = self.sfd_servers.get_server(search)
         if not server:
-            embed = discord.Embed(
-                title="",
-                description=":x: Server you searched for is not in the list,\n"
-                "make sure you parsed correct server name.",
-                color=discord.Color.from_rgb(r=255, g=0, b=0),
-            )
-            await ctx.respond(
-                embed=embed,
-                ephemeral=True,
-                delete_after=10,
-            )
+            await send_error(ctx, "SFD_SERVER_NOT_FOUND")
             return
 
         server = server.get_full_server_info()
@@ -430,12 +421,7 @@ class Commands(commands.Cog):
                 role = discord.utils.get(ctx.guild.roles, name="Exotic")
                 await ctx.send(role.mention)
             except AttributeError:
-                await ctx.respond(
-                    "I can't ping Exotic role, please check if role exists or"
-                    " if I have permission to ping it.",
-                    delete_after=10,
-                    ephemeral=True,
-                )
+                await send_error(ctx, "CANT_PING_ROLE")
                 return
 
         view = HostView(author=author)
@@ -582,12 +568,7 @@ class Commands(commands.Cog):
         collection: list = bot_config[collection_db_name]
 
         if to_upload in collection:
-            embed = discord.Embed(
-                title="",
-                description=f":x: String `{to_upload}` is already in the list, use `/bot_config show`",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed, ephemeral=True)
+            await send_error(ctx, "DB_ALREADY_IN_LIST", to_upload=to_upload)
             return
 
         collection.append(to_upload)
@@ -610,12 +591,7 @@ class Commands(commands.Cog):
         collection: list = bot_config[collection_db_name]
 
         if to_remove not in collection:
-            embed = discord.Embed(
-                title="",
-                description=f":x: String `{to_remove}` is not in the list, use `/bot_config show`",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed, ephemeral=True)
+            await send_error(ctx, "DB_NOT_IN_LIST", to_remove=to_remove)
             return
 
         del collection[collection.index(to_remove)]
@@ -649,16 +625,7 @@ class HostView(discord.ui.View):
             host_authors.pop(host_authors.index(self.author.name))
             return
 
-        embed = discord.Embed(
-            title="",
-            description=f"{interaction.user.mention}, you are not author of this embed.",
-            color=discord.Color.blue(),
-        )
-        await interaction.response.send_message(
-            embed=embed,
-            delete_after=10,
-            ephemeral=True,
-        )
+        await send_error(ctx, "NOT_EMBED_AUTHOR")
 
     async def on_timeout(self) -> None:
         embed = await self.disable_embed()

@@ -8,7 +8,8 @@ from discord.commands import slash_command, option, guild_only
 from pycord.multicog import subcommand
 
 from app.decorators import is_playing, is_joined, is_queue_empty, is_song_in_queue
-from app.utils import find_track
+from app.utils import find_track, fix_audio_title
+from app.errors import send_error
 
 
 # noinspection PyUnusedLocal
@@ -105,12 +106,7 @@ class Queue(commands.Cog):
         player: wavelink.Player = ctx.voice_client
 
         if len(player.queue) < 2:
-            embed = discord.Embed(
-                title="",
-                description=f"{ctx.author.mention}, can't shuffle 1 song in queue BRUH.",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed, ephemeral=True)
+            await send_error(ctx, "CANT_SHUFFLE")
             return
 
         player.queue.shuffle()
@@ -195,7 +191,7 @@ class Queue(commands.Cog):
         queue_status, footer = await self._get_queue_status(player.queue.mode)
 
         header = (
-            f"\n***__{queue_status}:__***\n **[{player.current.title}]({player.current.uri})**\n"
+            f"\n***__{queue_status}:__***\n **[{fix_audio_title(player.current)}]({player.current.uri})**\n"
             f" `{int(divmod(player.current.length, 60000)[0])}:{round(divmod(player.current.length, 60000)[1] / 1000):02} | "
             f"Requested by: {player.current.requester.name}`\n\n ***__Next:__***\n"
         )
@@ -204,10 +200,8 @@ class Queue(commands.Cog):
         current_description = header
 
         for pos, track in enumerate(player.queue):
-            track_title = track.title.replace("*", "")
-
             song_line = (
-                f"`{pos + 1}.` **[{track_title}]({track.uri})**\n"
+                f"`{pos + 1}.` **[{fix_audio_title(track)}]({track.uri})**\n"
                 f" `{int(divmod(track.length, 60000)[0])}:{round(divmod(track.length, 60000)[1] / 1000):02} | "
                 f"Requested by: {track.requester.name}`\n"
             )

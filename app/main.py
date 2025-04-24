@@ -17,6 +17,7 @@ from discord.ext import tasks, commands
 from motor.motor_asyncio import AsyncIOMotorClient
 from wavelink.enums import NodeStatus
 from pycord.multicog import Bot
+from zoneinfo import ZoneInfo
 
 from app.constants import (
     DISCORD_TOKEN,
@@ -187,7 +188,7 @@ class KexoBOT:
         fetch data from different sources.
         It runs the classes in a round-robin fashion.
         """
-        now = datetime.now()
+        now = datetime.now(ZoneInfo('Europe/Bratislava'))
         if self.main_loop_counter == 0:
             self.main_loop_counter = 1
             await self.reddit_fetcher.freegamefindings()
@@ -217,7 +218,6 @@ class KexoBOT:
             await self.esutaze.run()
 
         if now.minute % 6 == 0:
-            self._clear_temp_reddit_data()
             await self.sfd_servers.update_stats()
 
     async def hourly_loop(self) -> None:
@@ -227,7 +227,7 @@ class KexoBOT:
         It runs the classes in a round-robin fashion.
         It also updates the reddit cache and fetches lavalink servers.
         """
-        now = datetime.now()
+        now = datetime.now(ZoneInfo('Europe/Bratislava'))
         if now.day == 6 and now.hour == 0:
             await self._refresh_subreddit_icons()
 

@@ -9,7 +9,7 @@
 - [ ] Merge some files together
 - [ ] Split code into more functions
 - [ ] Add docstrings
-- [ ] Make session handler from timeouts
-- [ ] Use strip text function
+- [ ] Make session handler for timeouts
 - [ ] Lavalink fetch fix protocols
 - [ ] Use wavelink search spotify
+- [ ] JokeAPI slash command

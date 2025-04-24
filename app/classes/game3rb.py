@@ -7,7 +7,8 @@ import discord
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup
-from constants import GAME3RB_STRIP, GAME3RB_URL, GAME3RB_ICON, DB_CACHE, DB_LISTS
+from app.constants import GAME3RB_STRIP, GAME3RB_URL, GAME3RB_ICON, DB_CACHE, DB_LISTS
+from app.utils import strip_text
 
 
 class Game3rb:
@@ -60,10 +61,7 @@ class Game3rb:
             game_title = line.get("title")
             full_title = game_title
 
-            for part in GAME3RB_STRIP:
-                game_title = game_title.replace(part, "")
-
-            game_title = game_title.split()
+            game_title: list = strip_text(game_title, GAME3RB_STRIP).split()
             version = ""
             regex = re.compile(r"v\d+(\.\d+)+")
 

@@ -2,7 +2,6 @@ import os
 import logging
 from bson.objectid import ObjectId
 
-
 logging.basicConfig(level=logging.CRITICAL)
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
@@ -244,6 +243,7 @@ COUNTRIES = (
 SONG_STRIP = (
     ";",
     "*",
-    "https://",
-    "http://",
+    "https:",
+    "http:",
+    "/",
 )

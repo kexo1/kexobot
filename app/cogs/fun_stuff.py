@@ -35,6 +35,7 @@ from app.utils import (
     get_selected_user_data,
     generate_temp_user_data,
 )
+from app.errors import send_error
 
 
 class FunStuff(commands.Cog):
@@ -148,7 +149,7 @@ class FunStuff(commands.Cog):
 
                 is_channel_nsfw = ctx.channel.is_nsfw()
                 if submission.over_18 and not is_channel_nsfw:
-                    await self._reddit_channel_not_nsfw(ctx)
+                    await send_error(ctx, "CHANNEL_NOT_NSF")
                     return
 
                 embed = await self._create_reddit_embed(submission)
@@ -167,8 +168,10 @@ class FunStuff(commands.Cog):
                 self._update_temp_user_data(user_id, submission.permalink)
                 break
 
-        except (AsyncPrawcoreException, RequestException, ResponseException):
-            await self._reddit_unresponsive_msg(ctx)
+        except (AsyncPrawcoreException, RequestException, ResponseException) as e:
+            print(e)
+            print(vars(e))
+            await send_error(ctx, "REDDIT_REQUEST_ERROR")
 
     def _update_temp_user_data(self, user_id: int, submission_url: str) -> None:
         self.temp_user_data[user_id]["reddit"]["viewed_posts"].add(submission_url)
@@ -248,28 +251,6 @@ class FunStuff(commands.Cog):
     async def _post_video(ctx: discord.ApplicationContext, submission_url: str) -> None:
         video_url = submission_url.split("/")[4]
         await ctx.send(f"https://rxddit.com/{video_url}/", suppress=False)
-
-    @staticmethod
-    async def _reddit_channel_not_nsfw(ctx: discord.ApplicationContext) -> None:
-        embed = discord.Embed(
-            title="",
-            description="🚫 You have set NSFW posts to true, yet the channel you requested in is not NSFW,"
-            " skipping shitpost.\n",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
-        )
-        embed.set_footer(text="Message will be deleted in 20 seconds.")
-        await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
-
-    @staticmethod
-    async def _reddit_unresponsive_msg(ctx: discord.ApplicationContext) -> None:
-        embed = discord.Embed(
-            title="",
-            description="🚫 Reddit didn't respond, try again in a minute.\nWhat could cause "
-            "error? - Reddit is down, Subreddit is locked, API might be overloaded",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
-        )
-        embed.set_footer(text="Message will be deleted in 20 seconds.")
-        await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
 
 
 def setup(bot: commands.Bot):

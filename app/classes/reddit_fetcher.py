@@ -24,6 +24,7 @@ from app.constants import (
     DB_CACHE,
     DB_LISTS,
 )
+from app.utils import strip_text
 
 
 class RedditFetcher:
@@ -78,10 +79,7 @@ class RedditFetcher:
 
                 description_list = []
 
-                for part in REDDIT_STRIP:
-                    submission_text = submission_text.replace(part, "")
-
-                submission_text = submission_text.split("\n")
+                submission_text = strip_text(submission_text, REDDIT_STRIP).split("\n")
                 for line in submission_text:
                     line = line.strip()
 

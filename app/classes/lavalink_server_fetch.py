@@ -31,7 +31,11 @@ class LavalinkServerFetch:
             print(f"Failed to decode JSON from {LAVALIST_URL}")
 
         if not lavalink_servers:
-            lavalink_servers = [self._return_node("lavalink.kexoservers.online", "443", "kexobot", secure=True)]
+            lavalink_servers = [
+                self._return_node(
+                    "lavalink.kexoservers.online", "443", "kexobot", secure=True
+                )
+            ]
 
         return lavalink_servers
 
@@ -92,14 +96,11 @@ class LavalinkServerFetch:
         return lavalink_servers
 
     @staticmethod
-    def _return_node(host: str, port: int, password: str, secure: bool = False) -> wavelink.Node:
-        if secure:
-            protocol = "https://"
-        else:
-            protocol = "http://"
-
+    def _return_node(
+        host: str, port: int, password: str, secure: bool = False
+    ) -> wavelink.Node:
         return wavelink.Node(
-            uri=f"{protocol}{host}:{port}",
+            uri=f"{'https://' if secure else 'http://'}{host}:{port}",
             password=password,
             retries=1,
             inactive_player_timeout=600,

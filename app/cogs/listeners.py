@@ -12,7 +12,7 @@ from wavelink import (
     TrackStuckEventPayload,
 )
 from app.constants import SONG_STRIP
-from app.utils import strip_text
+from app.utils import fix_audio_title
 
 
 class Listeners(commands.Cog):
@@ -128,15 +128,18 @@ class Listeners(commands.Cog):
             await player.play(player.temp_current)
             print(f"Node switched to {node.uri}")
             return True
-        except (RuntimeError, wavelink.LavalinkException):
+        except (
+            RuntimeError,
+            wavelink.LavalinkException,
+            wavelink.InvalidNodeException,
+        ):
             return False
 
     def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
-
         embed = discord.Embed(
             color=discord.Colour.green(),
             title="Now playing",
-            description=f"[**{strip_text(payload.track.title, SONG_STRIP)}**]({payload.track.uri})",
+            description=f"[**{fix_audio_title(payload.track)}**]({payload.track.uri})",
         )
         embed.set_footer(
             text=f"Requested by {payload.player.current.requester.name}",

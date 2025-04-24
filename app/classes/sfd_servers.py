@@ -1,5 +1,6 @@
 import datetime
 import os
+
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 from typing import Union
@@ -147,7 +148,7 @@ class SFDServers:
             },
         )
 
-        now = datetime.datetime.now()
+        now = datetime.now(ZoneInfo('Europe/Bratislava'))
         last_update_week = activity["last_update_week"]
 
         if not is_older_than(6, last_update_week):

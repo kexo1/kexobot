@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, Dict
 from datetime import datetime
 
 import discord
@@ -11,7 +11,7 @@ import asyncio
 import asyncpraw
 import asyncpraw.models
 
-from constants import SHITPOST_SUBREDDITS_DEFAULT
+from constants import SHITPOST_SUBREDDITS_DEFAULT, SONG_STRIP
 
 
 def load_text_file(name: str) -> list:
@@ -45,7 +45,7 @@ def get_memory_usage():
 
 
 async def download_video(
-        session: httpx.AsyncClient, url: str, nsfw: bool
+    session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> Optional[discord.File]:
     video_folder = os.path.join(os.getcwd(), "video")
     os.makedirs(video_folder, exist_ok=True)
@@ -69,7 +69,7 @@ async def download_video(
 
 
 async def check_node_status(
-        bot: discord.Bot, uri: str, password: str
+    bot: discord.Bot, uri: str, password: str
 ) -> Optional[wavelink.Node]:
     node = [
         wavelink.Node(
@@ -83,10 +83,10 @@ async def check_node_status(
         await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=3)
         await node[0].fetch_info()
     except (
-            asyncio.TimeoutError,
-            wavelink.exceptions.NodeException,
-            wavelink.LavalinkException,
-            aiohttp.NonHttpUrlClientError,
+        asyncio.TimeoutError,
+        wavelink.exceptions.NodeException,
+        wavelink.LavalinkException,
+        aiohttp.NonHttpUrlClientError,
     ):
         return None
     return node
@@ -96,6 +96,17 @@ def strip_text(text: str, to_strip: tuple) -> str:
     for char in to_strip:
         text = text.replace(char, "")
     return text.strip()
+
+
+def fix_audio_title(track: wavelink.Playable) -> str:
+    if not track.title:
+        title = track.uri
+    else:
+        title = track.title
+
+    for char in SONG_STRIP:
+        title = title.replace(char, "")
+    return title.strip()
 
 
 def is_older_than(hours: int, custom_datetime: datetime) -> bool:
@@ -135,7 +146,7 @@ def generate_guild_data() -> dict:
 
 
 async def generate_temp_user_data(
-        reddit_agent: asyncpraw.Reddit, subreddits: list, user_id: int
+    reddit_agent: asyncpraw.Reddit, subreddits: list, user_id: int
 ) -> dict:
     multireddit: asyncpraw.models.Multireddit = await reddit_agent.multireddit(
         name=str(user_id), redditor="KexoBOT"
@@ -173,7 +184,7 @@ def generate_user_data() -> dict:
 
 
 async def get_selected_user_data(
-        bot: discord.Bot, ctx: discord.ApplicationContext, selected_data: str
+    bot: discord.Bot, ctx: discord.ApplicationContext, selected_data: str
 ) -> tuple:
     user_id = ctx.author.id
     user_data: dict = bot.user_data.get(user_id)
@@ -209,3 +220,44 @@ async def get_selected_user_data(
         )
     bot.temp_user_data[user_id] = temp_user_data
     return user_data[selected_data], temp_user_data[selected_data]
+
+
+async def make_http_request(
+    session: httpx.AsyncClient,
+    url: str,
+    headers: Optional[Dict] = None,
+    retries: int = 1,
+    timeout: float = 3.0,
+) -> Optional[httpx.Response]:
+    """
+    Make an HTTP request with retry logic.
+
+    Args:
+        session: The httpx client session to use
+        url: The URL to request
+        headers: Optional headers to send with the request
+        retries: Number of retry attempts
+        timeout: Request timeout in seconds
+
+    Returns:
+        The response if successful, None if all retries failed
+    """
+
+    for attempt in range(retries):
+        try:
+            response = await session.get(url, headers=headers, timeout=timeout)
+            # Don't raise for status for MP3 files as they might return 302 redirects
+            if not url.endswith('.mp3'):
+                response.raise_for_status()
+            return response
+        except (
+            httpx.TimeoutException,
+            httpx.ReadTimeout,
+            httpx.ConnectError,
+            httpx.HTTPError,
+        ):
+            if attempt == retries - 1:
+                print('Failed to fetch URL after retries:', url)
+                return None
+            await asyncio.sleep(1 * (attempt + 1))
+    return None
