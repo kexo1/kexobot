@@ -21,11 +21,12 @@ XTC_SERVER = 723197287861583885
 DUCK_CULT = 484047204202446858
 
 # -------------------- Lavalink -------------------- #
-LAVAINFO_API_URLS = [
+LAVAINFO_URLS = [
     "https://lavainfo.netlify.app/api/non-ssl",
     "https://lavainfo.netlify.app/api/ssl",
 ]
 LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
+LAVAINFO_GITHUB_URL = "https://raw.githubusercontent.com/appujet/lavalink-list/refs/heads/main/nodes.json"
 # -------------------- SFD Servers -------------------- #
 SFD_SERVER_URL = "https://mythologicinteractive.com/SFDGameServices.asmx"
 SFD_REQUEST = """<?xml version='1.0' encoding='utf-8'?>
@@ -253,4 +254,4 @@ SONG_STRIP = (
 RADIOGARDEN_PLACES_URL = "https://radio.garden/api/ara/content/places"
 RADIOGARDEN_PAGE_URL = "https://radio.garden/api/ara/content/page/"
 RADIOGARDEN_SEARCH_URL = "https://radio.garden/api/search?q="
-RADIOGARDEN_LISTEN_URl = "https://radio.garden/api/ara/content/listen/"
+RADIOGARDEN_LISTEN_URL = "https://radio.garden/api/ara/content/listen/"

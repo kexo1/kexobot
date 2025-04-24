@@ -85,7 +85,7 @@ class Queue(commands.Cog):
         track_pos = find_track(player, to_find)
         if track_pos is None:
             print(f"Track not found: {to_find}")
-            await send_error(ctx, "NO_TRACK_FOUND", to_find=to_find)
+            await send_error(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
             return
 
         track = player.queue[track_pos - 1]

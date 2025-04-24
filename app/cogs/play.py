@@ -16,7 +16,7 @@ from app.constants import (
     RADIOGARDEN_PLACES_URL,
     RADIOGARDEN_PAGE_URL,
     RADIOGARDEN_SEARCH_URL,
-    RADIOGARDEN_LISTEN_URl,
+    RADIOGARDEN_LISTEN_URL,
 )
 from app.utils import find_track, fix_audio_title, make_http_request
 from app.errors import send_error
@@ -124,7 +124,7 @@ class Play(commands.Cog):
             return
         response = await make_http_request(
             self.session,
-            f"{RADIOGARDEN_LISTEN_URl}{station_id}/channel.mp3",
+            f"{RADIOGARDEN_LISTEN_URL}{station_id}/channel.mp3",
             headers={"accept": "application/json"},
         )
         if not response:
@@ -145,7 +145,7 @@ class Play(commands.Cog):
 
         await self.play(ctx, station, play_next)
 
-    @radio.command(name="search", description="Search radio from RadioGarden")
+    @radio.command(name="play", description="Search and play radio from RadioGarden")
     @guild_only()
     @option("station", description="Name of the radio station.")
     @option(
@@ -178,7 +178,7 @@ class Play(commands.Cog):
         try:
             data = response.json()
             if not data["hits"]["hits"]:
-                await send_error(ctx, "NO_TRACKS", search=station)
+                await send_error(ctx, "NO_TRACKS_FOUND", search=station)
                 return
 
             for station_data in data["hits"]["hits"]:
@@ -223,7 +223,7 @@ class Play(commands.Cog):
 
         track_pos = find_track(player, to_find)
         if not track_pos:
-            await send_error(ctx, "NO_TRACK_FOUND", search=to_find)
+            await send_error(ctx, "NO_TRACK_FOUND_IN_QUEUE", search=to_find)
             return
 
         track = player.queue[track_pos - 1]
@@ -351,23 +351,40 @@ class Play(commands.Cog):
     async def _search_tracks(
         ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
-        try:
-            tracks: wavelink.Search = await wavelink.Playable.search(search)
-        except LavalinkLoadException as e:
-            if e.error == "Something went wrong while looking up the track.":
-                await send_error(ctx, "YOUTUBE_ERROR")
-                return None
-            await send_error(ctx, "LAVALINK_ERROR")
-            return None
-        except NodeException:
-            await send_error(ctx, "NODE_UNRESPONSIVE")
-            return None
+        sources = [
+            "spsearch",
+            "ytsearch",
+            wavelink.TrackSource.SoundCloud
+        ]
 
-        if not tracks:
-            await send_error(ctx, "NO_TRACKS", search=search)
-            return None
+        found_tracks = None
+        last_error = None
+        for source in sources:
+            try:
+                tracks: wavelink.Search = await wavelink.Playable.search(search, source=source)
+                if tracks:
+                    found_tracks = tracks
+                    break
+            except LavalinkLoadException as e:
+                print(e)
+                if e.error == "Something went wrong while looking up the track.":
+                    last_error = "YOUTUBE_ERROR"
+                    continue
+                last_error = "LAVALINK_ERROR"
+                continue
+            except NodeException as e:
+                print(e)
+                last_error = "NODE_UNRESPONSIVE"
+                continue
 
-        return tracks
+        if found_tracks:
+            return found_tracks
+
+        if last_error:
+            await send_error(ctx, last_error, search=search)
+        else:
+            await send_error(ctx, "NO_TRACKS_FOUND", search=search)
+        return None
 
     @staticmethod
     async def _should_move_to_channel(ctx: discord.ApplicationContext) -> bool:

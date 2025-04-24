@@ -2,7 +2,7 @@ import json
 import httpx
 import wavelink
 
-from app.constants import LAVALIST_URL, LAVAINFO_API_URLS
+from app.constants import LAVALIST_URL, LAVAINFO_URLS, LAVAINFO_GITHUB_URL
 
 
 class LavalinkServerFetch:
@@ -14,21 +14,26 @@ class LavalinkServerFetch:
         lavalink_servers = []
 
         try:
-            for url in LAVAINFO_API_URLS:
-                json_data = await self.session.get(url, timeout=10)
+            for url in LAVAINFO_URLS:
+                json_data = await self.session.get(url, timeout=3)
                 lavalink_servers += await self._lavainfo_fetch(json_data.json())
         except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
-            print(f"The request to {LAVAINFO_API_URLS[0]} timed out.")
+            print(f"The request to {LAVAINFO_URLS[0]} timed out.")
         except json.decoder.JSONDecodeError:
-            print(f"Failed to decode JSON from {LAVAINFO_API_URLS[0]}")
+            print(f"Failed to decode JSON from {LAVAINFO_URLS[0]}")
 
         try:
-            json_data = await self.session.get(LAVALIST_URL, timeout=10)
+            json_data = await self.session.get(LAVALIST_URL, timeout=3)
             lavalink_servers += await self._lavalist_fetch(json_data.json())
         except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
             print(f"The request to {LAVALIST_URL} timed out.")
         except json.decoder.JSONDecodeError:
             print(f"Failed to decode JSON from {LAVALIST_URL}")
+
+        # Use LavaInfo GitHub as a last resort (use when lavainfo not available)
+        if not lavalink_servers:
+            json_data = await self.session.get(LAVAINFO_GITHUB_URL, timeout=10)
+            lavalink_servers += await self._lavainfo_github_fetch(json_data.json())
 
         if not lavalink_servers:
             lavalink_servers = [
@@ -87,12 +92,26 @@ class LavalinkServerFetch:
                     or plugin["name"] == "lavasrc-plugin"
                 ):
                     node: wavelink.Node = self._return_node(
-                        server["host"], server["port"], server["password"]
+                        server["host"], server["port"], server["password"], True if server["secure"] else False
                     )
                     lavalink_servers.append(node)
                     break
 
         self.repeated_hostnames = [server["host"] for server in json_data]
+        return lavalink_servers
+
+    async def _lavainfo_github_fetch(self, json_data: list) -> list[wavelink.Node]:
+        lavalink_servers = []
+
+        for server in json_data:
+            if server["restVersion"] != "v4":
+                continue
+
+            node: wavelink.Node = self._return_node(
+                server["host"], server["port"], server["password"], True if server["secure"] else False
+            )
+            lavalink_servers.append(node)
+
         return lavalink_servers
 
     @staticmethod

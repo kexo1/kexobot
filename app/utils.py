@@ -112,8 +112,8 @@ def fix_audio_title(track: wavelink.Playable) -> str:
 def is_older_than(hours: int, custom_datetime: datetime) -> bool:
     current_time = datetime.now()
 
-    #if custom_datetime.tzinfo is not None and current_time.tzinfo is None:
-    #    current_time = current_time.replace(tzinfo=custom_datetime.tzinfo)
+    if custom_datetime.tzinfo is not None and current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=custom_datetime.tzinfo)
     time_difference = current_time - custom_datetime
     return time_difference.total_seconds() > hours * 3600
 

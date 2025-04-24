@@ -24,7 +24,7 @@ ERROR_CODES: Dict[str, ErrorHandler] = {
         description=f":x: I'm not playing anything. Type `/play` from vc.",
         color=discord.Color.blue(),
     ),
-    "NO_TRACK_FOUND": lambda ctx, **kwargs: discord.Embed(
+    "NO_TRACK_FOUND_IN_QUEUE": lambda ctx, **kwargs: discord.Embed(
         title="",
         description=f":x: No tracks with index {kwargs.get('to_find')} were found in the queue. Type `/queue` to see the list of tracks.",
         color=discord.Color.blue(),
@@ -50,7 +50,7 @@ ERROR_CODES: Dict[str, ErrorHandler] = {
         description=":x: Node is unresponsive, please use command `/reconnect_node`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
-    "NO_TRACKS": lambda ctx, **kwargs: discord.Embed(
+    "NO_TRACKS_FOUND": lambda ctx, **kwargs: discord.Embed(
         title="",
         description=f":x: No tracks were found for `{kwargs.get('search')}`.",
         color=discord.Color.blue(),
