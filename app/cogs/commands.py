@@ -16,7 +16,6 @@ from app.constants import (
     DB_LISTS,
     XTC_SERVER,
     KEXO_SERVER,
-    DUCK_CULT,
     DB_CHOICES,
     SFD_TIMEZONE_CHOICE,
     SHITPOST_SUBREDDITS_ALL,

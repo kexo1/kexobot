@@ -1,7 +1,5 @@
 import random
-import time
-from datetime import datetime, timedelta
-from typing import Literal
+from datetime import datetime
 
 import asyncpraw.reddit
 import asyncpraw.models
@@ -24,16 +22,13 @@ from app.constants import (
     ROAST_COMMANDS_MSG,
     IMGFLIP_PASSWORD,
     IMGFLIP_USERNAME,
-    SHITPOST_SUBREDDITS_DEFAULT,
     KYS_MESSAGES,
     KEXO_SERVER,
     SISKA_GANG_SERVER,
 )
 from app.utils import (
     load_text_file,
-    generate_user_data,
     get_selected_user_data,
-    generate_temp_user_data,
 )
 from app.errors import send_error
 

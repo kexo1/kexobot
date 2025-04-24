@@ -63,14 +63,14 @@ ERROR_CODES: Dict[str, ErrorHandler] = {
     "YOUTUBE_ERROR": lambda ctx: discord.Embed(
         title="",
         description=":x: Failed to load tracks, youtube plugin might be disabled, or version is outdated. Try "
-                    "`/reconnect_node`. If issue persists, it means YouTube updated their site and getting tracks "
+                    "`/reconnect_node`.\nIf issue persists, it means YouTube updated their site and getting tracks "
                     "won't work until youtube plugin gets fixed.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "LAVALINK_ERROR": lambda ctx: discord.Embed(
         title="",
         description=":x: Failed to load tracks, you probably inputted wrong link or this Lavalink server doesn't have "
-                    "necessary plugins. To fix this, use command `/reconnect_node`",
+                    "necessary plugins.\nTo fix this, use command `/reconnect_node`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NODE_REQUEST_ERROR": lambda ctx: discord.Embed(

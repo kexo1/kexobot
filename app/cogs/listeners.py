@@ -11,7 +11,6 @@ from wavelink import (
     TrackExceptionEventPayload,
     TrackStuckEventPayload,
 )
-from app.constants import SONG_STRIP
 from app.utils import fix_audio_title
 
 

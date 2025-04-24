@@ -1,12 +1,9 @@
-from typing import Union, Optional, Dict, List
+from typing import Union, Optional, List
 import random
 import re
-import time
-import asyncio
 
 import discord
 import wavelink
-import httpx
 
 from discord import option
 from discord.ext import commands
@@ -23,12 +20,7 @@ class Play(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.session = self.bot.session
-        self.radiomap_response: List[str] = []
-        self.radiomap_cache: Dict[str, Dict] = {
-            "last_update": 0,
-            "data": [],
-            "expiry": 43200,  # 12 hour cache
-        }
+        self.radiomap_cache: List[str] = []
 
     music = discord.SlashCommandGroup("music", "All music commands")
     radio = discord.SlashCommandGroup("radio", "All radio commands")
@@ -473,9 +465,8 @@ class Play(commands.Cog):
 
     async def _get_radiomap_data(self) -> List[str]:
         """Get radio map data with caching."""
-        current_time = time.time()
-        if current_time - self.radiomap_cache['last_update'] < self.radiomap_cache['expiry']:
-            return self.radiomap_cache['data']
+        if self.radiomap_cache:
+            return self.radiomap_cache
 
         response = await make_http_request(
             self.session,
@@ -483,7 +474,7 @@ class Play(commands.Cog):
             headers={"accept": "application/json"}
         )
         if not response:
-            return self.radiomap_cache['data']
+            return self.radiomap_cache
 
         data = response.json()
         if 'data' in data and 'list' in data['data']:
@@ -492,8 +483,7 @@ class Play(commands.Cog):
                 for item in data['data']['list']
                 if 'url' in item
             ]
-            self.radiomap_cache['data'] = place_ids
-            self.radiomap_cache['last_update'] = current_time
+            self.radiomap_cache = place_ids
             return place_ids
         return []
 

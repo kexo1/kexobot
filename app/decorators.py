@@ -1,8 +1,5 @@
 from functools import wraps
 
-import discord
-import wavelink
-
 from app.utils import find_track
 from app.errors import send_error
 
