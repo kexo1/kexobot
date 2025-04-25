@@ -3,8 +3,14 @@ import httpx
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup
-from constants import ELEKTRINA_MAX_ARTICLES, ELEKTRINA_URL, ELEKTRINA_ICON, DB_CACHE
-from utils import iso_to_timestamp
+
+from app.constants import (
+    ELEKTRINA_MAX_ARTICLES,
+    ELEKTRINA_URL,
+    ELEKTRINA_ICON,
+    DB_CACHE,
+)
+from app.utils import iso_to_timestamp, make_http_request
 
 
 class ElektrinaVypadky:
@@ -20,12 +26,7 @@ class ElektrinaVypadky:
 
     async def run(self) -> None:
         elektrinavypadky_cache = await self._load_bot_config()
-        try:
-            html_content = await self.session.get(ELEKTRINA_URL)
-        except (httpx.ReadTimeout, httpx.ConnectTimeout):
-            print("ElektrinaVypadky: Timeout")
-            return
-
+        html_content = await make_http_request(self.session, ELEKTRINA_URL)
         articles = self._get_articles(html_content.text)
         if articles:
             await self._process_articles(articles, elektrinavypadky_cache)

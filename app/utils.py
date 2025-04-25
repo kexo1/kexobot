@@ -10,6 +10,7 @@ import wavelink
 import asyncio
 import asyncpraw
 import asyncpraw.models
+import json
 
 from constants import SHITPOST_SUBREDDITS_DEFAULT, SONG_STRIP
 
@@ -103,7 +104,7 @@ def fix_audio_title(track: wavelink.Playable) -> str:
         title = track.title
     else:
         title = track.uri
-        
+
     for char in SONG_STRIP:
         title = title.replace(char, "")
     return title.strip()
@@ -228,9 +229,12 @@ async def get_selected_user_data(
 async def make_http_request(
     session: httpx.AsyncClient,
     url: str,
+    data: Optional[Dict] = None,
     headers: Optional[Dict] = None,
     retries: int = 1,
     timeout: float = 3.0,
+    get_json: bool = False,
+    binary: bool = False,
 ) -> Optional[httpx.Response]:
     """
     Make an HTTP request with retry logic.
@@ -238,9 +242,12 @@ async def make_http_request(
     Args:
         session: The httpx client session to use
         url: The URL to request
+        data: Optional data to send with the request
         headers: Optional headers to send with the request
         retries: Number of retry attempts
         timeout: Request timeout in seconds
+        get_json: If True, return the response as JSON
+        binary: If True, treat as binary content (like images) and don't raise for status
 
     Returns:
         The response if successful, None if all retries failed
@@ -248,19 +255,28 @@ async def make_http_request(
 
     for attempt in range(retries):
         try:
-            response = await session.get(url, headers=headers, timeout=timeout)
-            # Don't raise for status for MP3 files as they might return 302 redirects
-            if not url.endswith(".mp3"):
+            if data:
+                response = await session.post(url, data=data, headers=headers, timeout=timeout)
+            else:
+                response = await session.get(url, headers=headers, timeout=timeout)
+
+            # Don't raise for status for MP3 files or binary content
+            if not (url.endswith(".mp3") or binary):
                 response.raise_for_status()
+
+            if get_json:
+                return response.json()
             return response
         except (
-            httpx.TimeoutException,
             httpx.ReadTimeout,
+            httpx.TimeoutException,
             httpx.ConnectError,
             httpx.HTTPError,
-        ):
+        ) as e:
             if attempt == retries - 1:
-                print("Failed to fetch URL after retries:", url)
+                print(f"Request failed ({type(e).__name__}): {url}")
                 return None
             await asyncio.sleep(1 * (attempt + 1))
+        except json.decoder.JSONDecodeError:
+            print(f"Failed to decode JSON: {url}")
     return None

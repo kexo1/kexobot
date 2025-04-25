@@ -18,7 +18,7 @@ from app.constants import (
     DB_SFD_ACTIVITY,
     TIMEZONES,
 )
-from app.utils import average, is_older_than
+from app.utils import average, is_older_than, make_http_request
 
 plt.style.use("cyberpunk")
 
@@ -227,14 +227,10 @@ class SFDServers:
         return await self._parse_servers(search)
 
     async def _load_sfd_servers(self) -> str:
-        try:
-            response = await self.session.post(
-                SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS
-            )
-            return response.text
-        except (httpx.ReadTimeout, httpx.ConnectTimeout):
-            print("SFD Servers: Request timed out")
-        return ""
+        response = await make_http_request(self.session, SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS)
+        if not response:
+            return ""
+        return response.text
 
     async def _get_players_and_servers(self) -> tuple:
         servers = await self._parse_servers()
@@ -246,7 +242,9 @@ class SFDServers:
     async def _load_sfd_activity_data(self) -> dict:
         return await self.bot_config.find_one(DB_SFD_ACTIVITY)
 
-    async def _parse_servers(self, search: str = None) -> Union[list[Server], Server, None]:
+    async def _parse_servers(
+        self, search: str = None
+    ) -> Union[list[Server], Server, None]:
         response = await self._load_sfd_servers()
         if not response:
             return []
@@ -334,7 +332,11 @@ class SFDServers:
             servers.append(server)
 
         if search:
-            filtered_servers = [s for s in servers if s.server_name and search.lower() in s.server_name.lower()]
+            filtered_servers = [
+                s
+                for s in servers
+                if s.server_name and search.lower() in s.server_name.lower()
+            ]
             return filtered_servers
 
         return servers

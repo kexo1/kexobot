@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime
 from typing import Optional
 
+import aiohttp
 import asyncprawcore.exceptions
 import discord
 import asyncpraw
@@ -247,19 +248,12 @@ class KexoBOT:
         print("Httpx session initialized.")
 
     async def connect_node(
-            self, guild_id: int = KEXO_SERVER
+        self, guild_id: int = KEXO_SERVER
     ) -> Optional[wavelink.Node]:
         """Connect to lavalink node."""
         if not self.lavalink_servers:
             print("No lavalink servers found.")
             return None
-
-        if len(self.lavalink_servers) == 1 and not hasattr(bot, "node"):
-            await asyncio.wait_for(
-                wavelink.Pool.connect(nodes=[self.lavalink_servers[0]], client=bot), timeout=3
-            )
-            bot.node = self.lavalink_servers[0]
-            print("Only one lavalink server found.")
 
         if len(self.lavalink_servers) == 1:
             return self.lavalink_servers[0]
@@ -279,8 +273,9 @@ class KexoBOT:
                 print(f"Node {node.uri} is not responding, trying next...")
                 continue
             except (
-                    wavelink.exceptions.LavalinkException,
-                    wavelink.exceptions.NodeException,
+                wavelink.exceptions.LavalinkException,
+                wavelink.exceptions.NodeException,
+                aiohttp.client_exceptions.ServerDisconnectedError,
             ):
                 print(f"Failed to connect to {node.uri}, trying next...")
                 continue
@@ -474,7 +469,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required permissions to use this command."
-                        f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
@@ -484,7 +479,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 I don't have the required permissions to use this command."
-                        f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.send(embed=embed)
@@ -494,14 +489,14 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description=f"🚫 You don't have the required role to use this command."
-                        f"\nRequired role: `{error.missing_role}`",
+            f"\nRequired role: `{error.missing_role}`",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
         return
 
     if isinstance(error, discord.errors.NotFound) and "Unknown interaction" in str(
-            error
+        error
     ):
         embed = discord.Embed(
             title="",

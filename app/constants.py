@@ -11,7 +11,7 @@ logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
 
 # -------------------- Discord -------------------- #
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-# DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
 ESUTAZE_CHANNEL = 1302271245919981638
 GAME_UPDATES_CHANNEL = 882185054174994462
 FREE_STUFF_CHANNEL = 1081883673902714953
@@ -26,7 +26,9 @@ LAVAINFO_URLS = [
     "https://lavainfo.netlify.app/api/ssl",
 ]
 LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
-LAVAINFO_GITHUB_URL = "https://raw.githubusercontent.com/appujet/lavalink-list/refs/heads/main/nodes.json"
+LAVAINFO_GITHUB_URL = (
+    "https://raw.githubusercontent.com/appujet/lavalink-list/refs/heads/main/nodes.json"
+)
 # -------------------- SFD Servers -------------------- #
 SFD_SERVER_URL = "https://mythologicinteractive.com/SFDGameServices.asmx"
 SFD_REQUEST = """<?xml version='1.0' encoding='utf-8'?>
@@ -214,7 +216,9 @@ SHITPOST_SUBREDDITS_ALL = (
 )
 
 # -------------------- Music -------------------- #
-DISCORD_LOGO = "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
+DISCORD_LOGO = (
+    "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
+)
 COUNTRIES = (
     "United States",
     "United Kingdom",

@@ -6,13 +6,14 @@ import httpx
 from deep_translator import GoogleTranslator
 from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup, Tag
-from constants import (
+from app.constants import (
     ONLINEFIX_MAX_GAMES,
     ONLINEFIX_URL,
     ONLINEFIX_ICON,
     DB_CACHE,
     DB_LISTS,
 )
+from app.utils import make_http_request
 
 
 class OnlineFix:
@@ -28,17 +29,14 @@ class OnlineFix:
 
     async def run(self) -> None:
         onlinefix_cache, games = await self._load_bot_config()
-        try:
-            chat_log = await self.session.get(ONLINEFIX_URL)
-        except httpx.ReadTimeout:
-            print("OnlineFix: Timeout")
+        chat_log = await make_http_request(self.session, ONLINEFIX_URL)
+        if not chat_log:
             return
-
         chat_messages = await self._get_messages(chat_log.text)
         await self._process_messages(chat_messages, onlinefix_cache, games)
 
     async def _send_embed(self, url: str, game_title: str) -> None:
-        onlinefix_article = await self.session.get(url)
+        onlinefix_article = await make_http_request(self.session, url)
         soup = BeautifulSoup(onlinefix_article.text, "html.parser")
         head_tag = soup.find("head")
 

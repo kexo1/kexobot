@@ -10,6 +10,7 @@ from app.constants import (
     ALIENWAREARENA_STRIP,
     ALIENWAREARENA_URL,
 )
+from app.utils import make_http_request
 
 
 class AlienwareArena:
@@ -25,14 +26,12 @@ class AlienwareArena:
 
     async def run(self) -> None:
         alienwarearena_cache, to_filter = await self._load_bot_config()
-
-        try:
-            json_data = await self.session.get(ALIENWAREARENA_URL)
-        except httpx.ReadTimeout:
-            print("AlienwareArena: Timeout")
+        json_data = await make_http_request(
+            self.session, ALIENWAREARENA_URL, get_json=True
+        )
+        if not json_data:
             return
-
-        await self._send_embed(json_data.json(), alienwarearena_cache, to_filter)
+        await self._send_embed(json_data, alienwarearena_cache, to_filter)
 
     async def _send_embed(
         self, json_data: dict, alienwarearena_cache: list, to_filter: list

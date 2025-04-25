@@ -354,17 +354,18 @@ class Play(commands.Cog):
         sources = [
             "spsearch",
             "ytsearch",
-            wavelink.TrackSource.SoundCloud
+            wavelink.TrackSource.SoundCloud,
+            wavelink.TrackSource.YouTubeMusic,
         ]
 
-        found_tracks = None
         last_error = None
         for source in sources:
             try:
-                tracks: wavelink.Search = await wavelink.Playable.search(search, source=source)
+                tracks: wavelink.Search = await wavelink.Playable.search(
+                    search, source=source
+                )
                 if tracks:
-                    found_tracks = tracks
-                    break
+                    return tracks
             except LavalinkLoadException as e:
                 print(e)
                 if e.error == "Something went wrong while looking up the track.":
@@ -376,9 +377,6 @@ class Play(commands.Cog):
                 print(e)
                 last_error = "NODE_UNRESPONSIVE"
                 continue
-
-        if found_tracks:
-            return found_tracks
 
         if last_error:
             await send_error(ctx, last_error, search=search)

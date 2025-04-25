@@ -2,7 +2,9 @@ import json
 import httpx
 import wavelink
 
+from urllib.parse import urlparse
 from app.constants import LAVALIST_URL, LAVAINFO_URLS, LAVAINFO_GITHUB_URL
+from app.utils import make_http_request
 
 
 class LavalinkServerFetch:
@@ -12,29 +14,29 @@ class LavalinkServerFetch:
 
     async def get_lavalink_servers(self) -> list[wavelink.Node]:
         lavalink_servers = []
+        # To remove, site doesn't seem to be alive anymore
+        for url in LAVAINFO_URLS:
+            json_data: list = await make_http_request(
+                self.session, url, retries=2, get_json=True
+            )
+            if not json_data:
+                continue
+            lavalink_servers.extend(await self._lavainfo_fetch(json_data))
 
-        try:
-            for url in LAVAINFO_URLS:
-                json_data = await self.session.get(url, timeout=3)
-                lavalink_servers += await self._lavainfo_fetch(json_data.json())
-        except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
-            print(f"The request to {LAVAINFO_URLS[0]} timed out.")
-        except json.decoder.JSONDecodeError:
-            print(f"Failed to decode JSON from {LAVAINFO_URLS[0]}")
-
-        try:
-            json_data = await self.session.get(LAVALIST_URL, timeout=3)
-            lavalink_servers += await self._lavalist_fetch(json_data.json())
-        except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectError):
-            print(f"The request to {LAVALIST_URL} timed out.")
-        except json.decoder.JSONDecodeError:
-            print(f"Failed to decode JSON from {LAVALIST_URL}")
-
-        # Use LavaInfo GitHub as a last resort (use when lavainfo not available)
         if not lavalink_servers:
-            json_data = await self.session.get(LAVAINFO_GITHUB_URL, timeout=10)
-            lavalink_servers += await self._lavainfo_github_fetch(json_data.json())
+            json_data: list = await make_http_request(
+                self.session, LAVAINFO_GITHUB_URL, retries=2, get_json=True
+            )
+            if json_data:
+                lavalink_servers.extend(await self._lavainfo_github_fetch(json_data))
 
+        json_data: list = await make_http_request(
+            self.session, LAVALIST_URL, retries=2, get_json=True
+        )
+        if json_data:
+            lavalink_servers.extend(await self._lavalist_fetch(json_data))
+
+        # Use as a last resort
         if not lavalink_servers:
             lavalink_servers = [
                 self._return_node(
@@ -55,7 +57,10 @@ class LavalinkServerFetch:
                 continue
 
             node: wavelink.Node = self._return_node(
-                server["host"], server["port"], server["password"]
+                server["host"],
+                server["port"],
+                server["password"],
+                True if server["secure"] else False,
             )
             lavalink_servers.append(node)
 
@@ -92,7 +97,10 @@ class LavalinkServerFetch:
                     or plugin["name"] == "lavasrc-plugin"
                 ):
                     node: wavelink.Node = self._return_node(
-                        server["host"], server["port"], server["password"], True if server["secure"] else False
+                        server["host"],
+                        server["port"],
+                        server["password"],
+                        True if server["secure"] else False,
                     )
                     lavalink_servers.append(node)
                     break
@@ -108,10 +116,14 @@ class LavalinkServerFetch:
                 continue
 
             node: wavelink.Node = self._return_node(
-                server["host"], server["port"], server["password"], True if server["secure"] else False
+                server["host"],
+                server["port"],
+                server["password"],
+                True if server["secure"] else False,
             )
             lavalink_servers.append(node)
 
+        self.repeated_hostnames = [server["host"] for server in json_data]
         return lavalink_servers
 
     @staticmethod

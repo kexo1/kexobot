@@ -45,7 +45,7 @@ class Listeners(commands.Cog):
         embed = discord.Embed(
             title="",
             description=":warning: An error occured when playing song, trying to connect to a new node."
-            f"\n\n**Cause**: {payload.exception['cause']}"
+            f"\n\n**Message**: {payload.exception['message']}"
             f"\n**Severity**: {payload.exception['severity']}",
             color=discord.Color.yellow(),
         )

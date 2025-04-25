@@ -6,7 +6,9 @@ import httpx
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup, Tag
-from constants import ESUTAZE_URL, ESUTAZE_ICON, DB_CACHE, DB_LISTS
+
+from app.constants import ESUTAZE_URL, ESUTAZE_ICON, DB_CACHE, DB_LISTS
+from app.utils import make_http_request
 
 
 class Esutaze:
@@ -68,7 +70,7 @@ class Esutaze:
             return
 
         img_url = img_tag.get("src")
-        image_response = await self.session.get(img_url)
+        image_response = await make_http_request(self.session, img_url, binary=True)
         image = BytesIO(image_response.content)
 
         embed = discord.Embed(
@@ -86,12 +88,7 @@ class Esutaze:
         await self.channel.send(embed=embed, file=discord.File(image, "image.png"))
 
     async def _get_articles(self) -> list:
-        try:
-            html_content = await self.session.get(ESUTAZE_URL)
-        except (httpx.ReadTimeout, httpx.ConnectError):
-            print("Esutaze: Timeout")
-            return []
-
+        html_content = await make_http_request(self.session, ESUTAZE_URL)
         soup = BeautifulSoup(html_content.content, "xml")
         return soup.find_all("item")
 

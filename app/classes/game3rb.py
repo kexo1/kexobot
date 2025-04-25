@@ -8,7 +8,7 @@ import discord
 from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup
 from app.constants import GAME3RB_STRIP, GAME3RB_URL, GAME3RB_ICON, DB_CACHE, DB_LISTS
-from app.utils import strip_text
+from app.utils import strip_text, make_http_request
 
 
 class Game3rb:
@@ -30,11 +30,7 @@ class Game3rb:
 
         game_list = await self.bot_config.find_one(DB_LISTS)
         game_list = "\n".join(game_list["games"])
-        try:
-            source = await self.session.get(GAME3RB_URL)
-        except httpx.ReadTimeout:
-            print("Game3rb: Timeout")
-            return
+        source = await make_http_request(self.session, GAME3RB_URL)
 
         game_info = []
         to_upload = []
@@ -121,7 +117,12 @@ class Game3rb:
                 continue
 
             description = []
-            source = await self.session.get(game["url"])
+            source = await make_http_request(
+                self.session, game["url"],
+            )
+            if not source:
+                print("Broken link - ", game["url"])
+                continue
             soup = BeautifulSoup(source.text, "html.parser")
 
             torrent_url = soup.find("a", {"class": "torrent"})

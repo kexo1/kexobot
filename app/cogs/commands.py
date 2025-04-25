@@ -11,6 +11,7 @@ import wavelink
 from discord.ext import commands
 from discord.commands import slash_command, guild_only, option
 from motor.motor_asyncio import AsyncIOMotorClient
+from urllib.parse import urlparse
 
 from app.constants import (
     DB_LISTS,
@@ -127,22 +128,22 @@ class Commands(commands.Cog):
         node: wavelink.Node = self.bot.node
         node_info: wavelink.InfoResponsePayload = await node.fetch_info()
         embed = discord.Embed(
-            title="Node Info",
+            title=urlparse(node.uri).netloc,
             color=discord.Color.blue(),
         )
         plugins: wavelink.PluginResponsePayload = node_info.plugins
         unix_timestamp = int(iso_to_timestamp(str(node_info.build_time)).timestamp())
 
-        embed.add_field(name="Build time:", value=f"<t:{unix_timestamp}:D>")
-        embed.add_field(name="Java version:", value=node_info.jvm)
-        embed.add_field(name="Lavaplayer version:", value=node_info.lavaplayer)
-        embed.add_field(name="Filters:", value=", ".join(node_info.filters))
         embed.add_field(
             name="Plugins:",
             value=", ".join(f"{plugin.name}: {plugin.version}" for plugin in plugins),
             inline=False,
         )
-        embed.set_footer(text=node.uri)
+        embed.add_field(name="Lavaplayer version:", value=node_info.lavaplayer)
+        embed.add_field(name="Java version:", value=node_info.jvm)
+        embed.add_field(name="Build time:", value=f"<t:{unix_timestamp}:D>")
+        embed.add_field(name="Filters:", value=", ".join(node_info.filters))
+
         await ctx.respond(embed=embed)
 
     @slash_node.command(name="players", description="Information about node players.")
@@ -157,7 +158,7 @@ class Commands(commands.Cog):
             )
             await ctx.respond(embed=embed)
             return
-
+        # Would change to dict
         server_name = []
         playing = []
         node_uri = []
@@ -413,7 +414,7 @@ class Commands(commands.Cog):
                     ephemeral=True,
                     delete_after=10,
                 )
-                return
+                return None
 
         if ping:
             try:
@@ -421,13 +422,14 @@ class Commands(commands.Cog):
                 await ctx.send(role.mention)
             except AttributeError:
                 await send_error(ctx, "CANT_PING_ROLE")
-                return
+                return None
 
         view = HostView(author=author)
         await ctx.respond(embed=embed, view=view)
 
         interaction = await ctx.interaction.original_response()
         view.message = await ctx.channel.fetch_message(interaction.id)
+        return None
 
     # -------------------- Discord functions -------------------- #
     @slash_command(name="info", description="Shows bot info.")

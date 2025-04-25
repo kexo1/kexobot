@@ -199,10 +199,9 @@ class RedditFetcher:
 
     async def _create_embed(self, embed_dict: dict, url: str) -> None:
         url_obj = urlparse(url)
-        domain = url_obj.netloc
         embed = discord.Embed(
             title=embed_dict["title"],
-            description=f"{embed_dict['description']}\n\n**[{domain}]({url})**",
+            description=f"{embed_dict['description']}\n\n**[{url_obj.netloc}]({url})**",
             color=discord.Color.dark_theme(),
         )
         embed.set_thumbnail(url=embed_dict["icon"])
