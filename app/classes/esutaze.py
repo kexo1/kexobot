@@ -3,9 +3,8 @@ from io import BytesIO
 
 import discord
 import httpx
-
-from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup, Tag
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.constants import ESUTAZE_URL, ESUTAZE_ICON, DB_CACHE, DB_LISTS
 from app.utils import make_http_request
@@ -89,6 +88,9 @@ class Esutaze:
 
     async def _get_articles(self) -> list:
         html_content = await make_http_request(self.session, ESUTAZE_URL)
+        if not html_content:
+            return []
+
         soup = BeautifulSoup(html_content.content, "xml")
         return soup.find_all("item")
 

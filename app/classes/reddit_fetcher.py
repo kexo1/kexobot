@@ -1,19 +1,19 @@
-from typing import Optional
-from datetime import datetime
-
 import re
+from datetime import datetime
+from typing import Optional
+from urllib.parse import urlparse
+
 import asyncpraw
 import asyncpraw.models
-import httpx
 import discord
-
-from motor.motor_asyncio import AsyncIOMotorClient
-from urllib.parse import urlparse
+import httpx
 from asyncprawcore.exceptions import (
     AsyncPrawcoreException,
     ResponseException,
     RequestException,
 )
+from motor.motor_asyncio import AsyncIOMotorClient
+
 from app.constants import (
     REDDIT_CRACKWATCH_POSTS,
     REDDIT_STRIP,

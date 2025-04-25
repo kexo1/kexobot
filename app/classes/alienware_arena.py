@@ -1,8 +1,8 @@
 import discord
 import httpx
-
-from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup
+from motor.motor_asyncio import AsyncIOMotorClient
+
 from app.constants import (
     DB_CACHE,
     DB_LISTS,

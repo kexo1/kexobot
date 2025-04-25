@@ -1,12 +1,12 @@
+import re
 from datetime import datetime
 
-import re
+import discord
 import httpx
 import unidecode
-import discord
-
-from motor.motor_asyncio import AsyncIOMotorClient
 from bs4 import BeautifulSoup
+from motor.motor_asyncio import AsyncIOMotorClient
+
 from app.constants import GAME3RB_STRIP, GAME3RB_URL, GAME3RB_ICON, DB_CACHE, DB_LISTS
 from app.utils import strip_text, make_http_request
 
@@ -118,7 +118,8 @@ class Game3rb:
 
             description = []
             source = await make_http_request(
-                self.session, game["url"],
+                self.session,
+                game["url"],
             )
             if not source:
                 print("Broken link - ", game["url"])

@@ -1,8 +1,6 @@
-import json
 import httpx
 import wavelink
 
-from urllib.parse import urlparse
 from app.constants import LAVALIST_URL, LAVAINFO_URLS, LAVAINFO_GITHUB_URL
 from app.utils import make_http_request
 
@@ -11,6 +9,7 @@ class LavalinkServerFetch:
     def __init__(self, session: httpx.AsyncClient) -> None:
         self.session = session
         self.repeated_hostnames: list[str] = []
+        self.low_quality_nodes: list[str] = ["lavalink-v2.pericsq.ro"]
 
     async def get_lavalink_servers(self) -> list[wavelink.Node]:
         lavalink_servers = []
@@ -50,7 +49,10 @@ class LavalinkServerFetch:
         lavalink_servers = []
 
         for server in json_data:
-            if server["host"] in self.repeated_hostnames:
+            if (
+                server["host"] in self.repeated_hostnames
+                or server["host"] in self.low_quality_nodes
+            ):
                 continue
 
             if server.get("version") != "v4":
@@ -73,6 +75,9 @@ class LavalinkServerFetch:
             if "error" in server:
                 print("Error in lavainfo response: ", json_data.get("error"))
                 return []
+
+            if server["host"] in self.low_quality_nodes:
+                continue
 
             if server["isConnected"] is False:
                 continue
@@ -103,15 +108,18 @@ class LavalinkServerFetch:
                         True if server["secure"] else False,
                     )
                     lavalink_servers.append(node)
+                    self.repeated_hostnames.append(server["host"])
                     break
 
-        self.repeated_hostnames = [server["host"] for server in json_data]
         return lavalink_servers
 
     async def _lavainfo_github_fetch(self, json_data: list) -> list[wavelink.Node]:
         lavalink_servers = []
 
         for server in json_data:
+            if server["host"] in self.low_quality_nodes:
+                continue
+
             if server["restVersion"] != "v4":
                 continue
 
@@ -122,8 +130,8 @@ class LavalinkServerFetch:
                 True if server["secure"] else False,
             )
             lavalink_servers.append(node)
+            self.repeated_hostnames.append(server["host"])
 
-        self.repeated_hostnames = [server["host"] for server in json_data]
         return lavalink_servers
 
     @staticmethod

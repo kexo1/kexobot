@@ -1,16 +1,16 @@
+import asyncio
+import json
 import os
-from typing import Optional, Dict
 from datetime import datetime
+from typing import Optional, Dict
 
-import discord
 import aiohttp
+import asyncpraw
+import asyncpraw.models
+import discord
 import httpx
 import psutil
 import wavelink
-import asyncio
-import asyncpraw
-import asyncpraw.models
-import json
 
 from constants import SHITPOST_SUBREDDITS_DEFAULT, SONG_STRIP
 
@@ -256,7 +256,9 @@ async def make_http_request(
     for attempt in range(retries):
         try:
             if data:
-                response = await session.post(url, data=data, headers=headers, timeout=timeout)
+                response = await session.post(
+                    url, data=data, headers=headers, timeout=timeout
+                )
             else:
                 response = await session.get(url, headers=headers, timeout=timeout)
 
@@ -274,9 +276,9 @@ async def make_http_request(
             httpx.HTTPError,
         ) as e:
             if attempt == retries - 1:
-                print(f"Request failed ({type(e).__name__}): {url}")
+                print(f"Request failed ({type(e).__name__}): ", url)
                 return None
             await asyncio.sleep(1 * (attempt + 1))
         except json.decoder.JSONDecodeError:
-            print(f"Failed to decode JSON: {url}")
+            print(f"Failed to decode JSON: ", url)
     return None

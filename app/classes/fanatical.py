@@ -1,8 +1,13 @@
 import discord
 import httpx
-
 from motor.motor_asyncio import AsyncIOMotorClient
-from app.constants import DB_CACHE, FANATICAL_MAX_POSTS, FANATICAL_URL, FANATICAL_IMG_URL
+
+from app.constants import (
+    DB_CACHE,
+    FANATICAL_MAX_POSTS,
+    FANATICAL_URL,
+    FANATICAL_IMG_URL,
+)
 from app.utils import iso_to_timestamp, make_http_request
 
 
@@ -19,8 +24,7 @@ class Fanatical:
 
     async def run(self) -> None:
         fanatical_cache = await self._load_bot_config()
-        json_data = await make_http_request(
-            self.session, FANATICAL_URL, get_json=True)
+        json_data = await make_http_request(self.session, FANATICAL_URL, get_json=True)
         if not json_data:
             return
         await self._send_embed(json_data, fanatical_cache)

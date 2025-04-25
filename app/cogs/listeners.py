@@ -2,7 +2,6 @@ from typing import Union
 
 import discord
 import wavelink
-
 from discord.ext import commands
 from wavelink import (
     NodeDisconnectedEventPayload,
@@ -11,6 +10,7 @@ from wavelink import (
     TrackExceptionEventPayload,
     TrackStuckEventPayload,
 )
+
 from app.constants import DISCORD_LOGO
 from app.utils import fix_audio_title
 
@@ -26,16 +26,16 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
-        print(f"Node {payload.node.uri} is ready!")
-        if self.bot.get_online_nodes() > 1:
+        print(f"Node ({payload.node.uri}) is ready!")
+        if self.bot.get_online_nodes() > 1 and hasattr(self.bot, "node"):
             await self.bot.close_unused_nodes()
 
     @commands.Cog.listener()
     async def on_wavelink_node_disconnected(
         self, payload: NodeDisconnectedEventPayload
     ) -> None:
-        if self.bot.get_online_nodes() == 0:
-            print(f"Node {payload.node.uri} is disconnected, fetching new node...")
+        if self.bot.get_online_nodes() == 0 and hasattr(self.bot, "node"):
+            print(f"Node ({payload.node.uri}) is disconnected, fetching new node...")
             await self.bot.connect_node()
 
     @commands.Cog.listener()

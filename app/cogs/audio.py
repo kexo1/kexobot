@@ -2,12 +2,13 @@ from typing import Optional
 
 import discord
 import wavelink
-
-from discord.ext import commands
 from discord import option
 from discord.commands import slash_command, guild_only
+from discord.ext import commands
 from pycord.multicog import subcommand
+
 from app.decorators import is_joined
+from app.response_handler import send_response
 
 
 class Audio(commands.Cog):
@@ -29,24 +30,14 @@ class Audio(commands.Cog):
     async def change_volume(
         self, ctx: discord.ApplicationContext, vol: Optional[int] = None
     ) -> None:
-        vc: wavelink.Player = ctx.voice_client
+        player: wavelink.Player = ctx.voice_client
 
         if vol is None:
-            embed = discord.Embed(
-                title="",
-                description=f"🔊 **{int(vc.volume)}%**",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed)
+            await send_response(ctx, "CURRENT_VOLUME", volume=player.volume)
             return
 
-        await vc.set_volume(vol)
-        embed = discord.Embed(
-            title="",
-            description=f"**🔊 Volume set to `{vol}%`**",
-            color=discord.Color.blue(),
-        )
-        await ctx.respond(embed=embed)
+        await player.set_volume(vol)
+        await send_response(ctx, "VOLUME_CHANGED", ephemeral=False, volume=vol)
 
     @subcommand("music")
     @slash_command(name="speed", description="Speeds up music.")
@@ -69,12 +60,9 @@ class Audio(commands.Cog):
         filters.timescale.set(speed=multiplier)
 
         await player.set_filters(filters)
-        embed = discord.Embed(
-            title="",
-            description=f"**⏩ Sped up by `{multiplier}x`**",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx, "SPEED_CHANGED", ephemeral=False, multiplier=multiplier
         )
-        await ctx.respond(embed=embed)
 
     @subcommand("music")
     @slash_command(name="clear-effects", description="Clears all effects on player.")
@@ -83,15 +71,10 @@ class Audio(commands.Cog):
     async def clear_effects(self, ctx: discord.ApplicationContext) -> None:
         player: wavelink.Player = ctx.voice_client
         filters: wavelink.Filters = player.filters
+
         filters.reset()
         await player.set_filters(filters)
-        embed = discord.Embed(
-            title="",
-            description="**✅ Effects were cleared.**",
-            color=discord.Color.blue(),
-        )
-        embed.set_footer(text="takes 3 seconds to apply")
-        await ctx.respond(embed=embed)
+        await send_response(ctx, "EFFECTS_CLEARED", ephemeral=False)
 
 
 def setup(bot: commands.Bot):

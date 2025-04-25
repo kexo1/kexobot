@@ -1,25 +1,32 @@
-import random
 import asyncio
-
+import random
 from datetime import datetime
 from typing import Optional
-
-import aiohttp
-import asyncprawcore.exceptions
-import discord
-import asyncpraw
-import asyncpraw.models
-import httpx
-import dns.resolver
-import wavelink
-
-from fake_useragent import UserAgent
-from discord.ext import tasks, commands
-from motor.motor_asyncio import AsyncIOMotorClient
-from wavelink.enums import NodeStatus
-from pycord.multicog import Bot
 from zoneinfo import ZoneInfo
 
+import aiohttp
+import asyncpraw
+import asyncpraw.models
+import asyncprawcore.exceptions
+import discord
+import dns.resolver
+import httpx
+import wavelink
+from discord.ext import tasks, commands
+from fake_useragent import UserAgent
+from motor.motor_asyncio import AsyncIOMotorClient
+from pycord.multicog import Bot
+from wavelink.enums import NodeStatus
+
+from app.classes.alienware_arena import AlienwareArena
+from app.classes.elektrina_vypadky import ElektrinaVypadky
+from app.classes.esutaze import Esutaze
+from app.classes.fanatical import Fanatical
+from app.classes.game3rb import Game3rb
+from app.classes.lavalink_server_fetch import LavalinkServerFetch
+from app.classes.online_fix import OnlineFix
+from app.classes.reddit_fetcher import RedditFetcher
+from app.classes.sfd_servers import SFDServers
 from app.constants import (
     DISCORD_TOKEN,
     MONGO_DB_URL,
@@ -37,16 +44,6 @@ from app.constants import (
     KEXO_SERVER,
 )
 from app.utils import generate_temp_guild_data, is_older_than
-
-from app.classes.esutaze import Esutaze
-from app.classes.online_fix import OnlineFix
-from app.classes.game3rb import Game3rb
-from app.classes.alienware_arena import AlienwareArena
-from app.classes.lavalink_server_fetch import LavalinkServerFetch
-from app.classes.elektrina_vypadky import ElektrinaVypadky
-from app.classes.reddit_fetcher import RedditFetcher
-from app.classes.fanatical import Fanatical
-from app.classes.sfd_servers import SFDServers
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
@@ -98,6 +95,7 @@ class KexoBOT:
         bot.connect_node = self.connect_node
         bot.close_unused_nodes = self.close_unused_nodes
         bot.get_online_nodes = self.get_online_nodes
+        bot.get_avaiable_nodes = self.get_avaiable_nodes
         bot.guild_temp_data = self.guild_temp_data
 
         self.onlinefix = None | OnlineFix
@@ -267,17 +265,19 @@ class KexoBOT:
                 await asyncio.wait_for(
                     wavelink.Pool.connect(nodes=[node], client=bot), timeout=3
                 )
-                await node.fetch_info()  # Some fucking nodes secretly don't respond,
-            # I've played these games before!!!
+                # Some fucking nodes secretly don't respond,
+                # I've played these games before!!!
+                await node.fetch_info()
+
             except asyncio.TimeoutError:
-                print(f"Node {node.uri} is not responding, trying next...")
+                print(f"Node ({node.uri}) - Timeout, trying next...")
                 continue
             except (
                 wavelink.exceptions.LavalinkException,
                 wavelink.exceptions.NodeException,
                 aiohttp.client_exceptions.ServerDisconnectedError,
             ):
-                print(f"Failed to connect to {node.uri}, trying next...")
+                print(f"Node ({node.uri}) - Failed to connect, trying next...")
                 continue
 
             bot.node = node
@@ -308,7 +308,7 @@ class KexoBOT:
                 break
 
             if len(node.players) == 0:
-                print(f"Node {node.uri} is empty, removing...")
+                print(f"Node ({node.uri}) is empty, removing...")
                 # noinspection PyProtectedMember
                 await node._pool_closer()  # Node is not properly closed
                 await node.close(eject=True)
@@ -323,6 +323,10 @@ class KexoBOT:
                 if node.status == NodeStatus.CONNECTED
             ]
         )
+
+    def get_avaiable_nodes(self) -> int:
+        """Get the number of available lavalink nodes."""
+        return len(self.lavalink_servers)
 
     @staticmethod
     def _clear_temp_reddit_data() -> None:

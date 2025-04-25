@@ -1,16 +1,15 @@
 import datetime
 import os
-
 from datetime import timedelta
-from zoneinfo import ZoneInfo
 from typing import Union, cast
+from zoneinfo import ZoneInfo
 
 import httpx
 import matplotlib.pyplot as plt
 import mplcyberpunk
-
 from bs4 import BeautifulSoup
 from motor.motor_asyncio import AsyncIOMotorClient
+
 from app.constants import (
     SFD_SERVER_URL,
     SFD_REQUEST,
@@ -162,6 +161,7 @@ class SFDServers:
         hours_diff = time_diff.total_seconds() / 3600
         update_count = min(4, max(1, int(hours_diff // 6)))
         print(f"Updating weekly stats: {update_count} updates")
+        print(now)
         players_week, servers_week = activity["players_week"], activity["servers_week"]
 
         recent_players = players_day[-60 * update_count :]
@@ -187,9 +187,14 @@ class SFDServers:
         players_week.extend(new_players_averages)
         servers_week.extend(new_servers_averages)
 
-        # Ensure now is in the correct timezone before storing
-        if now.tzinfo is None:
-            now = now.replace(tzinfo=ZoneInfo("Europe/Bratislava"))
+        # Round the current time to the nearest 6-hour mark
+        current_hour = now.hour
+        rounded_hour = (current_hour // 6) * 6
+        next_update = now.replace(hour=rounded_hour, minute=0, second=0, microsecond=0)
+
+        # Ensure next_update is in the correct timezone
+        if next_update.tzinfo is None:
+            next_update = next_update.replace(tzinfo=ZoneInfo("Europe/Bratislava"))
 
         await self.bot_config.update_many(
             DB_SFD_ACTIVITY,
@@ -197,7 +202,7 @@ class SFDServers:
                 "$set": {
                     "players_week": players_week,
                     "servers_week": servers_week,
-                    "last_update_week": now,
+                    "last_update_week": next_update,
                 }
             },
         )
@@ -227,7 +232,9 @@ class SFDServers:
         return await self._parse_servers(search)
 
     async def _load_sfd_servers(self) -> str:
-        response = await make_http_request(self.session, SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS)
+        response = await make_http_request(
+            self.session, SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS
+        )
         if not response:
             return ""
         return response.text

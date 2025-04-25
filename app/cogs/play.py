@@ -1,16 +1,14 @@
-from typing import Union, Optional, List
 import random
 import re
+from typing import Union, Optional, List
 
 import discord
 import wavelink
-
 from discord import option
-from discord.ext import commands
 from discord.commands import guild_only
+from discord.ext import commands
 from wavelink.exceptions import LavalinkLoadException, NodeException
 
-from app.decorators import is_joined, is_playing, is_queue_empty
 from app.constants import (
     COUNTRIES,
     RADIOGARDEN_PLACES_URL,
@@ -18,8 +16,9 @@ from app.constants import (
     RADIOGARDEN_SEARCH_URL,
     RADIOGARDEN_LISTEN_URL,
 )
+from app.decorators import is_joined, is_playing, is_queue_empty
+from app.response_handler import send_response
 from app.utils import find_track, fix_audio_title, make_http_request
-from app.errors import send_error
 
 
 class Play(commands.Cog):
@@ -57,7 +56,7 @@ class Play(commands.Cog):
         if not is_moved:
             return
 
-        track = await self._fetch_track(ctx, search)
+        track = await self._fetch_tracks(ctx, search)
         if not track:
             return
 
@@ -100,7 +99,7 @@ class Play(commands.Cog):
 
         place_ids = await self._get_radiomap_data()
         if not place_ids:
-            await send_error(ctx, "RADIOMAP_ERROR")
+            await send_response(ctx, "RADIOMAP_ERROR")
             return
 
         place_id = random.choice(place_ids)
@@ -111,7 +110,7 @@ class Play(commands.Cog):
             headers={"accept": "application/json"},
         )
         if not response:
-            await send_error(ctx, "RADIOMAP_ERROR")
+            await send_response(ctx, "RADIOMAP_ERROR")
             return
 
         try:
@@ -120,7 +119,7 @@ class Play(commands.Cog):
                 "/"
             )[-1]
         except (KeyError, IndexError, ValueError):
-            await send_error(ctx, "RADIOMAP_ERROR")
+            await send_response(ctx, "RADIOMAP_ERROR")
             return
         response = await make_http_request(
             self.session,
@@ -128,7 +127,7 @@ class Play(commands.Cog):
             headers={"accept": "application/json"},
         )
         if not response:
-            await send_error(ctx, "RADIOMAP_ERROR")
+            await send_response(ctx, "RADIOMAP_ERROR")
             return
 
         response_text = response.text
@@ -136,7 +135,7 @@ class Play(commands.Cog):
             r'(?:href="|Redirecting to )(https?://[^"\s]+)', response_text
         )
         if not url_match:
-            await send_error(ctx, "RADIOMAP_ERROR")
+            await send_response(ctx, "RADIOMAP_ERROR")
             return
 
         station = url_match.group(1)
@@ -172,13 +171,13 @@ class Play(commands.Cog):
             headers={"accept": "application/json"},
         )
         if not response:
-            await send_error(ctx, "RADIOMAP_ERROR")
+            await send_response(ctx, "RADIOMAP_ERROR")
             return
 
         try:
             data = response.json()
             if not data["hits"]["hits"]:
-                await send_error(ctx, "NO_TRACKS_FOUND", search=station)
+                await send_response(ctx, "NO_TRACKS_FOUND", search=station)
                 return
 
             for station_data in data["hits"]["hits"]:
@@ -190,9 +189,9 @@ class Play(commands.Cog):
                 await self.play(ctx, station_url, play_next)
                 return
 
-            await send_error(ctx, "NO_TRACKS", search=station)
+            await send_response(ctx, "NO_TRACKS", search=station)
         except (KeyError, ValueError):
-            await send_error(ctx, "RADIOMAP_ERROR")
+            await send_response(ctx, "RADIOMAP_ERROR")
 
     @music.command(name="skip", description="Skip playing song.")
     @commands.cooldown(1, 4, commands.BucketType.user)
@@ -203,10 +202,7 @@ class Play(commands.Cog):
         await player.skip()
 
         player.should_respond = False
-        embed = discord.Embed(
-            title="", description="**⏭️   Skipped**", color=discord.Color.blue()
-        )
-        await ctx.respond(embed=embed)
+        await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
 
     @music.command(name="skip-to", description="Skips to selected song in queue.")
     @guild_only()
@@ -223,7 +219,7 @@ class Play(commands.Cog):
 
         track_pos = find_track(player, to_find)
         if not track_pos:
-            await send_error(ctx, "NO_TRACK_FOUND_IN_QUEUE", search=to_find)
+            await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", search=to_find)
             return
 
         track = player.queue[track_pos - 1]
@@ -231,80 +227,50 @@ class Play(commands.Cog):
         del player.queue[track_pos]
         await player.stop()
 
-        embed = discord.Embed(
-            title="",
-            description=f"**Skipped to [{track.title}]({track.uri})**",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx, "TRACK_SKIPPED_TO", ephemeral=False, title=track.title, uri=track.uri
         )
-        await ctx.respond(embed=embed, ephemeral=True)
 
     @music.command(name="pause", description="Pauses song that is currently playing.")
     @guild_only()
     @is_playing()
-    async def pause_command(self, ctx: discord.ApplicationContext) -> None:
+    async def pause(self, ctx: discord.ApplicationContext) -> None:
         player: wavelink.Player = ctx.voice_client
 
         if player.paused:
-            embed = discord.Embed(
-                title="",
-                description=f"{ctx.user.mention}, song is already paused, use `/resume`",
-                color=discord.Color.blue(),
-            )
-            await ctx.response.send_message(embed=embed)
+            await send_response(ctx, "ALREADY_PAUSED")
             return
 
         await player.pause(True)
-
-        embed = discord.Embed(
-            title="", description="**⏸️   Paused**", color=discord.Color.blue()
-        )
-
-        embed.set_footer(text="Deleting in 10s.")
-        await ctx.respond(embed=embed, delete_after=10)
+        await send_response(ctx, "TRACK_PAUSED", ephemeral=False, delete_after=10)
 
     @music.command(name="resume", description="Resumes paused song.")
     @guild_only()
     @is_playing()
-    async def resume_command(self, ctx: discord.ApplicationContext) -> None:
+    async def resume(self, ctx: discord.ApplicationContext) -> None:
         player: wavelink.Player = ctx.voice_client
         await player.pause(False)
-
-        embed = discord.Embed(
-            title="",
-            description="**:arrow_forward: Resumed**",
-            color=discord.Color.blue(),
-        )
-        embed.set_footer(text="Deleting in 10s.")
-        await ctx.respond(embed=embed, delete_after=10)
+        await send_response(ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10)
 
     @music.command(name="leave", description="Leaves voice channel.")
     @guild_only()
     @commands.cooldown(1, 4, commands.BucketType.user)
     @is_joined()
-    async def disconnect_command(self, ctx: discord.ApplicationContext) -> None:
+    async def disconnect(self, ctx: discord.ApplicationContext) -> None:
         player: wavelink.Player = ctx.voice_client
 
         if player.channel.id != ctx.author.voice.channel.id:
-            embed = discord.Embed(
-                title="",
-                description=f"{ctx.author.mention},"
-                f" join the voice channel the bot is playing in to disconnect it.",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed, ephemeral=True)
+            await send_response(ctx, "NOT_IN_SAME_VOICE_CHANNEL")
             return
 
-        embed = discord.Embed(
-            title="",
-            description=f"**✅ Left <#{player.channel.id}>**",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx, "DISCONNECTED", ephemeral=False, channel_id=player.channel.id
         )
-        await ctx.respond(embed=embed)
         player.cleanup()
         await player.disconnect()
 
     # ----------------------- Helper functions ------------------------ #
-    async def _fetch_track(
+    async def _fetch_tracks(
         self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
@@ -378,10 +344,9 @@ class Play(commands.Cog):
                 last_error = "NODE_UNRESPONSIVE"
                 continue
 
-        if last_error:
-            await send_error(ctx, last_error, search=search)
-        else:
-            await send_error(ctx, "NO_TRACKS_FOUND", search=search)
+        await send_response(
+            ctx, last_error if last_error else "NO_TRACKS_FOUND", search=search
+        )
         return None
 
     @staticmethod
@@ -391,41 +356,32 @@ class Play(commands.Cog):
             return True
 
         if player.playing:
-            embed = discord.Embed(
-                title="",
-                description=f"{ctx.author.mention}, I'm playing in another channel,"
-                f" wait till song finishes.",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed)
+            await send_response(ctx, "NOT_IN_SAME_VOICE_CHANNEL_PLAYING")
             return False
 
         await player.move_to(ctx.author.voice.channel)
-        embed = discord.Embed(
-            title="",
-            description=f"**Moving to <#{ctx.author.voice.channel.id}>**.",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx, "MOVED", ephemeral=False, channel_id=ctx.author.voice.channel.id
         )
-        await ctx.respond(embed=embed)
         player.should_respond = False
         return True
 
     @staticmethod
     async def _join_channel(ctx: discord.ApplicationContext) -> bool:
         if not ctx.author.voice or not ctx.author.voice.channel:
-            await send_error(ctx, "NO_VOICE_CHANNEL")
+            await send_response(ctx, "NO_VOICE_CHANNEL")
             return False
 
         try:
             await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
         except wavelink.InvalidChannelStateException:
-            await send_error(ctx, "NO_PERMISSIONS")
+            await send_response(ctx, "NO_PERMISSIONS")
             return False
         except wavelink.exceptions.InvalidNodeException:
-            await send_error(ctx, "NO_NODES")
+            await send_response(ctx, "NO_NODES")
             return False
         except wavelink.exceptions.ChannelTimeoutException:
-            await send_error(ctx, "CONNECTION_TIMEOUT")
+            await send_response(ctx, "CONNECTION_TIMEOUT")
             vc: wavelink.Player = ctx.guild.voice_client
             vc.cleanup()
             return False
@@ -440,7 +396,7 @@ class Play(commands.Cog):
         try:
             await player.play(track)
         except wavelink.exceptions.NodeException:
-            await send_error(ctx, "NODE_REQUEST_ERROR")
+            await send_response(ctx, "NODE_REQUEST_ERROR")
             return False
 
         player.temp_current = track  # To be used in case of switching nodes
@@ -455,13 +411,13 @@ class Play(commands.Cog):
         player.should_respond = False
         player.just_joined = True
 
-        embed = discord.Embed(
-            title="",
-            description=f"**✅ Joined to <#{player.channel.id}>"
-            f" and set text channel to <#{ctx.channel.id}>.**",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx,
+            "JOINED",
+            ephemeral=False,
+            channel_id=player.channel.id,
+            text_channel_id=player.text_channel.id,
         )
-        await ctx.respond(embed=embed)
 
     @staticmethod
     def _queue_embed(track: wavelink.Playable) -> discord.Embed:

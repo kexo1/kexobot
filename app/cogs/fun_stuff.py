@@ -1,23 +1,22 @@
 import random
 from datetime import datetime
 
-import asyncpraw.reddit
 import asyncpraw.models
+import asyncpraw.reddit
 import discord
 import httpx
 import imgflip
 import requests
-
-from discord.ext import commands
-from discord.commands import slash_command
-from discord import option
-from pycord.multicog import subcommand
-
 from asyncprawcore.exceptions import (
     AsyncPrawcoreException,
     ResponseException,
     RequestException,
 )
+from discord import option
+from discord.commands import slash_command
+from discord.ext import commands
+from pycord.multicog import subcommand
+
 from app.constants import (
     ROAST_COMMANDS_MSG,
     IMGFLIP_PASSWORD,
@@ -26,11 +25,11 @@ from app.constants import (
     KEXO_SERVER,
     SISKA_GANG_SERVER,
 )
+from app.response_handler import send_response
 from app.utils import (
     load_text_file,
     get_selected_user_data,
 )
-from app.errors import send_error
 
 
 class FunStuff(commands.Cog):
@@ -144,7 +143,7 @@ class FunStuff(commands.Cog):
 
                 is_channel_nsfw = ctx.channel.is_nsfw()
                 if submission.over_18 and not is_channel_nsfw:
-                    await send_error(ctx, "CHANNEL_NOT_NSF")
+                    await send_response(ctx, "CHANNEL_NOT_NSFW")
                     return
 
                 embed = await self._create_reddit_embed(submission)
@@ -166,7 +165,7 @@ class FunStuff(commands.Cog):
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:
             print(e)
             print(vars(e))
-            await send_error(ctx, "REDDIT_REQUEST_ERROR")
+            await send_response(ctx, "REDDIT_REQUEST_ERROR")
 
     def _update_temp_user_data(self, user_id: int, submission_url: str) -> None:
         self.temp_user_data[user_id]["reddit"]["viewed_posts"].add(submission_url)

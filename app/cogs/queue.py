@@ -2,14 +2,13 @@ import datetime
 
 import discord
 import wavelink
-
-from discord.ext import commands
 from discord.commands import slash_command, option, guild_only
+from discord.ext import commands
 from pycord.multicog import subcommand
 
 from app.decorators import is_playing, is_joined, is_queue_empty
+from app.response_handler import send_response
 from app.utils import find_track, fix_audio_title
-from app.errors import send_error
 
 
 # noinspection PyUnusedLocal
@@ -84,18 +83,18 @@ class Queue(commands.Cog):
         player: wavelink.Player = ctx.voice_client
         track_pos = find_track(player, to_find)
         if track_pos is None:
-            print(f"Track not found: {to_find}")
-            await send_error(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
+            await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
             return
 
         track = player.queue[track_pos - 1]
         del player.queue[track_pos - 1]
-        embed = discord.Embed(
-            title="",
-            description=f"**Removed [{track.title}]({track.uri})**",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx,
+            "QUEUE_TRACK_REMOVED",
+            ephemeral=False,
+            title=track.title,
+            uri=track.uri,
         )
-        await ctx.respond(embed=embed)
 
     @subcommand("music")
     @slash_command(
@@ -109,14 +108,11 @@ class Queue(commands.Cog):
         player: wavelink.Player = ctx.voice_client
 
         if len(player.queue) < 2:
-            await send_error(ctx, "CANT_SHUFFLE")
+            await send_response(ctx, "CANT_SHUFFLE")
             return
 
         player.queue.shuffle()
-        embed = discord.Embed(
-            title="", description="**🔀 Queue shuffled!**", color=discord.Color.blue()
-        )
-        await ctx.respond(embed=embed)
+        await send_response(ctx, "QUEUE_SHUFFLED", ephemeral=False)
 
     @subcommand("music")
     @slash_command(
@@ -131,21 +127,13 @@ class Queue(commands.Cog):
 
         if player.queue.mode == wavelink.QueueMode.loop_all:
             player.queue.mode = wavelink.QueueMode.loop_all
-            embed = discord.Embed(
-                title="",
-                description="**No longer looping queue.**",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed)
+            await send_response(ctx, "QUEUE_LOOP_DISABLED")
             return
 
         player.queue.mode = wavelink.QueueMode.loop_all
-        embed = discord.Embed(
-            title="",
-            description=f"🔁 **Looping current queue ({player.queue.count} songs)**",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx, "QUEUE_LOOP_ENABLED", ephemeral=False, count=player.queue.count
         )
-        await ctx.respond(embed=embed)
 
     @subcommand("music")
     @slash_command(
@@ -159,21 +147,17 @@ class Queue(commands.Cog):
 
         if player.queue.mode == wavelink.QueueMode.loop:
             player.queue.mode = wavelink.QueueMode.normal
-            embed = discord.Embed(
-                title="",
-                description="**No longer looping current song.**",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed)
+            await send_response(ctx, "TRACK_LOOP_DISABLED")
             return
 
         player.queue.mode = wavelink.QueueMode.loop
-        embed = discord.Embed(
-            title="",
-            description=f"🔁 **Looping [{player.current.title}]({player.current.uri}).**",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx,
+            "TRACK_LOOP_ENABLED",
+            ephemeral=False,
+            title=player.current.title,
+            uri=player.current.uri,
         )
-        await ctx.respond(embed=embed)
 
     @subcommand("music")
     @slash_command(name="clear", description="Clears queue")
@@ -183,10 +167,7 @@ class Queue(commands.Cog):
         player: wavelink.Player = ctx.voice_client
         player.queue.clear()
 
-        embed = discord.Embed(
-            title="", description="🗑️ **Cleared**", color=discord.Color.blue()
-        )
-        await ctx.respond(embed=embed)
+        await send_response(ctx, "QUEUE_CLEARED", ephemeral=False)
 
     async def _get_queue_embeds(
         self, ctx: discord.ApplicationContext, player: wavelink.Player

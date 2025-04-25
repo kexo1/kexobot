@@ -1,18 +1,19 @@
 import datetime
-import random
-import time
-import sys
 import os
+import random
+import sys
+import time
+from urllib.parse import urlparse
 
 import asyncpraw.models
 import discord
 import wavelink
-
-from discord.ext import commands
 from discord.commands import slash_command, guild_only, option
+from discord.ext import commands
 from motor.motor_asyncio import AsyncIOMotorClient
-from urllib.parse import urlparse
 
+from app.__init__ import __version__
+from app.classes.sfd_servers import SFDServers
 from app.constants import (
     DB_LISTS,
     XTC_SERVER,
@@ -21,7 +22,7 @@ from app.constants import (
     SFD_TIMEZONE_CHOICE,
     SHITPOST_SUBREDDITS_ALL,
 )
-from app.classes.sfd_servers import SFDServers
+from app.response_handler import send_response
 from app.utils import (
     get_memory_usage,
     iso_to_timestamp,
@@ -29,8 +30,6 @@ from app.utils import (
     check_node_status,
     generate_user_data,
 )
-from app.errors import send_error
-from app.__init__ import __version__
 
 host_authors = []
 
@@ -81,21 +80,13 @@ class Commands(commands.Cog):
         )
 
         if not node:
-            embed = discord.Embed(
-                title="",
-                description=f":x: Failed to connect to `{uri}`",
-                color=discord.Color.from_rgb(r=255, g=0, b=0),
-            )
-            await ctx.respond(embed=embed)
+            await send_response(ctx, "NODE_CONNECT_FAILURE", uri=uri)
             return
 
         self.bot.node = node
-        embed = discord.Embed(
-            title="",
-            description=f"**✅ Connected to node `{node[0].uri}`**",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx, "NODE_CONNECT_SUCCESS", ephemeral=False, uri=node[0].uri
         )
-        await ctx.respond(embed=embed)
 
     @slash_node.command(
         name="reconnect", description="Automatically reconnect to avaiable node"
@@ -109,19 +100,16 @@ class Commands(commands.Cog):
 
         if player:
             await player.switch_node(node)
-            embed = discord.Embed(
-                title="",
-                description=f"**✅ Connected your player to node `{self.bot.node.uri}`**",
-                color=discord.Color.blue(),
+            await send_response(
+                ctx,
+                "NODE_RECONNECT_TO_PLAYER_SUCCESS",
+                ephemeral=False,
+                uri=self.bot.node.uri,
             )
         else:
-            embed = discord.Embed(
-                title="",
-                description=f"**✅ Connected to node `{self.bot.node.uri}`**",
-                color=discord.Color.blue(),
+            await send_response(
+                ctx, "NODE_RECONNECT_SUCCESS", ephemeral=False, uri=self.bot.node.uri
             )
-
-        await ctx.respond(embed=embed)
 
     @slash_node.command(name="info", description="Information about connected node.")
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
@@ -151,12 +139,7 @@ class Commands(commands.Cog):
         nodes: dict[str, wavelink.Node] = wavelink.Pool.nodes.values()
 
         if not nodes:
-            embed = discord.Embed(
-                title="",
-                description=":x: There are no nodes connected.",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed)
+            await send_response(ctx, "NO_NODES_CONNECTED")
             return
         # Would change to dict
         server_name = []
@@ -181,12 +164,7 @@ class Commands(commands.Cog):
                 node_uri.append(node.uri)
 
         if not server_name:
-            embed = discord.Embed(
-                title="",
-                description=":x: There are no players connected.",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed)
+            await send_response(ctx, "NO_PLAYERS_CONNECTED")
             return
 
         embed.add_field(name="Server:ㅤㅤㅤㅤ", value="\n".join(server_name))
@@ -204,16 +182,7 @@ class Commands(commands.Cog):
     async def get_sfd_servers(self, ctx: discord.ApplicationContext) -> None:
         servers = await self.sfd_servers.get_servers()
         if not servers:
-            embed = discord.Embed(
-                title="",
-                description=":x: There are no servers available right now.",
-                color=discord.Color.from_rgb(r=255, g=0, b=0),
-            )
-            await ctx.respond(
-                embed=embed,
-                ephemeral=True,
-                delete_after=10,
-            )
+            await send_response(ctx, "SFD_SERVERS_NOT_FOUND")
             return
 
         servers_dict, all_players = await self.sfd_servers.get_servers_info()
@@ -235,7 +204,7 @@ class Commands(commands.Cog):
     ) -> None:
         server = self.sfd_servers.get_server(search)
         if not server:
-            await send_error(ctx, "SFD_SERVER_NOT_FOUND")
+            await send_response(ctx, "SFD_SERVER_NOT_FOUND")
             return
 
         server = server.get_full_server_info()
@@ -361,12 +330,8 @@ class Commands(commands.Cog):
         author = ctx.author
 
         if author in host_authors:
-            return await ctx.respond(
-                "You have already created host embed!"
-                " Click on button embed to stop it from beign active.",
-                delete_after=10,
-                ephemeral=True,
-            )
+            await send_response(ctx, "ALREADY_HOSTING")
+            return None
 
         host_authors.append(author.name)
 
@@ -409,11 +374,7 @@ class Commands(commands.Cog):
             if image.endswith((".jpg", ".jpeg", ".png", ".gif")):
                 embed.set_thumbnail(url=image)
             else:
-                await ctx.respond(
-                    "Image url needs to end with .png, .gif and etc.",
-                    ephemeral=True,
-                    delete_after=10,
-                )
+                await send_response(ctx, "INCORRECT_IMAGE_URL")
                 return None
 
         if ping:
@@ -421,7 +382,7 @@ class Commands(commands.Cog):
                 role = discord.utils.get(ctx.guild.roles, name="Exotic")
                 await ctx.send(role.mention)
             except AttributeError:
-                await send_error(ctx, "CANT_PING_ROLE")
+                await send_response(ctx, "CANT_PING_ROLE")
                 return None
 
         view = HostView(author=author)
@@ -442,6 +403,7 @@ class Commands(commands.Cog):
         embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
         embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
         embed.add_field(name="Online nodes:ㅤ", value=self.bot.get_online_nodes())
+        embed.add_field(name="Available nodes:ㅤ", value=self.bot.get_avaiable_nodes())
         embed.add_field(name="Joined servers:ㅤ", value=len(self.bot.guilds))
         embed.add_field(name="Version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
@@ -525,12 +487,7 @@ class Commands(commands.Cog):
                 {"_id": user_id, "reddit": user_data["reddit"]}
             )
 
-            embed = discord.Embed(
-                title="",
-                description="**✅ Generated user data.**",
-                color=discord.Color.blue(),
-            )
-            await ctx.respond(embed=embed, ephemeral=True)
+            await send_response(ctx, "USER_DATA_GENERATED", ephemeral=False)
             self.user_data[user_id] = user_data
         else:
             self.user_data.setdefault(user_id, {})["reddit"] = user_data["reddit"]
@@ -569,19 +526,16 @@ class Commands(commands.Cog):
         collection: list = bot_config[collection_db_name]
 
         if to_upload in collection:
-            await send_error(ctx, "DB_ALREADY_IN_LIST", to_upload=to_upload)
+            await send_response(ctx, "DB_ALREADY_IN_LIST", to_upload=to_upload)
             return
 
         collection.append(to_upload)
         await self.bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
-        embed = discord.Embed(
-            title="",
-            description=f":white_check_mark: String `{to_upload}` was added to `{collection_name}`",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx, "DB_ADDED", to_upload=to_upload, collection_name=collection_name
         )
-        await ctx.respond(embed=embed)
 
     async def _remove_from_bot_config(
         self, ctx, collection: str, to_remove: str
@@ -592,20 +546,16 @@ class Commands(commands.Cog):
         collection: list = bot_config[collection_db_name]
 
         if to_remove not in collection:
-            await send_error(ctx, "DB_NOT_IN_LIST", to_remove=to_remove)
+            await send_response(ctx, "DB_NOT_IN_LIST", to_remove=to_remove)
             return
 
         del collection[collection.index(to_remove)]
-
         await self.bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
-        embed = discord.Embed(
-            title="",
-            description=f":white_check_mark: String `{to_remove}` was removed from `{collection_name}`",
-            color=discord.Color.blue(),
+        await send_response(
+            ctx, "DB_REMOVED", to_remove=to_remove, collection_name=collection_name
         )
-        await ctx.respond(embed=embed)
 
 
 class HostView(discord.ui.View):
@@ -626,7 +576,7 @@ class HostView(discord.ui.View):
             host_authors.pop(host_authors.index(self.author.name))
             return
 
-        await send_error(interaction, "NOT_EMBED_AUTHOR")
+        await send_response(interaction, "NOT_EMBED_AUTHOR")
 
     async def on_timeout(self) -> None:
         embed = await self.disable_embed()
@@ -646,7 +596,7 @@ class HostView(discord.ui.View):
                 )
             }.**"
         )
-        host_authors.pop(host_authors.index(self.author.name))
+        del host_authors[host_authors.index(self.author.name)]
 
     async def disable_embed(self) -> discord.Embed:
         self.stop()
