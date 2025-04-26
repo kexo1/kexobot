@@ -12,7 +12,7 @@ from app.constants import (
 from app.utils import iso_to_timestamp, make_http_request
 
 
-class ElektrinaVypadky:
+class PowerOutageMonitor:
     def __init__(
         self,
         bot_config: AsyncIOMotorClient,

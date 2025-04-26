@@ -21,7 +21,7 @@ from app.response_handler import send_response
 from app.utils import find_track, fix_audio_title, make_http_request
 
 
-class Play(commands.Cog):
+class MusicCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.session = self.bot.session
@@ -467,4 +467,4 @@ class Play(commands.Cog):
 
 
 def setup(bot: commands.Bot) -> None:
-    bot.add_cog(Play(bot))
+    bot.add_cog(MusicCommands(bot))

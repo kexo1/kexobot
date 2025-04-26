@@ -5,7 +5,7 @@ from app.constants import LAVALIST_URL, LAVAINFO_URLS, LAVAINFO_GITHUB_URL
 from app.utils import make_http_request
 
 
-class LavalinkServerFetch:
+class LavalinkServerManager:
     def __init__(self, session: httpx.AsyncClient) -> None:
         self.session = session
         self.repeated_hostnames: list[str] = []

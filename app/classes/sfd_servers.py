@@ -22,7 +22,7 @@ from app.utils import average, is_older_than, make_http_request
 plt.style.use("cyberpunk")
 
 
-class Server:
+class SFDServer:
     def __init__(
         self,
         address_ipv4,
@@ -50,7 +50,7 @@ class Server:
         self.version = version
 
     def __repr__(self) -> str:
-        return f"Server({self.server_name}, {self.map_name}, {self.players}, {self.max_players}, {self.bots})"
+        return f"SFDServer({self.server_name}, {self.map_name}, {self.players}, {self.max_players}, {self.bots})"
 
     def get_full_server_info(self):
         return self
@@ -161,7 +161,6 @@ class SFDServers:
         hours_diff = time_diff.total_seconds() / 3600
         update_count = min(4, max(1, int(hours_diff // 6)))
         print(f"Updating weekly stats: {update_count} updates")
-        print(now)
         players_week, servers_week = activity["players_week"], activity["servers_week"]
 
         recent_players = players_day[-60 * update_count :]
@@ -208,7 +207,7 @@ class SFDServers:
         )
 
     async def get_servers_info(self) -> tuple:
-        servers: list[Server] = cast(list[Server], await self._parse_servers())
+        servers: list[SFDServer] = cast(list[SFDServer], await self._parse_servers())
         servers_dict: dict = {"server_name": [], "maps": [], "players": []}
         all_players = 0
 
@@ -224,11 +223,11 @@ class SFDServers:
 
         return servers_dict, all_players
 
-    async def get_servers(self) -> list[Server]:
-        servers: list[Server] = await self._parse_servers()
+    async def get_servers(self) -> list[SFDServer]:
+        servers: list[SFDServer] = await self._parse_servers()
         return servers
 
-    async def get_server(self, search: str) -> Server:
+    async def get_server(self, search: str) -> SFDServer:
         return await self._parse_servers(search)
 
     async def _load_sfd_servers(self) -> str:
@@ -251,7 +250,7 @@ class SFDServers:
 
     async def _parse_servers(
         self, search: str = None
-    ) -> Union[list[Server], Server, None]:
+    ) -> Union[list[SFDServer], SFDServer, None]:
         response = await self._load_sfd_servers()
         if not response:
             return []
@@ -322,7 +321,7 @@ class SFDServers:
                 else None
             )
 
-            server = Server(
+            server = SFDServer(
                 address_ipv4,
                 port,
                 server_name,

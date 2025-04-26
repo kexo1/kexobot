@@ -19,12 +19,12 @@ from pycord.multicog import Bot
 from wavelink.enums import NodeStatus
 
 from app.classes.alienware_arena import AlienwareArena
-from app.classes.elektrina_vypadky import ElektrinaVypadky
-from app.classes.esutaze import Esutaze
+from app.classes.contests import ContestMonitor
 from app.classes.fanatical import Fanatical
 from app.classes.game3rb import Game3rb
-from app.classes.lavalink_server_fetch import LavalinkServerFetch
+from app.classes.lavalink_server import LavalinkServerManager
 from app.classes.online_fix import OnlineFix
+from app.classes.power_outages import PowerOutageMonitor
 from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
 from app.constants import (
@@ -51,7 +51,7 @@ dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
 bot = Bot()
 
 
-class KexoBOT:
+class KexoBot:
     """Main class for the bot.
     This class is responsible for initializing the bot, creating the session,
     and connecting to the lavalink server.
@@ -101,9 +101,9 @@ class KexoBOT:
         self.onlinefix = None | OnlineFix
         self.game3rb = None | Game3rb
         self.reddit_fetcher = None | RedditFetcher
-        self.elektrina_vypadky = None | ElektrinaVypadky
-        self.esutaze = None | Esutaze
-        self.lavalink_fetch = None | LavalinkServerFetch
+        self.power_outage_monitor = None | PowerOutageMonitor
+        self.contest_monitor = None | ContestMonitor
+        self.lavalink_server_manager = None | LavalinkServerManager
         self.fanatical = None | Fanatical
         self.sfd_servers = None | SFDServers
         self.alienwarearena = None | AlienwareArena
@@ -173,13 +173,15 @@ class KexoBOT:
         self.sfd_servers = self._initialize_class(
             SFDServers, self.bot_config, self.session
         )
-        self.elektrina_vypadky = self._initialize_class(
-            ElektrinaVypadky, self.bot_config, self.session, self.user_kexo
+        self.power_outage_monitor = self._initialize_class(
+            PowerOutageMonitor, self.bot_config, self.session, self.user_kexo
         )
-        self.esutaze = self._initialize_class(
-            Esutaze, self.bot_config, self.session, self.esutaze_channel
+        self.contest_monitor = self._initialize_class(
+            ContestMonitor, self.bot_config, self.session, self.esutaze_channel
         )
-        self.lavalink_fetch = self._initialize_class(LavalinkServerFetch, self.session)
+        self.lavalink_server_manager = self._initialize_class(
+            LavalinkServerManager, self.session
+        )
 
     async def main_loop(self) -> None:
         """Main loop for the bot.
@@ -214,7 +216,7 @@ class KexoBOT:
 
         elif self.main_loop_counter == 6:
             self.main_loop_counter = 0
-            await self.esutaze.run()
+            await self.power_outage_monitor.run()
 
         if now.minute % 6 == 0:
             await self.sfd_servers.update_stats(now)
@@ -236,8 +238,10 @@ class KexoBOT:
         if now.hour == 0:
             await self._set_joke()
 
-        self.lavalink_servers = await self.lavalink_fetch.get_lavalink_servers()
-        await self.elektrina_vypadky.run()
+        self.lavalink_servers = (
+            await self.lavalink_server_manager.get_lavalink_servers()
+        )
+        await self.power_outage_monitor.run()
 
     def _create_session(self) -> None:
         """Create a httpx session for the bot."""
@@ -389,7 +393,7 @@ class KexoBOT:
         print(f"User {self.user_kexo.name} fetched.")
 
 
-kexobot = KexoBOT()
+kexobot = KexoBot()
 
 
 def create_cog_session() -> None:
@@ -402,11 +406,11 @@ def setup_cogs() -> None:
     """Load all cogs for the bot."""
     cogs_list = [
         "commands",
-        "play",
+        "music_commands",
         "listeners",
         "queue",
-        "audio",
-        "fun_stuff",
+        "audio_commands",
+        "fun_commands",
     ]
 
     create_cog_session()

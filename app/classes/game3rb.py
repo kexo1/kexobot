@@ -12,6 +12,8 @@ from app.utils import strip_text, make_http_request
 
 
 class Game3rb:
+    """Class for monitoring and reporting game updates from game3rb.com."""
+
     def __init__(
         self,
         bot_config: AsyncIOMotorClient,

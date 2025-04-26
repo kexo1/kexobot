@@ -10,7 +10,7 @@ from app.constants import ESUTAZE_URL, ESUTAZE_ICON, DB_CACHE, DB_LISTS
 from app.utils import make_http_request
 
 
-class Esutaze:
+class ContestMonitor:
     def __init__(
         self,
         bot_config: AsyncIOMotorClient,

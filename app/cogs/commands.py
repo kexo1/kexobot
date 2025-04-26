@@ -34,7 +34,7 @@ from app.utils import (
 host_authors = []
 
 
-class Commands(commands.Cog):
+class CommandCog(commands.Cog):
     """Cog that contains all main commands."""
 
     def __init__(self, bot: commands.Bot) -> None:
@@ -743,4 +743,4 @@ class SubredditSelect(discord.ui.Select):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(Commands(bot))
+    bot.add_cog(CommandCog(bot))

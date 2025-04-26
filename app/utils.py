@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional, Dict, Callable, Any
 
 import aiohttp
 import asyncpraw
@@ -187,6 +187,50 @@ def generate_user_data() -> dict:
     }
 
 
+def fix_user_data(old_data: dict) -> dict:
+    """Fixes user data by adding missing keys and values."""
+    data = old_data.copy()
+    return fix_data(data, generate_user_data)
+
+
+def fix_guild_data(old_data: dict) -> dict:
+    """Fixes guild data by adding missing keys and values.
+
+    Args:
+        old_data: The old data to be fixed
+
+    Returns:
+        The fixed data with all required keys and values
+    """
+    data = old_data.copy()
+    return fix_data(data, generate_guild_data)
+
+
+def fix_data(
+    fixed_data: Dict[str, Any], generator: Callable[[], Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Generic function to fix data by adding missing keys and values from a generator.
+
+    Args:
+        fixed_data: The data to be fixed
+        generator: A function that returns a dictionary with default values
+
+    Returns:
+        The fixed data with all required keys and values
+    """
+    default_data = generator()
+
+    for key, value in default_data.items():
+        if key not in fixed_data:
+            fixed_data[key] = value
+        elif isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                if sub_key not in fixed_data[key]:
+                    fixed_data[key][sub_key] = sub_value
+
+    return fixed_data
+
+
 async def get_selected_user_data(
     bot: discord.Bot, ctx: discord.ApplicationContext, selected_data: str
 ) -> tuple:
@@ -207,9 +251,10 @@ async def get_selected_user_data(
 
     user_data = await bot.user_data_db.find_one({"_id": user_id})  # Load from DB
     if user_data:
-        bot.user_data.setdefault(user_id, {})[selected_data] = user_data[selected_data]
+        fixed_data = fix_user_data(user_data)
+        bot.user_data[user_id] = fixed_data
         temp_user_data = await generate_temp_user_data(
-            bot.reddit_agent, user_data["reddit"]["subreddits"], user_id
+            bot.reddit_agent, fixed_data["reddit"]["subreddits"], user_id
         )
     else:  # If not in DB, create new user data
         user_data = generate_user_data()

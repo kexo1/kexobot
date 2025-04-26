@@ -32,7 +32,7 @@ from app.utils import (
 )
 
 
-class FunStuff(commands.Cog):
+class FunCommands(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.bot_config = self.bot.bot_config
@@ -248,4 +248,4 @@ class FunStuff(commands.Cog):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(FunStuff(bot))
+    bot.add_cog(FunCommands(bot))
