@@ -117,6 +117,11 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         description=":x: Failed to get response from RadioMap API, try again later.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
+    "RADIOMAP_NO_STATION_FOUND": lambda ctx, **kwargs: discord.Embed(
+        title="",
+        description=f":x: No station found with name {kwargs.get('search')}.",
+        color=discord.Color.blue(),
+    ),
     "CHANNEL_NOT_NSFW": lambda ctx: discord.Embed(
         title="",
         description=":x: You have set NSFW posts to true, yet the channel you requested in is not NSFW,"

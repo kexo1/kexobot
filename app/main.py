@@ -270,14 +270,15 @@ class KexoBOT:
                 await node.fetch_info()
 
             except asyncio.TimeoutError:
-                print(f"Node ({node.uri}) - Timeout, trying next...")
+                print(f"Node timed out. ({node.uri})")
                 continue
             except (
                 wavelink.exceptions.LavalinkException,
                 wavelink.exceptions.NodeException,
                 aiohttp.client_exceptions.ServerDisconnectedError,
+                aiohttp.client_exceptions.ClientConnectorError,
             ):
-                print(f"Node ({node.uri}) - Failed to connect, trying next...")
+                print(f"Node failed to connect. ({node.uri})")
                 continue
 
             bot.node = node
@@ -308,7 +309,7 @@ class KexoBOT:
                 break
 
             if len(node.players) == 0:
-                print(f"Node ({node.uri}) is empty, removing...")
+                print(f"Node is empty, removing. ({node.uri})")
                 # noinspection PyProtectedMember
                 await node._pool_closer()  # Node is not properly closed
                 await node.close(eject=True)

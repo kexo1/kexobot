@@ -27,15 +27,15 @@ class Listeners(commands.Cog):
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
         print(f"Node ({payload.node.uri}) is ready!")
-        if self.bot.get_online_nodes() > 1 and hasattr(self.bot, "node"):
+        if self.bot.get_online_nodes() > 1 and self.is_bot_node_connected():
             await self.bot.close_unused_nodes()
 
     @commands.Cog.listener()
     async def on_wavelink_node_disconnected(
         self, payload: NodeDisconnectedEventPayload
     ) -> None:
-        if self.bot.get_online_nodes() == 0 and hasattr(self.bot, "node"):
-            print(f"Node ({payload.node.uri}) is disconnected, fetching new node...")
+        if self.bot.get_online_nodes() == 0 and self.is_bot_node_connected():
+            print(f"Node got disconnected, connecting new node. ({payload.node.uri})")
             await self.bot.connect_node()
 
     @commands.Cog.listener()
@@ -126,7 +126,7 @@ class Listeners(commands.Cog):
             node: wavelink.Node = await self.bot.connect_node()
             await player.switch_node(node)
             await player.play(player.temp_current)
-            print(f"Node switched to {node.uri}")
+            print(f"Node switched. ({node.uri})")
             return True
         except (
             RuntimeError,
@@ -147,6 +147,9 @@ class Listeners(commands.Cog):
         )
         embed.set_thumbnail(url=payload.track.artwork)
         return embed
+
+    def is_bot_node_connected(self) -> bool:
+        return hasattr(self.bot, "node")
 
     @staticmethod
     def _has_pfp(member: discord.Member) -> str:

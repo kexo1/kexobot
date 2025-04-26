@@ -405,7 +405,7 @@ class Commands(commands.Cog):
         embed.add_field(name="Online nodes:ㅤ", value=self.bot.get_online_nodes())
         embed.add_field(name="Available nodes:ㅤ", value=self.bot.get_avaiable_nodes())
         embed.add_field(name="Joined servers:ㅤ", value=len(self.bot.guilds))
-        embed.add_field(name="Version:", value=__version__)
+        embed.add_field(name="Bot version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
         embed.add_field(
             name="Python version:",

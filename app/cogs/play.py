@@ -177,7 +177,7 @@ class Play(commands.Cog):
         try:
             data = response.json()
             if not data["hits"]["hits"]:
-                await send_response(ctx, "NO_TRACKS_FOUND", search=station)
+                await send_response(ctx, "RADIOMAP_NO_STATION_FOUND", search=station)
                 return
 
             for station_data in data["hits"]["hits"]:
@@ -185,11 +185,10 @@ class Play(commands.Cog):
                 if country and station_source["page"]["country"]["title"] != country:
                     continue
 
-                station_url = station_source["stream"].replace(";", "")
-                await self.play(ctx, station_url, play_next)
+                await self.play(ctx, station_source["stream"], play_next)
                 return
 
-            await send_response(ctx, "NO_TRACKS", search=station)
+            await send_response(ctx, "RADIOMAP_NO_STATION_FOUND", search=station)
         except (KeyError, ValueError):
             await send_response(ctx, "RADIOMAP_ERROR")
 

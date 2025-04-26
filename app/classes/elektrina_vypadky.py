@@ -26,11 +26,11 @@ class ElektrinaVypadky:
     async def run(self) -> None:
         elektrinavypadky_cache = await self._load_bot_config()
         html_content = await make_http_request(self.session, ELEKTRINA_URL)
-        articles = self._get_articles(html_content.text)
-        if articles:
-            await self._process_articles(articles, elektrinavypadky_cache)
+        if not html_content:
             return
-        print("ElektrinaVypadky: No articles found")
+
+        articles = self._get_articles(html_content.text)
+        await self._process_articles(articles, elektrinavypadky_cache)
 
     @staticmethod
     def _get_articles(html_content: str) -> list:
