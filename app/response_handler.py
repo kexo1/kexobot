@@ -106,11 +106,11 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         "necessary plugins.\nTo fix this, use command `/reconnect_node`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
-    "NODE_REQUEST_ERROR": lambda ctx: discord.Embed(
+    "NODE_REQUEST_ERROR": lambda ctx, **kwargs: discord.Embed(
         title="",
-        description=":x: Failed to connect to send request to the node.\nError might be caused by Discord servers not "
-        "responding, give it a minute or use command `/reconnect_node`",
-        color=discord.Color.from_rgb(r=220, g=0, b=0),
+        description=":warning: An error occured when trying to send request to the node, trying to connect to a new node."
+                    f"\n\n**Message: {kwargs.get('error')}**",
+        color=discord.Color.yellow(),
     ),
     "RADIOMAP_ERROR": lambda ctx: discord.Embed(
         title="",

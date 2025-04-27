@@ -18,6 +18,7 @@ matplotlib
 mplcyberpunk
 tzdata
 psutil
+dotenv
 
 # Wavelink depencies
 yarl>=1.9.2

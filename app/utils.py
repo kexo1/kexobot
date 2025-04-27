@@ -46,7 +46,7 @@ def get_memory_usage():
 
 
 async def download_video(
-    session: httpx.AsyncClient, url: str, nsfw: bool
+        session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> Optional[discord.File]:
     video_folder = os.path.join(os.getcwd(), "video")
     os.makedirs(video_folder, exist_ok=True)
@@ -70,7 +70,7 @@ async def download_video(
 
 
 async def check_node_status(
-    bot: discord.Bot, uri: str, password: str
+        bot: discord.Bot, uri: str, password: str
 ) -> Optional[wavelink.Node]:
     node = [
         wavelink.Node(
@@ -84,10 +84,10 @@ async def check_node_status(
         await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=3)
         await node[0].fetch_info()
     except (
-        asyncio.TimeoutError,
-        wavelink.exceptions.NodeException,
-        wavelink.LavalinkException,
-        aiohttp.NonHttpUrlClientError,
+            asyncio.TimeoutError,
+            wavelink.exceptions.NodeException,
+            wavelink.LavalinkException,
+            aiohttp.NonHttpUrlClientError,
     ):
         return None
     return node[0]
@@ -138,6 +138,38 @@ def find_track(player: wavelink.Player, to_find: str) -> Optional[int]:
     return to_find
 
 
+async def switch_node(connect_node: Callable[[], wavelink.Node], player: wavelink.Player) -> bool:
+    try:
+        node: wavelink.Node = await connect_node()
+        await player.switch_node(node)
+        await player.play(player.temp_current)
+        print(f"Node switched. ({node.uri})")
+        return True
+    except (
+            RuntimeError,
+            wavelink.LavalinkException,
+            wavelink.InvalidNodeException,
+    ):
+        return False
+
+
+def node_status_message(is_switched: bool) -> discord.Embed:
+    if is_switched:
+        embed = discord.Embed(
+            title="",
+            description=f"**:white_check_mark: Successfully connected to `{self.bot.node.uri}`**",
+            color=discord.Color.green(),
+        )
+    else:
+        embed = discord.Embed(
+            title="",
+            description=":x: Failed to connect to a new node, try `/reconnect_node`",
+            color=discord.Color.from_rgb(r=210, g=0, b=0),
+        )
+
+    return embed
+
+
 def generate_temp_guild_data() -> dict:
     return {"lavalink_server_pos": 0}
 
@@ -150,7 +182,7 @@ def generate_guild_data() -> dict:
 
 
 async def generate_temp_user_data(
-    reddit_agent: asyncpraw.Reddit, subreddits: list, user_id: int
+        reddit_agent: asyncpraw.Reddit, subreddits: list, user_id: int
 ) -> dict:
     multireddit: asyncpraw.models.Multireddit = await reddit_agent.multireddit(
         name=str(user_id), redditor="KexoBOT"
@@ -207,7 +239,7 @@ def fix_guild_data(old_data: dict) -> dict:
 
 
 def fix_data(
-    fixed_data: Dict[str, Any], generator: Callable[[], Dict[str, Any]]
+        fixed_data: Dict[str, Any], generator: Callable[[], Dict[str, Any]]
 ) -> Dict[str, Any]:
     """Generic function to fix data by adding missing keys and values from a generator.
 
@@ -232,7 +264,7 @@ def fix_data(
 
 
 async def get_selected_user_data(
-    bot: discord.Bot, ctx: discord.ApplicationContext, selected_data: str
+        bot: discord.Bot, ctx: discord.ApplicationContext, selected_data: str
 ) -> tuple:
     user_id = ctx.author.id
     user_data: dict = bot.user_data.get(user_id)
@@ -272,14 +304,14 @@ async def get_selected_user_data(
 
 
 async def make_http_request(
-    session: httpx.AsyncClient,
-    url: str,
-    data: Optional[Dict] = None,
-    headers: Optional[Dict] = None,
-    retries: int = 1,
-    timeout: float = 3.0,
-    get_json: bool = False,
-    binary: bool = False,
+        session: httpx.AsyncClient,
+        url: str,
+        data: Optional[Dict] = None,
+        headers: Optional[Dict] = None,
+        retries: int = 1,
+        timeout: float = 3.0,
+        get_json: bool = False,
+        binary: bool = False,
 ) -> Optional[httpx.Response]:
     """
     Make an HTTP request with retry logic.
@@ -315,10 +347,10 @@ async def make_http_request(
                 return response.json()
             return response
         except (
-            httpx.ReadTimeout,
-            httpx.TimeoutException,
-            httpx.ConnectError,
-            httpx.HTTPError,
+                httpx.ReadTimeout,
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                httpx.HTTPError,
         ) as e:
             if attempt == retries - 1:
                 print(f"Request failed ({type(e).__name__}): ", url)

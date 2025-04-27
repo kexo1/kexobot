@@ -27,6 +27,7 @@ from app.classes.online_fix import OnlineFix
 from app.classes.power_outages import PowerOutageMonitor
 from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
+from app.classes.game_updates import GameUpdates
 from app.constants import (
     DISCORD_TOKEN,
     MONGO_DB_URL,
@@ -98,6 +99,7 @@ class KexoBot:
         bot.get_avaiable_nodes = self.get_avaiable_nodes
         bot.guild_temp_data = self.guild_temp_data
 
+        # Initialize class variables
         self.onlinefix = None | OnlineFix
         self.game3rb = None | Game3rb
         self.reddit_fetcher = None | RedditFetcher
@@ -107,6 +109,7 @@ class KexoBot:
         self.fanatical = None | Fanatical
         self.sfd_servers = None | SFDServers
         self.alienwarearena = None | AlienwareArena
+        self.game_updates = None | GameUpdates
         self.esutaze_channel = None | discord.TextChannel
         self.game_updates_channel = None | discord.TextChannel
         self.free_stuff_channel = None | discord.TextChannel
@@ -146,6 +149,16 @@ class KexoBot:
 
     def _define_classes(self) -> None:
         """Define classes for the bot."""
+        # Initialize the new GameUpdates class
+        self.game_updates = self._initialize_class(
+            GameUpdates,
+            self.bot_config,
+            self.session,
+            self.game_updates_channel,
+            self.user_kexo,
+        )
+
+        # Keep the original classes for now until we verify the new one works
         self.onlinefix = self._initialize_class(
             OnlineFix, self.bot_config, self.session, self.game_updates_channel
         )
@@ -196,15 +209,15 @@ class KexoBot:
 
         elif self.main_loop_counter == 1:
             self.main_loop_counter = 2
-            await self.alienwarearena.run()
+            await self.game_updates.alienware_arena()
 
         elif self.main_loop_counter == 2:
             self.main_loop_counter = 3
-            await self.game3rb.run()
+            await self.game_updates.game3rb()
 
         elif self.main_loop_counter == 3:
             self.main_loop_counter = 4
-            await self.onlinefix.run()
+            await self.game_updates.online_fix()
 
         elif self.main_loop_counter == 4:
             self.main_loop_counter = 5
@@ -212,11 +225,11 @@ class KexoBot:
 
         elif self.main_loop_counter == 5:
             self.main_loop_counter = 6
-            await self.fanatical.run()
+            await self.game_updates.fanatical()
 
         elif self.main_loop_counter == 6:
             self.main_loop_counter = 0
-            await self.power_outage_monitor.run()
+            await self.contest_monitor.run()
 
         if now.minute % 6 == 0:
             await self.sfd_servers.update_stats(now)
@@ -408,7 +421,7 @@ def setup_cogs() -> None:
         "commands",
         "music_commands",
         "listeners",
-        "queue",
+        "queue_commands",
         "audio_commands",
         "fun_commands",
     ]

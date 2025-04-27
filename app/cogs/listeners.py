@@ -12,7 +12,7 @@ from wavelink import (
 )
 
 from app.constants import DISCORD_LOGO
-from app.utils import fix_audio_title
+from app.utils import fix_audio_title, switch_node, node_status_message
 
 
 class Listeners(commands.Cog):
@@ -101,24 +101,8 @@ class Listeners(commands.Cog):
         payload: Union[TrackExceptionEventPayload, TrackStuckEventPayload],
     ) -> None:
         await payload.player.text_channel.send(embed=embed)
-        is_switched: bool = await self._switch_node(payload.player)
-        await self._node_status_message(payload.player.text_channel, is_switched)
-
-    async def _node_status_message(
-        self, channel: discord.TextChannel, is_switched: bool
-    ) -> None:
-        if is_switched:
-            embed = discord.Embed(
-                title="",
-                description=f"**:white_check_mark: Successfully connected to `{self.bot.node.uri}`**",
-                color=discord.Color.green(),
-            )
-        else:
-            embed = discord.Embed(
-                title="",
-                description=":x: Failed to connect to a new node, try `/reconnect_node`",
-                color=discord.Color.from_rgb(r=210, g=0, b=0),
-            )
+        is_switched: bool = await switch_node(self.bot.connect_node, payload.player)
+        embed = node_status_message(is_switched)
         await channel.send(embed=embed)
 
     async def _switch_node(self, player: wavelink.Player) -> bool:

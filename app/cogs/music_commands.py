@@ -18,7 +18,7 @@ from app.constants import (
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import send_response
-from app.utils import find_track, fix_audio_title, make_http_request
+from app.utils import find_track, fix_audio_title, make_http_request, switch_node, node_status_message
 
 
 class MusicCommands(commands.Cog):
@@ -36,7 +36,7 @@ class MusicCommands(commands.Cog):
     @option(
         "search",
         description="You can either put a url or a name of the song,"
-        " both youtube and spotify are supported.",
+                    " both youtube and spotify are supported.",
     )
     @option(
         "play_next",
@@ -44,7 +44,7 @@ class MusicCommands(commands.Cog):
         type=bool,
     )
     async def play(
-        self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
+            self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
     ) -> None:
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
@@ -93,7 +93,7 @@ class MusicCommands(commands.Cog):
         description="If you want to play this song next in queue, set this to true.",
     )
     async def radio_random(
-        self, ctx: discord.ApplicationContext, play_next: bool = False
+            self, ctx: discord.ApplicationContext, play_next: bool = False
     ) -> None:
         await ctx.defer()
 
@@ -158,11 +158,11 @@ class MusicCommands(commands.Cog):
         choices=COUNTRIES,
     )
     async def play_radio(
-        self,
-        ctx: discord.ApplicationContext,
-        station: str,
-        country: str = "",
-        play_next: bool = False,
+            self,
+            ctx: discord.ApplicationContext,
+            station: str,
+            country: str = "",
+            play_next: bool = False,
     ) -> None:
         encoded_station = discord.utils.escape_markdown(station)
         response = await make_http_request(
@@ -212,7 +212,7 @@ class MusicCommands(commands.Cog):
     @is_playing()
     @is_queue_empty()
     async def skip_to_command(
-        self, ctx: discord.ApplicationContext, to_find: str
+            self, ctx: discord.ApplicationContext, to_find: str
     ) -> None:
         player: wavelink.Player = ctx.voice_client
 
@@ -270,7 +270,7 @@ class MusicCommands(commands.Cog):
 
     # ----------------------- Helper functions ------------------------ #
     async def _fetch_tracks(
-        self, ctx: discord.ApplicationContext, search: str
+            self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
         if tracks:
@@ -279,8 +279,8 @@ class MusicCommands(commands.Cog):
 
     @staticmethod
     async def _fetch_first_track(
-        ctx: discord.ApplicationContext,
-        tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
+            ctx: discord.ApplicationContext,
+            tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
     ) -> wavelink.Playable:
         player: wavelink.Player = ctx.voice_client
         # If it's a playlist
@@ -297,7 +297,7 @@ class MusicCommands(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"Added the playlist **`{tracks.name}`**"
-                f" ({song_count} songs) to the queue.",
+                            f" ({song_count} songs) to the queue.",
                 color=discord.Color.blue(),
             )
             if player.should_respond:
@@ -314,7 +314,7 @@ class MusicCommands(commands.Cog):
 
     @staticmethod
     async def _search_tracks(
-        ctx: discord.ApplicationContext, search: str
+            ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
         sources = [
             "spsearch",
@@ -386,19 +386,22 @@ class MusicCommands(commands.Cog):
             return False
         return True
 
-    @staticmethod
     async def _play_track(
-        ctx: discord.ApplicationContext, track: wavelink.Playable
+            self,
+            ctx: discord.ApplicationContext,
+            track: wavelink.Playable
     ) -> bool:
         player: wavelink.Player = ctx.voice_client
+        player.temp_current = track  # To be used in case of switching nodes
 
         try:
             await player.play(track)
-        except wavelink.exceptions.NodeException:
-            await send_response(ctx, "NODE_REQUEST_ERROR")
-            return False
+        except (wavelink.exceptions.NodeException, wavelink.exceptions.LavalinkException) as e:
+            await send_response(ctx, "NODE_REQUEST_ERROR", ephemeral=False, error=e.error)
+            is_switched: bool = await switch_node(self.bot.connect_node, player)
+            embed: discord.Embed = node_status_message(is_switched)
+            await ctx.send(embed=embed)
 
-        player.temp_current = track  # To be used in case of switching nodes
         return True
 
     @staticmethod
