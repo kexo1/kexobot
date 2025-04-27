@@ -12,7 +12,7 @@ from wavelink import (
 )
 
 from app.constants import DISCORD_LOGO
-from app.utils import fix_audio_title, switch_node, node_status_message
+from app.utils import fix_audio_title, switch_node
 
 
 class Listeners(commands.Cog):
@@ -101,9 +101,7 @@ class Listeners(commands.Cog):
         payload: Union[TrackExceptionEventPayload, TrackStuckEventPayload],
     ) -> None:
         await payload.player.text_channel.send(embed=embed)
-        is_switched: bool = await switch_node(self.bot.connect_node, payload.player)
-        embed = node_status_message(is_switched)
-        await channel.send(embed=embed)
+        await switch_node(self.bot.connect_node, payload.player, payload.player.text_channel)
 
     async def _switch_node(self, player: wavelink.Player) -> bool:
         try:

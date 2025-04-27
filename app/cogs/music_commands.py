@@ -398,9 +398,7 @@ class MusicCommands(commands.Cog):
             await player.play(track)
         except (wavelink.exceptions.NodeException, wavelink.exceptions.LavalinkException) as e:
             await send_response(ctx, "NODE_REQUEST_ERROR", ephemeral=False, error=e.error)
-            is_switched: bool = await switch_node(self.bot.connect_node, player)
-            embed: discord.Embed = node_status_message(is_switched)
-            await ctx.send(embed=embed)
+            await switch_node(self.bot.connect_node, player, ctx.channel)
 
         return True
 

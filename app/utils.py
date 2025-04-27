@@ -138,33 +138,59 @@ def find_track(player: wavelink.Player, to_find: str) -> Optional[int]:
     return to_find
 
 
-async def switch_node(connect_node: Callable[[], wavelink.Node], player: wavelink.Player) -> bool:
+async def switch_node(connect_node: Callable[[], wavelink.Node], player: wavelink.Player,
+        channel: discord.TextChannel) -> bool:
+    """
+    Attempt to switch to a new node for audio playback.
+    
+    Args:
+        connect_node: Callable that returns a new wavelink.Node
+        player: The current wavelink Player
+        channel: The Discord text channel to send status messages to
+        
+    Returns:
+        bool: True if switch successful, False otherwise
+    """
     try:
         node: wavelink.Node = await connect_node()
         await player.switch_node(node)
         await player.play(player.temp_current)
         print(f"Node switched. ({node.uri})")
+        embed = node_status_message(is_switched=True, uri=node.uri)
+        await channel.send(embed=embed)
         return True
     except (
             RuntimeError,
             wavelink.LavalinkException,
             wavelink.InvalidNodeException,
     ):
+        embed = node_status_message(is_switched=False, uri=node.uri)
+        await channel.send(embed=embed)
         return False
 
 
-def node_status_message(is_switched: bool) -> discord.Embed:
+def node_status_message(is_switched: bool, uri: str) -> discord.Embed:
+    """
+    Create an embed message for node connection status.
+    
+    Args:
+        is_switched: Whether the node switch was successful
+        uri: The URI of the node
+        
+    Returns:
+        discord.Embed: The formatted status message
+    """
     if is_switched:
         embed = discord.Embed(
             title="",
-            description=f"**:white_check_mark: Successfully connected to `{self.bot.node.uri}`**",
+            description=f"**:white_check_mark: Successfully connected to `{uri}`**",
             color=discord.Color.green(),
         )
     else:
         embed = discord.Embed(
             title="",
             description=":x: Failed to connect to a new node, try `/reconnect_node`",
-            color=discord.Color.from_rgb(r=210, g=0, b=0),
+            color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
 
     return embed

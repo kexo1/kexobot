@@ -18,12 +18,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pycord.multicog import Bot
 from wavelink.enums import NodeStatus
 
-from app.classes.alienware_arena import AlienwareArena
 from app.classes.contests import ContestMonitor
-from app.classes.fanatical import Fanatical
-from app.classes.game3rb import Game3rb
 from app.classes.lavalink_server import LavalinkServerManager
-from app.classes.online_fix import OnlineFix
 from app.classes.power_outages import PowerOutageMonitor
 from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
@@ -100,15 +96,11 @@ class KexoBot:
         bot.guild_temp_data = self.guild_temp_data
 
         # Initialize class variables
-        self.onlinefix = None | OnlineFix
-        self.game3rb = None | Game3rb
         self.reddit_fetcher = None | RedditFetcher
         self.power_outage_monitor = None | PowerOutageMonitor
         self.contest_monitor = None | ContestMonitor
         self.lavalink_server_manager = None | LavalinkServerManager
-        self.fanatical = None | Fanatical
         self.sfd_servers = None | SFDServers
-        self.alienwarearena = None | AlienwareArena
         self.game_updates = None | GameUpdates
         self.esutaze_channel = None | discord.TextChannel
         self.game_updates_channel = None | discord.TextChannel
@@ -159,22 +151,6 @@ class KexoBot:
         )
 
         # Keep the original classes for now until we verify the new one works
-        self.onlinefix = self._initialize_class(
-            OnlineFix, self.bot_config, self.session, self.game_updates_channel
-        )
-        self.game3rb = self._initialize_class(
-            Game3rb,
-            self.bot_config,
-            self.session,
-            self.game_updates_channel,
-            self.user_kexo,
-        )
-        self.alienwarearena = self._initialize_class(
-            AlienwareArena, self.bot_config, self.session, self.free_stuff_channel
-        )
-        self.fanatical = self._initialize_class(
-            Fanatical, self.bot_config, self.session, self.free_stuff_channel
-        )
         self.reddit_fetcher = self._initialize_class(
             RedditFetcher,
             self.bot_config,
