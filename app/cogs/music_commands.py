@@ -18,7 +18,7 @@ from app.constants import (
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import send_response
-from app.utils import find_track, fix_audio_title, make_http_request, switch_node, node_status_message
+from app.utils import find_track, fix_audio_title, make_http_request, switch_node
 
 
 class MusicCommands(commands.Cog):
@@ -368,20 +368,21 @@ class MusicCommands(commands.Cog):
     @staticmethod
     async def _join_channel(ctx: discord.ApplicationContext) -> bool:
         if not ctx.author.voice or not ctx.author.voice.channel:
-            await send_response(ctx, "NO_VOICE_CHANNEL")
+            await send_response(ctx, "NO_VOICE_CHANNEL", respond=False)
             return False
 
         try:
             await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
         except wavelink.InvalidChannelStateException:
-            await send_response(ctx, "NO_PERMISSIONS")
+            await send_response(ctx, "NO_PERMISSIONS", respond=False)
             return False
         except wavelink.exceptions.InvalidNodeException:
-            await send_response(ctx, "NO_NODES")
+            await send_response(ctx, "NO_NODES", respond=False)
             return False
         except wavelink.exceptions.ChannelTimeoutException:
-            await send_response(ctx, "CONNECTION_TIMEOUT")
+            await send_response(ctx, "CONNECTION_TIMEOUT", respond=False)
             vc: wavelink.Player = ctx.guild.voice_client
+            print(vc.channel.name)
             vc.cleanup()
             return False
         return True

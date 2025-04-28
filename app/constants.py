@@ -2,18 +2,17 @@ import logging
 import os
 
 from bson.objectid import ObjectId
-from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.CRITICAL)
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
 
 
-load_dotenv(os.getenv("SECRET_PATH"))
+# load_dotenv(os.getenv("SECRET_PATH"))
 
 # -------------------- Discord -------------------- #
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
+# DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
 ESUTAZE_CHANNEL = 1302271245919981638
 GAME_UPDATES_CHANNEL = 882185054174994462
 FREE_STUFF_CHANNEL = 1081883673902714953

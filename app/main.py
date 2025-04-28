@@ -19,11 +19,11 @@ from pycord.multicog import Bot
 from wavelink.enums import NodeStatus
 
 from app.classes.contests import ContestMonitor
+from app.classes.game_updates import GameUpdates
 from app.classes.lavalink_server import LavalinkServerManager
 from app.classes.power_outages import PowerOutageMonitor
 from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
-from app.classes.game_updates import GameUpdates
 from app.constants import (
     DISCORD_TOKEN,
     MONGO_DB_URL,

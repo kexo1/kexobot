@@ -307,6 +307,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
 async def send_response(
     ctx: discord.ApplicationContext,
     response_code: str,
+    respond: bool = True,
     ephemeral: bool = True,
     delete_after: int = None,
     **kwargs: Any,
@@ -317,6 +318,7 @@ async def send_response(
     Args:
         ctx: The application context
         response_code: The response code from RESPONSE_CODES
+        respond: Whether to respond to the interaction or send a message
         ephemeral: Whether the response should be ephemeral
         delete_after: Time in seconds to delete the response after
         **kwargs: Additional arguments to pass to the response handler
@@ -326,4 +328,8 @@ async def send_response(
 
     response_handler = RESPONSE_CODES[response_code]
     embed = response_handler(ctx, **kwargs)
-    await ctx.respond(embed=embed, ephemeral=ephemeral, delete_after=delete_after)
+
+    if respond:
+        await ctx.respond(embed=embed, ephemeral=ephemeral, delete_after=delete_after)
+    else:
+        await ctx.send(embed=embed, delete_after=delete_after)

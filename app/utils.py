@@ -156,44 +156,24 @@ async def switch_node(connect_node: Callable[[], wavelink.Node], player: wavelin
         await player.switch_node(node)
         await player.play(player.temp_current)
         print(f"Node switched. ({node.uri})")
-        embed = node_status_message(is_switched=True, uri=node.uri)
+        embed = discord.Embed(
+            title="",
+            description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
+            color=discord.Color.green(),
+        )
         await channel.send(embed=embed)
         return True
     except (
-            RuntimeError,
             wavelink.LavalinkException,
             wavelink.InvalidNodeException,
     ):
-        embed = node_status_message(is_switched=False, uri=node.uri)
-        await channel.send(embed=embed)
-        return False
-
-
-def node_status_message(is_switched: bool, uri: str) -> discord.Embed:
-    """
-    Create an embed message for node connection status.
-    
-    Args:
-        is_switched: Whether the node switch was successful
-        uri: The URI of the node
-        
-    Returns:
-        discord.Embed: The formatted status message
-    """
-    if is_switched:
-        embed = discord.Embed(
-            title="",
-            description=f"**:white_check_mark: Successfully connected to `{uri}`**",
-            color=discord.Color.green(),
-        )
-    else:
         embed = discord.Embed(
             title="",
             description=":x: Failed to connect to a new node, try `/reconnect_node`",
             color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
-
-    return embed
+        await channel.send(embed=embed)
+        return False
 
 
 def generate_temp_guild_data() -> dict:
