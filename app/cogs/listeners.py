@@ -24,6 +24,17 @@ class Listeners(commands.Cog):
         if not payload.player.should_respond:
             await payload.player.text_channel.send(embed=self._playing_embed(payload))
 
+        if payload.player.queue.history.count == 3:
+            await payload.player.text_channel.send(
+                f"-# Not happy with the current node performance?\n"
+                f"-# You can switch between {self.bot.get_avaiable_nodes()} nodes by using /node reconnect."
+            )
+
+        if payload.player.queue.history.count == 10:
+            await payload.player.text_channel.send(
+                f"-# Would you like to see which platforms are supported by this node? Use the /node supported_platforms."
+            )
+
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
         print(f"Node ({payload.node.uri}) is ready!")
@@ -101,21 +112,7 @@ class Listeners(commands.Cog):
         payload: Union[TrackExceptionEventPayload, TrackStuckEventPayload],
     ) -> None:
         await payload.player.text_channel.send(embed=embed)
-        await switch_node(self.bot.connect_node, payload.player, payload.player.text_channel)
-
-    async def _switch_node(self, player: wavelink.Player) -> bool:
-        try:
-            node: wavelink.Node = await self.bot.connect_node()
-            await player.switch_node(node)
-            await player.play(player.temp_current)
-            print(f"Node switched. ({node.uri})")
-            return True
-        except (
-            RuntimeError,
-            wavelink.LavalinkException,
-            wavelink.InvalidNodeException,
-        ):
-            return False
+        await switch_node(self.bot.connect_node, payload.player)
 
     def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
         embed = discord.Embed(

@@ -1,5 +1,8 @@
+import asyncio
 import datetime
 import os
+import socket
+import struct
 from datetime import timedelta
 from typing import Union, cast
 from zoneinfo import ZoneInfo
@@ -126,7 +129,7 @@ class SFDServers:
         )
         plt.close("all")
 
-    async def update_stats(self, now) -> None:
+    async def update_stats(self) -> None:
         activity = await self._load_sfd_activity_data()
         players_day, servers_day = activity["players_day"], activity["servers_day"]
         current_players, current_servers = await self._get_players_and_servers()
@@ -147,16 +150,12 @@ class SFDServers:
             },
         )
 
-        last_update_week = activity["last_update_week"]
-        # Convert last_update_week to the same timezone as now
-        if last_update_week.tzinfo is None:
-            last_update_week = last_update_week.replace(tzinfo=now.tzinfo)
-        elif last_update_week.tzinfo != now.tzinfo:
-            last_update_week = last_update_week.astimezone(now.tzinfo)
+        last_update_week: datetime = activity["last_update_week"]
 
         if not is_older_than(6, last_update_week):
             return
 
+        now = await get_ntp_time_europe_bratislava()
         time_diff = now - last_update_week
         hours_diff = time_diff.total_seconds() / 3600
         update_count = min(4, max(1, int(hours_diff // 6)))
@@ -359,3 +358,30 @@ class SFDServers:
         mplcyberpunk.add_gradient_fill(alpha_gradientglow=0.5)
         plt.tight_layout()
         plt.grid(True)
+
+
+async def get_ntp_time_europe_bratislava():
+    NTP_SERVER = 'pool.ntp.org'
+    NTP_PORT = 123
+    NTP_PACKET_FORMAT = '!12I'
+    NTP_DELTA = 2208988800
+
+    msg = b'\x1b' + 47 * b'\0'
+    loop = asyncio.get_event_loop()
+    
+    def get_ntp():
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(2)
+            s.sendto(msg, (NTP_SERVER, NTP_PORT))
+            msg_recv, _ = s.recvfrom(1024)
+        unpacked = struct.unpack(NTP_PACKET_FORMAT, msg_recv[0:struct.calcsize(NTP_PACKET_FORMAT)])
+        timestamp = unpacked[10] + float(unpacked[11]) / 2**32
+        return timestamp - NTP_DELTA
+
+    try:
+        unix_time = await loop.run_in_executor(None, get_ntp)
+        utc_dt = datetime.datetime.utcfromtimestamp(unix_time).replace(tzinfo=datetime.timezone.utc)
+        bratislava_dt = utc_dt.astimezone(ZoneInfo('Europe/Bratislava'))
+        return bratislava_dt
+    except Exception as e:
+        return datetime.datetime.now(ZoneInfo('Europe/Bratislava'))

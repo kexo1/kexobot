@@ -1,18 +1,20 @@
 import logging
 import os
+import re
 
 from bson.objectid import ObjectId
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.CRITICAL)
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
 
 
-# load_dotenv(os.getenv("SECRET_PATH"))
+load_dotenv(os.getenv("SECRET_PATH"))
 
 # -------------------- Discord -------------------- #
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-# DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
 ESUTAZE_CHANNEL = 1302271245919981638
 GAME_UPDATES_CHANNEL = 882185054174994462
 FREE_STUFF_CHANNEL = 1081883673902714953
@@ -22,10 +24,6 @@ XTC_SERVER = 723197287861583885
 DUCK_CULT = 484047204202446858
 
 # -------------------- Lavalink -------------------- #
-LAVAINFO_URLS = [
-    "https://lavainfo.netlify.app/api/non-ssl",
-    "https://lavainfo.netlify.app/api/ssl",
-]
 LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
 LAVAINFO_GITHUB_URL = (
     "https://raw.githubusercontent.com/appujet/lavalink-list/refs/heads/main/nodes.json"
@@ -217,6 +215,116 @@ SHITPOST_SUBREDDITS_ALL = (
 )
 
 # -------------------- Music -------------------- #
+SOURCE_PATTERNS = [
+    # YouTube Music (music.youtube.com URLs)
+    (
+        re.compile(
+            r"""(?ix)
+            https?://music\.youtube\.com/
+            (?:watch\?v=|playlist\?list=|channel/|@|user/)
+            """
+        ),
+        "ytmsearch",
+    ),
+    # YouTube (youtube.com, youtu.be URLs)
+    (
+        re.compile(
+            r"""(?ix)
+            https?://(?:www\.)?(?:youtube\.com|youtu\.be)/
+            (?:
+                (?:watch\?v=)|
+                (?:playlist\?list=)|
+                (?:embed/)|
+                (?:v/)|
+                (?:shorts/)|
+                (?:live/)|
+                (?:channel/)|
+                (?:@)|
+                (?:user/)|
+                (?:attribution_link\?.*v=)
+            )
+            """
+        ),
+        "ytsearch",
+    ),
+    # Spotify
+    (
+        re.compile(
+            r"""(?ix)
+            https?://open\.spotify\.com/
+            (?:intl-[\w-]+/)?
+            (?:track|album|playlist|artist)/[\w]+
+            """
+        ),
+        "spsearch",
+    ),
+    # Apple Music
+    (
+        re.compile(
+            r"""(?ix)
+            https?://music\.apple\.com/
+            [\w-]+/(?:album|playlist|artist)/[\w-]+
+            """
+        ),
+        "amsearch",
+    ),
+    # Deezer
+    (
+        re.compile(
+            r"""(?ix)
+            https?://(?:www\.)?deezer\.com/
+            (?:track|album|playlist|artist)/\d+|
+            https?://deezer\.page\.link/[\w]+
+            """
+        ),
+        "dzsearch",
+    ),
+    # Yandex Music
+    (
+        re.compile(
+            r"""(?ix)
+            https?://music\.yandex\.ru/
+            (?:album/\d+(?:/track/\d+)?|
+            track/\d+|
+            users/[^/]+/playlists/\d+|
+            artist/\d+)
+            """
+        ),
+        "ymsearch",
+    ),
+    # VK Music
+    (
+        re.compile(
+            r"""(?ix)
+            https?://(?:vk\.com|vk\.ru)/
+            (?:audio|audios|music/playlist|music/album|artist)/[^\s]+
+            """
+        ),
+        "vksearch",
+    ),
+    # Tidal
+    (
+        re.compile(
+            r"""(?ix)
+            https?://tidal\.com/browse/
+            (?:track|album|playlist|artist)/\d+
+            """
+        ),
+        "tdsearch",
+    ),
+    # Qobuz
+    (
+        re.compile(
+            r"""(?ix)
+            https?://(?:open|play)\.qobuz\.com/
+            (?:track|album|playlist|artist)/[\w]+|
+            https?://www\.qobuz\.com/[\w-]+/album/[\w-]+
+            """
+        ),
+        "qbsearch",
+    ),
+]
+SUPPORTED_PLATFORMS = ("Youtube", "Youtube Music", "Soundcloud", "Spotify (likely)", "Apple Music (unlikely)", "Deezer (unlikely)", "Yandex Music (unlikely)", "VK Music (unlikely)", "Tidal (unlikely)", "Qobuz (unlikely)")
 DISCORD_LOGO = (
     "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
 )

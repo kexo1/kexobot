@@ -1,3 +1,4 @@
+import asyncio
 import random
 import re
 from typing import Union, Optional, List
@@ -18,7 +19,13 @@ from app.constants import (
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import send_response
-from app.utils import find_track, fix_audio_title, make_http_request, switch_node
+from app.utils import (
+    find_track,
+    fix_audio_title,
+    make_http_request,
+    switch_node,
+    get_search_prefix,
+)
 
 
 class MusicCommands(commands.Cog):
@@ -36,7 +43,7 @@ class MusicCommands(commands.Cog):
     @option(
         "search",
         description="You can either put a url or a name of the song,"
-                    " both youtube and spotify are supported.",
+        " both youtube and spotify are supported.",
     )
     @option(
         "play_next",
@@ -44,7 +51,7 @@ class MusicCommands(commands.Cog):
         type=bool,
     )
     async def play(
-            self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
+        self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
     ) -> None:
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
@@ -61,6 +68,7 @@ class MusicCommands(commands.Cog):
             return
 
         player: wavelink.Player = ctx.voice_client
+        player.temp_current = track  # To be used in case of switching nodes
 
         if player.playing:
             if play_next:
@@ -93,7 +101,7 @@ class MusicCommands(commands.Cog):
         description="If you want to play this song next in queue, set this to true.",
     )
     async def radio_random(
-            self, ctx: discord.ApplicationContext, play_next: bool = False
+        self, ctx: discord.ApplicationContext, play_next: bool = False
     ) -> None:
         await ctx.defer()
 
@@ -145,6 +153,7 @@ class MusicCommands(commands.Cog):
         await self.play(ctx, station, play_next)
 
     @radio.command(name="play", description="Search and play radio from RadioGarden")
+    @commands.cooldown(1, 4, commands.BucketType.user)
     @guild_only()
     @option("station", description="Name of the radio station.")
     @option(
@@ -158,11 +167,11 @@ class MusicCommands(commands.Cog):
         choices=COUNTRIES,
     )
     async def play_radio(
-            self,
-            ctx: discord.ApplicationContext,
-            station: str,
-            country: str = "",
-            play_next: bool = False,
+        self,
+        ctx: discord.ApplicationContext,
+        station: str,
+        country: str = "",
+        play_next: bool = False,
     ) -> None:
         encoded_station = discord.utils.escape_markdown(station)
         response = await make_http_request(
@@ -193,7 +202,6 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "RADIOMAP_ERROR")
 
     @music.command(name="skip", description="Skip playing song.")
-    @commands.cooldown(1, 4, commands.BucketType.user)
     @guild_only()
     @is_playing()
     async def skip_command(self, ctx: discord.ApplicationContext) -> None:
@@ -212,7 +220,7 @@ class MusicCommands(commands.Cog):
     @is_playing()
     @is_queue_empty()
     async def skip_to_command(
-            self, ctx: discord.ApplicationContext, to_find: str
+        self, ctx: discord.ApplicationContext, to_find: str
     ) -> None:
         player: wavelink.Player = ctx.voice_client
 
@@ -253,7 +261,6 @@ class MusicCommands(commands.Cog):
 
     @music.command(name="leave", description="Leaves voice channel.")
     @guild_only()
-    @commands.cooldown(1, 4, commands.BucketType.user)
     @is_joined()
     async def disconnect(self, ctx: discord.ApplicationContext) -> None:
         player: wavelink.Player = ctx.voice_client
@@ -270,7 +277,7 @@ class MusicCommands(commands.Cog):
 
     # ----------------------- Helper functions ------------------------ #
     async def _fetch_tracks(
-            self, ctx: discord.ApplicationContext, search: str
+        self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
         if tracks:
@@ -279,8 +286,8 @@ class MusicCommands(commands.Cog):
 
     @staticmethod
     async def _fetch_first_track(
-            ctx: discord.ApplicationContext,
-            tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
+        ctx: discord.ApplicationContext,
+        tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
     ) -> wavelink.Playable:
         player: wavelink.Player = ctx.voice_client
         # If it's a playlist
@@ -297,7 +304,7 @@ class MusicCommands(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"Added the playlist **`{tracks.name}`**"
-                            f" ({song_count} songs) to the queue.",
+                f" ({song_count} songs) to the queue.",
                 color=discord.Color.blue(),
             )
             if player.should_respond:
@@ -312,40 +319,54 @@ class MusicCommands(commands.Cog):
         track.requester = ctx.author
         return track
 
-    @staticmethod
     async def _search_tracks(
-            ctx: discord.ApplicationContext, search: str
+        self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
-        sources = [
-            "spsearch",
-            "ytsearch",
-            wavelink.TrackSource.SoundCloud,
-            wavelink.TrackSource.YouTubeMusic,
-        ]
+        source = get_search_prefix(search)
+        if source is None:
+            source = "ytsearch"
 
+        player = ctx.voice_client
         last_error = None
-        for source in sources:
+        for i in range(2):
             try:
-                tracks: wavelink.Search = await wavelink.Playable.search(
-                    search, source=source
+                tracks: wavelink.Search = await asyncio.wait_for(
+                    wavelink.Playable.search(search, source=source), timeout=3
                 )
                 if tracks:
                     return tracks
-            except LavalinkLoadException as e:
-                print(e)
-                if e.error == "Something went wrong while looking up the track.":
-                    last_error = "YOUTUBE_ERROR"
-                    continue
-                last_error = "LAVALINK_ERROR"
-                continue
-            except NodeException as e:
-                print(e)
+            except TimeoutError:
                 last_error = "NODE_UNRESPONSIVE"
-                continue
+                await switch_node(self.bot.connect_node, player=player, play_after=False)
+            except LavalinkLoadException as e:
+                print("LavalinkLoadException: ", e)
+                last_error = "LAVALINK_ERROR"
+            except NodeException as e:
+                print("NodeException: ", e)
+                last_error = "NODE_UNRESPONSIVE"
+                await switch_node(self.bot.connect_node, player=player, play_after=False)
+            except AttributeError:
+                last_error = "NODE_UNRESPONSIVE"
+                await switch_node(self.bot.connect_node, player=player, play_after=False)
+            # Fallback to default search
+            source = "ytsearch"
 
-        await send_response(
-            ctx, last_error if last_error else "NO_TRACKS_FOUND", search=search
-        )
+        should_respond = False if player.just_joined else True
+        if last_error:
+            await send_response(
+                ctx,
+                last_error,
+                ephemeral=False,
+                respond=should_respond,
+            )
+        else:
+            await send_response(
+                ctx,
+                "NO_TRACKS_FOUND",
+                ephemeral=False,
+                respond=should_respond,
+                search=search,
+            )
         return None
 
     @staticmethod
@@ -368,19 +389,19 @@ class MusicCommands(commands.Cog):
     @staticmethod
     async def _join_channel(ctx: discord.ApplicationContext) -> bool:
         if not ctx.author.voice or not ctx.author.voice.channel:
-            await send_response(ctx, "NO_VOICE_CHANNEL", respond=False)
+            await send_response(ctx, "NO_VOICE_CHANNEL")
             return False
 
         try:
             await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
         except wavelink.InvalidChannelStateException:
-            await send_response(ctx, "NO_PERMISSIONS", respond=False)
+            await send_response(ctx, "NO_PERMISSIONS")
             return False
         except wavelink.exceptions.InvalidNodeException:
-            await send_response(ctx, "NO_NODES", respond=False)
+            await send_response(ctx, "NO_NODES")
             return False
         except wavelink.exceptions.ChannelTimeoutException:
-            await send_response(ctx, "CONNECTION_TIMEOUT", respond=False)
+            await send_response(ctx, "CONNECTION_TIMEOUT")
             vc: wavelink.Player = ctx.guild.voice_client
             print(vc.channel.name)
             vc.cleanup()
@@ -388,18 +409,20 @@ class MusicCommands(commands.Cog):
         return True
 
     async def _play_track(
-            self,
-            ctx: discord.ApplicationContext,
-            track: wavelink.Playable
+        self, ctx: discord.ApplicationContext, track: wavelink.Playable
     ) -> bool:
         player: wavelink.Player = ctx.voice_client
-        player.temp_current = track  # To be used in case of switching nodes
 
         try:
             await player.play(track)
-        except (wavelink.exceptions.NodeException, wavelink.exceptions.LavalinkException) as e:
-            await send_response(ctx, "NODE_REQUEST_ERROR", ephemeral=False, error=e.error)
-            await switch_node(self.bot.connect_node, player, ctx.channel)
+        except (
+            wavelink.exceptions.NodeException,
+            wavelink.exceptions.LavalinkException,
+        ) as e:
+            await send_response(
+                ctx, "NODE_REQUEST_ERROR", ephemeral=False, error=e.error
+            )
+            await switch_node(self.bot.connect_node, player=player)
 
         return True
 

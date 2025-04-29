@@ -44,7 +44,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "NO_NODES": lambda ctx: discord.Embed(
         title="",
-        description=":x: No nodes are currently assigned to the bot.\nTo fix this, use command `/reconnect_node`",
+        description=":x: No nodes are currently assigned to the bot.\nTo fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_NODES_CONNECTED": lambda ctx: discord.Embed(
@@ -59,7 +59,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "NODE_UNRESPONSIVE": lambda ctx: discord.Embed(
         title="",
-        description=":x: Node is unresponsive, please use command `/reconnect_node`",
+        description=":x: Node is unresponsive, trying to connect to a new node.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_PLAYERS_CONNECTED": lambda ctx: discord.Embed(
@@ -96,20 +96,20 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "YOUTUBE_ERROR": lambda ctx: discord.Embed(
         title="",
         description=":x: Failed to load tracks, youtube plugin might be disabled, or version is outdated. Try "
-        "`/reconnect_node`.\nIf issue persists, it means YouTube updated their site and getting tracks "
+        "`/node reconnect`.\nIf issue persists, it means YouTube updated their site and getting tracks "
         "won't work until youtube plugin gets fixed.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "LAVALINK_ERROR": lambda ctx: discord.Embed(
         title="",
         description=":x: Failed to load tracks, you probably inputted wrong link or this Lavalink server doesn't have "
-        "necessary plugins.\nTo fix this, use command `/reconnect_node`",
+        "necessary plugins.\nTo fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NODE_REQUEST_ERROR": lambda ctx, **kwargs: discord.Embed(
         title="",
         description=":warning: An error occured when trying to send request to the node, trying to connect to a new node."
-                    f"\n\n**Message: {kwargs.get('error')}**",
+        f"\n\n**Message: {kwargs.get('error')}**",
         color=discord.Color.yellow(),
     ),
     "RADIOMAP_ERROR": lambda ctx: discord.Embed(
@@ -328,7 +328,6 @@ async def send_response(
 
     response_handler = RESPONSE_CODES[response_code]
     embed = response_handler(ctx, **kwargs)
-
     if respond:
         await ctx.respond(embed=embed, ephemeral=ephemeral, delete_after=delete_after)
     else:

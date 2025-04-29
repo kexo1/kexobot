@@ -206,9 +206,9 @@ class KexoBot:
         elif self.main_loop_counter == 6:
             self.main_loop_counter = 0
             await self.contest_monitor.run()
-
+            
         if now.minute % 6 == 0:
-            await self.sfd_servers.update_stats(now)
+            await self.sfd_servers.update_stats()
 
     async def hourly_loop(self) -> None:
         """Hourly loop for the bot.
@@ -249,14 +249,14 @@ class KexoBot:
         if len(self.lavalink_servers) == 1:
             return self.lavalink_servers[0]
 
-        for _ in range(len(self.lavalink_servers)):
+        for i in range(len(self.lavalink_servers)):
             node: wavelink.Node = self.get_node(guild_id)
             if not node:
                 return None
 
             try:
                 await asyncio.wait_for(
-                    wavelink.Pool.connect(nodes=[node], client=bot), timeout=3
+                    wavelink.Pool.connect(nodes=[node], client=bot), timeout=2
                 )
                 # Some fucking nodes secretly don't respond,
                 # I've played these games before!!!
@@ -264,6 +264,7 @@ class KexoBot:
 
             except asyncio.TimeoutError:
                 print(f"Node timed out. ({node.uri})")
+                del self.lavalink_servers[i]
                 continue
             except (
                 wavelink.exceptions.LavalinkException,
@@ -272,6 +273,7 @@ class KexoBot:
                 aiohttp.client_exceptions.ClientConnectorError,
             ):
                 print(f"Node failed to connect. ({node.uri})")
+                del self.lavalink_servers[i]
                 continue
 
             bot.node = node
