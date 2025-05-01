@@ -69,7 +69,7 @@ class GameUpdates:
 
             title = giveaway["title"]
 
-            is_filtered = [k for k in to_filter if k in title.lower()]
+            is_filtered = [k for k in to_filter if k.lower() in title.lower()]
             if is_filtered:
                 continue
 
@@ -81,18 +81,18 @@ class GameUpdates:
 
             soup = BeautifulSoup(giveaway["description"], "html.parser")
 
-            about_section = soup.find("p", string=lambda text: text and "About" in text)
-            if about_section:
+            about_strong = soup.find(
+                "strong", string=lambda text: text and "About" in text
+            )
+            if about_strong:
                 result = []
-                current = about_section
+                current = about_strong.find_parent("p")
                 while current:
                     result.append(current.get_text(strip=True))
                     current = current.find_next_sibling("p")
                 description = "\n".join(result)
             else:
-                strong_element = soup.find("strong")
-                strong_text = strong_element.text if strong_element else ""
-                description = strong_text + f"\n\n**[eu.alienwarearena.com]({url})**"
+                description = "**[eu.alienwarearena.com]({url})**"
 
             embed = discord.Embed(
                 title=title, description=description, colour=discord.Colour.dark_theme()
@@ -104,20 +104,8 @@ class GameUpdates:
             DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
         )
 
-    async def _load_alienware_config(self) -> Tuple[List[str], List[str]]:
-        alienwarearena_cache = await self.bot_config.find_one(DB_CACHE)
-        to_filter = await self.bot_config.find_one(DB_LISTS)
-        return (
-            alienwarearena_cache["alienwarearena_cache"],
-            to_filter["alienwarearena_exceptions"],
-        )
-
-    # Game3rb methods
     async def game3rb(self) -> None:
         """Check for updates from Game3rb."""
-        if not self.user_kexo:
-            return
-
         game3rb_cache = await self.bot_config.find_one(DB_CACHE)
         game3rb_cache = game3rb_cache["game3rb_cache"]
 
@@ -152,7 +140,7 @@ class GameUpdates:
 
             game_title: list = strip_text(game_title, GAME3RB_STRIP).split()
             version = ""
-            regex = re.compile(r"v\d+(\.\d+)+")
+            regex = re.compile(r"v\d+(\.\d+)*")
 
             if regex.match(game_title[-1]):
                 version = f" got updated to {game_title[-1]}"
@@ -178,7 +166,6 @@ class GameUpdates:
 
             game_title = " ".join(game_title)
             carts = []
-
             if game_title.lower() not in game_list.lower():
                 article = article.find_next("article")
                 continue
@@ -270,7 +257,6 @@ class GameUpdates:
                 DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
             )
 
-    # Fanatical methods
     async def fanatical(self) -> None:
         """Check for updates from Fanatical."""
         fanatical_cache = await self._load_fanatical_config()
@@ -314,11 +300,6 @@ class GameUpdates:
             DB_CACHE, {"$set": {"fanatical_cache": fanatical_cache}}
         )
 
-    async def _load_fanatical_config(self) -> List[str]:
-        fanatical_cache = await self.bot_config.find_one(DB_CACHE)
-        return fanatical_cache["fanatical_cache"]
-
-    # OnlineFix methods
     async def online_fix(self) -> None:
         """Check for updates from Online-Fix."""
         onlinefix_cache, games = await self._load_onlinefix_config()
@@ -407,6 +388,18 @@ class GameUpdates:
             print("OnlineFix: Chat element not found")
             return []
         return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
+
+    async def _load_alienware_config(self) -> Tuple[List[str], List[str]]:
+        alienwarearena_cache = await self.bot_config.find_one(DB_CACHE)
+        to_filter = await self.bot_config.find_one(DB_LISTS)
+        return (
+            alienwarearena_cache["alienwarearena_cache"],
+            to_filter["alienwarearena_exceptions"],
+        )
+
+    async def _load_fanatical_config(self) -> List[str]:
+        fanatical_cache = await self.bot_config.find_one(DB_CACHE)
+        return fanatical_cache["fanatical_cache"]
 
     async def _load_onlinefix_config(self) -> Tuple[List[str], List[str]]:
         onlinefix_cache = await self.bot_config.find_one(DB_CACHE)

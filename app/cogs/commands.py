@@ -5,6 +5,7 @@ import sys
 import time
 from urllib.parse import urlparse
 
+import aiohttp
 import asyncpraw.models
 import discord
 import wavelink
@@ -197,7 +198,10 @@ class CommandCog(commands.Cog):
         node_uri = []
 
         for node in nodes:
-            players: wavelink.PlayerResponsePayload = await node.fetch_players()
+            try:
+                players: wavelink.PlayerResponsePayload = await node.fetch_players()
+            except aiohttp.client_exceptions.ClientConnectorError:
+                continue
 
             if not players:
                 continue

@@ -228,7 +228,7 @@ class KexoBot:
             self._clear_temp_reddit_data()
 
         if now.hour == 0:
-            await self._set_joke()
+            # await self._set_joke()
             self.clear_offline_lavalink_servers()
 
         self.lavalink_servers = await self.lavalink_server_manager.get_lavalink_servers(
