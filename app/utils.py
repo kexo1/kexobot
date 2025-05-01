@@ -168,7 +168,7 @@ async def switch_node(
             if play_after:
                 await player.play(player.temp_current)
 
-            print(f"{i+1}. Node switched. ({node.uri})")
+            print(f"{i + 1}. Node switched. ({node.uri})")
             embed = discord.Embed(
                 title="",
                 description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",

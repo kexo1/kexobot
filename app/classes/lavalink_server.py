@@ -10,8 +10,12 @@ class LavalinkServerManager:
         self.session = session
         self.repeated_hostnames: list[str] = []
         self.low_quality_nodes: list[str] = ["lavalink-v2.pericsq.ro"]
+        self.offline_lavalink_servers: list[str] = []
 
-    async def get_lavalink_servers(self) -> list[wavelink.Node]:
+    async def get_lavalink_servers(
+        self, offline_lavalink_servers: list[str]
+    ) -> list[wavelink.Node]:
+        self.offline_lavalink_servers = offline_lavalink_servers
         lavalink_servers = []
         # Lavainfo from github
         json_data: list = await make_http_request(
@@ -42,7 +46,8 @@ class LavalinkServerManager:
 
         for server in json_data:
             if (
-                server["host"] in self.repeated_hostnames
+                server["host"] in self.offline_lavalink_servers
+                or server["host"] in self.repeated_hostnames
                 or server["host"] in self.low_quality_nodes
             ):
                 continue
@@ -62,9 +67,11 @@ class LavalinkServerManager:
 
     async def _lavainfo_github_fetch(self, json_data: list) -> list[wavelink.Node]:
         lavalink_servers = []
-
         for server in json_data:
-            if server["host"] in self.low_quality_nodes:
+            if (
+                server["host"] in self.offline_lavalink_servers
+                or server["host"] in self.low_quality_nodes
+            ):
                 continue
 
             if server["restVersion"] != "v4":

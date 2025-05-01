@@ -69,8 +69,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "CONNECTION_TIMEOUT": lambda ctx: discord.Embed(
         title="",
-        description=":x: Failed to connect to the voice channel, was bot moved manually? If yes disconnect it and try "
-        "again.",
+        description=":x: Failed to connect to the voice channel, was bot disconnected or moved manually before? If yes use `/leave`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_TRACKS_FOUND": lambda ctx, **kwargs: discord.Embed(
@@ -328,7 +327,25 @@ async def send_response(
 
     response_handler = RESPONSE_CODES[response_code]
     embed = response_handler(ctx, **kwargs)
-    if respond:
-        await ctx.respond(embed=embed, ephemeral=ephemeral, delete_after=delete_after)
-    else:
-        await ctx.send(embed=embed, delete_after=delete_after)
+
+    try:
+        if respond:
+            await ctx.respond(
+                embed=embed, ephemeral=ephemeral, delete_after=delete_after
+            )
+        else:
+            await ctx.send(embed=embed, delete_after=delete_after)
+    except discord.errors.NotFound as e:
+        # Handle "Unknown interaction" errors (10062)
+        if "10062" in str(e):
+            try:
+                # Fallback to sending a regular message if interaction expired
+                await ctx.channel.send(embed=embed, delete_after=delete_after)
+            except Exception:
+                # Last resort - log to console if we can't send a message
+                print(
+                    f"Failed to send response for {response_code}: Interaction timed out and fallback failed."
+                )
+        else:
+            # Re-raise if it's a different type of NotFound error
+            raise

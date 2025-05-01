@@ -232,16 +232,16 @@ SOURCE_PATTERNS = [
             r"""(?ix)
             https?://(?:www\.)?(?:youtube\.com|youtu\.be)/
             (?:
-                (?:watch\?v=)|
-                (?:playlist\?list=)|
-                (?:embed/)|
-                (?:v/)|
-                (?:shorts/)|
-                (?:live/)|
-                (?:channel/)|
-                (?:@)|
-                (?:user/)|
-                (?:attribution_link\?.*v=)
+                watch\?v=|
+                playlist\?list=|
+                embed/|
+                v/|
+                shorts/|
+                live/|
+                channel/|
+                @|
+                user/|
+                attribution_link\?.*v=
             )
             """
         ),
@@ -253,7 +253,7 @@ SOURCE_PATTERNS = [
             r"""(?ix)
             https?://open\.spotify\.com/
             (?:intl-[\w-]+/)?
-            (?:track|album|playlist|artist)/[\w]+
+            (?:track|album|playlist|artist)/\w+
             """
         ),
         "spsearch",
@@ -274,7 +274,7 @@ SOURCE_PATTERNS = [
             r"""(?ix)
             https?://(?:www\.)?deezer\.com/
             (?:track|album|playlist|artist)/\d+|
-            https?://deezer\.page\.link/[\w]+
+            https?://deezer\.page\.link/\w+
             """
         ),
         "dzsearch",
@@ -297,7 +297,7 @@ SOURCE_PATTERNS = [
         re.compile(
             r"""(?ix)
             https?://(?:vk\.com|vk\.ru)/
-            (?:audio|audios|music/playlist|music/album|artist)/[^\s]+
+            (?:audio|audios|music/playlist|music/album|artist)/\S+
             """
         ),
         "vksearch",
@@ -317,14 +317,25 @@ SOURCE_PATTERNS = [
         re.compile(
             r"""(?ix)
             https?://(?:open|play)\.qobuz\.com/
-            (?:track|album|playlist|artist)/[\w]+|
+            (?:track|album|playlist|artist)/\w+|
             https?://www\.qobuz\.com/[\w-]+/album/[\w-]+
             """
         ),
         "qbsearch",
     ),
 ]
-SUPPORTED_PLATFORMS = ("Youtube", "Youtube Music", "Soundcloud", "Spotify (likely)", "Apple Music (unlikely)", "Deezer (unlikely)", "Yandex Music (unlikely)", "VK Music (unlikely)", "Tidal (unlikely)", "Qobuz (unlikely)")
+SUPPORTED_PLATFORMS = (
+    "Youtube",
+    "Youtube Music",
+    "Soundcloud",
+    "Spotify (likely)",
+    "Apple Music (unlikely)",
+    "Deezer (unlikely)",
+    "Yandex Music (unlikely)",
+    "VK Music (unlikely)",
+    "Tidal (unlikely)",
+    "Qobuz (unlikely)",
+)
 DISCORD_LOGO = (
     "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
 )

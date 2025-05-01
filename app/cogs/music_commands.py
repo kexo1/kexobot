@@ -53,6 +53,9 @@ class MusicCommands(commands.Cog):
     async def play(
         self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
     ) -> None:
+        # Defer the response right away to avoid interaction timeout
+        await ctx.defer(ephemeral=False)
+
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
             if not joined:
@@ -337,17 +340,23 @@ class MusicCommands(commands.Cog):
                     return tracks
             except TimeoutError:
                 last_error = "NODE_UNRESPONSIVE"
-                await switch_node(self.bot.connect_node, player=player, play_after=False)
+                await switch_node(
+                    self.bot.connect_node, player=player, play_after=False
+                )
             except LavalinkLoadException as e:
                 print("LavalinkLoadException: ", e)
                 last_error = "LAVALINK_ERROR"
             except NodeException as e:
                 print("NodeException: ", e)
                 last_error = "NODE_UNRESPONSIVE"
-                await switch_node(self.bot.connect_node, player=player, play_after=False)
+                await switch_node(
+                    self.bot.connect_node, player=player, play_after=False
+                )
             except AttributeError:
                 last_error = "NODE_UNRESPONSIVE"
-                await switch_node(self.bot.connect_node, player=player, play_after=False)
+                await switch_node(
+                    self.bot.connect_node, player=player, play_after=False
+                )
             # Fallback to default search
             source = "ytsearch"
 
@@ -391,6 +400,9 @@ class MusicCommands(commands.Cog):
         if not ctx.author.voice or not ctx.author.voice.channel:
             await send_response(ctx, "NO_VOICE_CHANNEL")
             return False
+
+        if not ctx.response:
+            await ctx.defer()
 
         try:
             await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)

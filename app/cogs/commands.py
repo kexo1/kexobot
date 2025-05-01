@@ -74,7 +74,7 @@ class CommandCog(commands.Cog):
     @option("password", description="Lavalink server password.", required=True)
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def manual_connect(
-            self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
+        self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
     ) -> None:
         await ctx.defer()
         node: wavelink.Node = await check_node_status(
@@ -100,7 +100,9 @@ class CommandCog(commands.Cog):
         player: wavelink.Player = ctx.voice_client
 
         if player:
-            node: wavelink.Node = await switch_node(self.bot.connect_node, player=player, play_after=False)
+            node: wavelink.Node = await switch_node(
+                self.bot.connect_node, player=player, play_after=False
+            )
             self.bot.node = node
             await send_response(
                 ctx,
@@ -138,7 +140,10 @@ class CommandCog(commands.Cog):
 
         await ctx.respond(embed=embed)
 
-    @slash_node.command(name="supported_platforms", description="Supported music platforms in the current node")
+    @slash_node.command(
+        name="supported_platforms",
+        description="Supported music platforms in the current node",
+    )
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
         node: wavelink.Node = self.bot.node
         node_info: wavelink.InfoResponsePayload = await node.fetch_info()
@@ -158,18 +163,25 @@ class CommandCog(commands.Cog):
         if youtube_plugin and lavasrc_plugin:
             embed.add_field(
                 name=f"_{len(SUPPORTED_PLATFORMS)} platforms supported_",
-                value="\n".join(f"{i + 1}. {SUPPORTED_PLATFORMS[i]}" for i in range(len(SUPPORTED_PLATFORMS)))
+                value="\n".join(
+                    f"{i + 1}. {SUPPORTED_PLATFORMS[i]}"
+                    for i in range(len(SUPPORTED_PLATFORMS))
+                ),
             )
 
         elif youtube_plugin:
             embed.add_field(
                 name=f"_3 platforms supported_",
-                value="\n".join(f"{i + 1}. {SUPPORTED_PLATFORMS[i]}" for i in range(3))
+                value="\n".join(f"{i + 1}. {SUPPORTED_PLATFORMS[i]}" for i in range(3)),
             )
         else:
             embed.description = "No platforms supported"
 
-        embed.set_footer(text=f"unlikely - depends if node owner added API key for each platform" if lavasrc_plugin else "")
+        embed.set_footer(
+            text=f"unlikely - depends if node owner added API key for each platform"
+            if lavasrc_plugin
+            else ""
+        )
         await ctx.respond(embed=embed)
 
     @slash_node.command(name="players", description="Information about node players.")
@@ -238,7 +250,7 @@ class CommandCog(commands.Cog):
     @option("server", description="Server name.")
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def get_sfd_server_info(
-            self, ctx: discord.ApplicationContext, search: str
+        self, ctx: discord.ApplicationContext, search: str
     ) -> None:
         server = self.sfd_servers.get_server(search)
         if not server:
@@ -279,10 +291,10 @@ class CommandCog(commands.Cog):
     )
     @commands.cooldown(1, 60, commands.BucketType.user)
     async def get_sfd_graph(
-            self,
-            ctx: discord.ApplicationContext,
-            graph_range: str,
-            timezone: str = "New_York",
+        self,
+        ctx: discord.ApplicationContext,
+        graph_range: str,
+        timezone: str = "New_York",
     ) -> None:
         await ctx.defer()
 
@@ -352,18 +364,18 @@ class CommandCog(commands.Cog):
     )
     @commands.cooldown(1, 300, commands.BucketType.user)
     async def host(
-            self,
-            ctx: discord.ApplicationContext,
-            server_name: str,
-            duration: str,
-            branch: str,
-            version: str,
-            password: str,
-            region: str,
-            scripts: str,
-            slots: int = 8,
-            ping: bool = True,
-            image: str = None,
+        self,
+        ctx: discord.ApplicationContext,
+        server_name: str,
+        duration: str,
+        branch: str,
+        version: str,
+        password: str,
+        region: str,
+        scripts: str,
+        slots: int = 8,
+        ping: bool = True,
+        image: str = None,
     ) -> None:
         author = ctx.author
 
@@ -454,7 +466,7 @@ class CommandCog(commands.Cog):
 
     @slash_command(name="random_number", description="Choose number between intervals.")
     async def random_number(
-            self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
+        self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
     ) -> None:
         if ineteger1 > ineteger2:
             ineteger2, ineteger1 = ineteger1, ineteger2
@@ -537,7 +549,7 @@ class CommandCog(commands.Cog):
         embed = discord.Embed(
             title="Select Subreddits",
             description="Select the subreddits you want to see in shitpost command."
-                        " Currently selected subreddits are pre-checked.",
+            " Currently selected subreddits are pre-checked.",
             color=discord.Color.blue(),
         )
 
@@ -576,7 +588,7 @@ class CommandCog(commands.Cog):
         )
 
     async def _remove_from_bot_config(
-            self, ctx, collection: str, to_remove: str
+        self, ctx, collection: str, to_remove: str
     ) -> None:
         bot_config: dict = await self.bot_config.find_one(DB_LISTS)
         collection_name = collection
@@ -606,7 +618,7 @@ class HostView(discord.ui.View):
         style=discord.ButtonStyle.gray, label="I stopped hosting.", emoji="📣"
     )
     async def button_callback(
-            self, button: discord.Button, interaction: discord.Interaction
+        self, button: discord.Button, interaction: discord.Interaction
     ) -> None:
         if interaction.user.name in host_authors:
             embed = await self.disable_embed()
@@ -621,17 +633,17 @@ class HostView(discord.ui.View):
         await self.message.edit(embed=embed, view=None)
         await self.author.send(
             f"**You forgot to click button in {self.message.jump_url} you {
-            random.choice(
-                (
-                    'dumbass',
-                    'retard',
-                    'nitwit',
-                    'prick',
-                    'cunt',
-                    'pillock',
-                    'twat',
+                random.choice(
+                    (
+                        'dumbass',
+                        'retard',
+                        'nitwit',
+                        'prick',
+                        'cunt',
+                        'pillock',
+                        'twat',
+                    )
                 )
-            )
             }.**"
         )
         del host_authors[host_authors.index(self.author.name)]

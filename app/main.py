@@ -12,11 +12,13 @@ import discord
 import dns.resolver
 import httpx
 import wavelink
+
 from discord.ext import tasks, commands
 from fake_useragent import UserAgent
 from motor.motor_asyncio import AsyncIOMotorClient
 from pycord.multicog import Bot
 from wavelink.enums import NodeStatus
+from urllib.parse import urlparse
 
 from app.classes.contests import ContestMonitor
 from app.classes.game_updates import GameUpdates
@@ -64,7 +66,8 @@ class KexoBot:
         self.session = None | httpx.AsyncClient
         self.subreddit_cache = None | dict
         self.main_loop_counter = 0
-        self.lavalink_servers = []
+        self.lavalink_servers: list[wavelink.Node] = []
+        self.offline_lavalink_servers: list[str] = []
         self.guild_temp_data = {}
 
         database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]
@@ -206,9 +209,9 @@ class KexoBot:
         elif self.main_loop_counter == 6:
             self.main_loop_counter = 0
             await self.contest_monitor.run()
-            
+
         if now.minute % 6 == 0:
-            await self.sfd_servers.update_stats()
+            await self.sfd_servers.update_stats(now)
 
     async def hourly_loop(self) -> None:
         """Hourly loop for the bot.
@@ -226,9 +229,10 @@ class KexoBot:
 
         if now.hour == 0:
             await self._set_joke()
+            self.clear_offline_lavalink_servers()
 
-        self.lavalink_servers = (
-            await self.lavalink_server_manager.get_lavalink_servers()
+        self.lavalink_servers = await self.lavalink_server_manager.get_lavalink_servers(
+            self.offline_lavalink_servers
         )
         await self.power_outage_monitor.run()
 
@@ -264,7 +268,10 @@ class KexoBot:
 
             except asyncio.TimeoutError:
                 print(f"Node timed out. ({node.uri})")
-                del self.lavalink_servers[i]
+                offline_lavalink_server = self.lavalink_servers.pop(i)
+                self.offline_lavalink_servers.append(
+                    urlparse(offline_lavalink_server.uri).hostname
+                )
                 continue
             except (
                 wavelink.exceptions.LavalinkException,
@@ -273,7 +280,10 @@ class KexoBot:
                 aiohttp.client_exceptions.ClientConnectorError,
             ):
                 print(f"Node failed to connect. ({node.uri})")
-                del self.lavalink_servers[i]
+                offline_lavalink_server = self.lavalink_servers.pop(i)
+                self.offline_lavalink_servers.append(
+                    urlparse(offline_lavalink_server.uri).hostname
+                )
                 continue
 
             bot.node = node
@@ -323,6 +333,10 @@ class KexoBot:
     def get_avaiable_nodes(self) -> int:
         """Get the number of available lavalink nodes."""
         return len(self.lavalink_servers)
+
+    def clear_offline_lavalink_servers(self) -> None:
+        """Clear offline lavalink servers."""
+        self.offline_lavalink_servers: list[str] = []
 
     @staticmethod
     def _clear_temp_reddit_data() -> None:

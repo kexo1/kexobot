@@ -60,7 +60,8 @@ class Listeners(commands.Cog):
             f"\n**Severity**: {payload.exception['severity']}",
             color=discord.Color.yellow(),
         )
-        await self._manage_node(embed, payload)
+        await payload.player.text_channel.send(embed=embed)
+        await switch_node(self.bot.connect_node, payload.player)
 
     @commands.Cog.listener()
     async def on_wavelink_track_stuck(self, payload: TrackStuckEventPayload) -> None:
@@ -69,7 +70,10 @@ class Listeners(commands.Cog):
             description=":warning: Song got stuck, trying to connect to a new node.",
             color=discord.Colour.yellow(),
         )
-        await self._manage_node(embed, payload)
+        await payload.player.text_channel.send(embed=embed)
+        await switch_node(
+            self.bot.connect_node, player=payload.player, play_after=False
+        )
 
     @commands.Cog.listener()
     async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:
@@ -105,14 +109,6 @@ class Listeners(commands.Cog):
             player.cleanup()
             await player.disconnect()
             return
-
-    async def _manage_node(
-        self,
-        embed: discord.Embed,
-        payload: Union[TrackExceptionEventPayload, TrackStuckEventPayload],
-    ) -> None:
-        await payload.player.text_channel.send(embed=embed)
-        await switch_node(self.bot.connect_node, payload.player)
 
     def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
         embed = discord.Embed(
