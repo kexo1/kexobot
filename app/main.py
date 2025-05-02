@@ -1,7 +1,7 @@
 import asyncio
-import random
 from datetime import datetime
 from typing import Optional
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import aiohttp
@@ -12,13 +12,11 @@ import discord
 import dns.resolver
 import httpx
 import wavelink
-
 from discord.ext import tasks, commands
 from fake_useragent import UserAgent
 from motor.motor_asyncio import AsyncIOMotorClient
 from pycord.multicog import Bot
 from wavelink.enums import NodeStatus
-from urllib.parse import urlparse
 
 from app.classes.contests import ContestMonitor
 from app.classes.game_updates import GameUpdates
@@ -35,7 +33,6 @@ from app.constants import (
     REDDIT_USERNAME,
     REDDIT_CLIENT_ID,
     SHITPOST_SUBREDDITS_ALL,
-    HUMOR_SECRET,
     DB_CACHE,
     ESUTAZE_CHANNEL,
     GAME_UPDATES_CHANNEL,
@@ -97,6 +94,8 @@ class KexoBot:
         bot.get_online_nodes = self.get_online_nodes
         bot.get_avaiable_nodes = self.get_avaiable_nodes
         bot.guild_temp_data = self.guild_temp_data
+        # Other
+        bot.humor_api_exahusted = False
 
         # Initialize class variables
         self.reddit_fetcher = None | RedditFetcher
@@ -228,8 +227,8 @@ class KexoBot:
             self._clear_temp_reddit_data()
 
         if now.hour == 0:
-            # await self._set_joke()
-            self.clear_offline_lavalink_servers()
+            self.bot.humor_api_exahusted = False
+            self._clear_offline_lavalink_servers()
 
         self.lavalink_servers = await self.lavalink_server_manager.get_lavalink_servers(
             self.offline_lavalink_servers
@@ -334,7 +333,7 @@ class KexoBot:
         """Get the number of available lavalink nodes."""
         return len(self.lavalink_servers)
 
-    def clear_offline_lavalink_servers(self) -> None:
+    def _clear_offline_lavalink_servers(self) -> None:
         """Clear offline lavalink servers."""
         self.offline_lavalink_servers: list[str] = []
 
@@ -350,23 +349,6 @@ class KexoBot:
                 bot.temp_user_data[user_id]["reddit"]["last_used"] = None
                 bot.temp_user_data[user_id]["reddit"]["viewed_posts"] = set()
                 bot.temp_user_data[user_id]["reddit"]["search_limit"] = 3
-
-    async def _set_joke(self) -> None:
-        """Set a random joke as the bot's activity."""
-        joke_categroy = random.choice(("jewish", "racist"))
-        try:
-            joke = await self.session.get(
-                f"https://api.humorapi.com/jokes/random?max-length=128&include-tags="
-                f"{joke_categroy}&api-key={HUMOR_SECRET}"
-            )
-        except httpx.ReadTimeout:
-            print("Couldn't fetch joke: Timeout")
-            return
-
-        joke = joke.json().get("joke")
-        await bot.change_presence(
-            activity=discord.Activity(type=discord.ActivityType.watching, name=joke)
-        )
 
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""

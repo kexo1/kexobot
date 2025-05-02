@@ -11,6 +11,7 @@ import discord
 import wavelink
 from discord.commands import slash_command, guild_only, option
 from discord.ext import commands
+from discord.utils import escape_markdown
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.__init__ import __version__
@@ -23,6 +24,9 @@ from app.constants import (
     SFD_TIMEZONE_CHOICE,
     SHITPOST_SUBREDDITS_ALL,
     SUPPORTED_PLATFORMS,
+    HUMOR_SECRET,
+    HUMOR_API_URL,
+    JOKE_API_URL,
 )
 from app.response_handler import send_response
 from app.utils import (
@@ -32,6 +36,7 @@ from app.utils import (
     check_node_status,
     generate_user_data,
     switch_node,
+    make_http_request,
 )
 
 host_authors = []
@@ -42,6 +47,7 @@ class CommandCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        self.session = self.bot.session
         self.bot_config: AsyncIOMotorClient = self.bot.bot_config
         self.user_data_db: AsyncIOMotorClient = self.bot.user_data_db
         self.user_data: dict = self.bot.user_data
@@ -49,6 +55,7 @@ class CommandCog(commands.Cog):
         self.guild_temp_data: dict = self.bot.guild_temp_data
 
         self.run_time = time.time()
+        self.viewed_jokes: list[str] = []
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
         self.sfd_servers = SFDServers(self.bot_config, self.bot.session)
 
@@ -249,6 +256,36 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Current Map", value="\n".join(servers_dict["maps"]))
         embed.add_field(name="Players", value="\n".join(servers_dict["players"]))
         await ctx.respond(embed=embed)
+
+    # -------------------- Joke command -------------------- #
+    @slash_command(
+        name="joke", description="Fetches random cringe joke.", guild_ids=[KEXO_SERVER]
+    )
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def joke(self, ctx: discord.ApplicationContext) -> None:
+        await ctx.defer()
+
+        for _ in range(5):
+            if not self.bot.humor_api_exahusted:
+                joke = await self._get_joke_humorapi()
+                if not joke:
+                    joke = await self._get_joke_jokeapi()
+            else:
+                joke = await self._get_joke_jokeapi()
+
+            if not joke:
+                await send_response(ctx, "JOKE_TIMEOUT")
+                return
+
+            if joke in self.viewed_jokes:
+                continue
+
+            self.viewed_jokes.append(joke)
+            break
+
+        joke = escape_markdown(joke)
+        await ctx.respond(joke)
+        return
 
     @slash_sfd.command(name="server_info", description="Find searched server.")
     @option("server", description="Server name.")
@@ -609,6 +646,44 @@ class CommandCog(commands.Cog):
         )
         await send_response(
             ctx, "DB_REMOVED", to_remove=to_remove, collection_name=collection_name
+        )
+
+    async def _get_joke_humorapi(self) -> str | None:
+        joke_category = random.choice(("jewish", "racist", "yomama"))
+        joke = await make_http_request(
+            self.session,
+            HUMOR_API_URL + f"{joke_category}&api-key={HUMOR_SECRET}",
+            retries=3,
+            get_json=True,
+        )
+        if not joke:
+            self.bot.humor_api_exahusted = True
+            return None
+
+        if joke.get("status") == "failure":
+            self.bot.humor_api_exahusted = True
+            return None
+
+        return joke.get("joke")
+
+    async def _get_joke_jokeapi(self) -> str | None:
+        joke = await make_http_request(
+            self.session,
+            JOKE_API_URL,
+            retries=3,
+            get_json=True,
+        )
+        if not joke:
+            return None
+
+        if joke.get("error"):
+            await send_response(ctx, "JOKE_TIMEOUT")
+            return None
+
+        return (
+            f"{joke.get('setup')}\n{joke.get('delivery')}"
+            if joke.get("type") == "twopart"
+            else joke.get("joke")
         )
 
 

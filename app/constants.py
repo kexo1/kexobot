@@ -248,7 +248,7 @@ SOURCE_PATTERNS = [
         ),
         "ytsearch",
     ),
-    # Spotify
+    # Spotify (prefer ytsearch over spsearch)
     (
         re.compile(
             r"""(?ix)
@@ -257,7 +257,7 @@ SOURCE_PATTERNS = [
             (?:track|album|playlist|artist)/\w+
             """
         ),
-        "spsearch",
+        "ytsearch",
     ),
     # Apple Music
     (
@@ -380,3 +380,7 @@ RADIOGARDEN_PLACES_URL = "https://radio.garden/api/ara/content/places"
 RADIOGARDEN_PAGE_URL = "https://radio.garden/api/ara/content/page/"
 RADIOGARDEN_SEARCH_URL = "https://radio.garden/api/search?q="
 RADIOGARDEN_LISTEN_URL = "https://radio.garden/api/ara/content/listen/"
+
+# -------------------- Jokes -------------------- #
+JOKE_API_URL = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark"
+HUMOR_API_URL = "https://api.humorapi.com/jokes/random?include-tags="

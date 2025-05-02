@@ -7,6 +7,5 @@
 
 ## Improvements
 - [ ] Make Game3rb more readable
-- [ ] Merge some files together
 - [ ] Split code into more functions
 - [ ] Add docstrings

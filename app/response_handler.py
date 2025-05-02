@@ -1,4 +1,4 @@
-from typing import Dict, Callable, Any
+from typing import Dict, Callable, Any, Union
 
 import discord
 
@@ -109,6 +109,23 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         title="",
         description=":warning: An error occured when trying to send request to the node, trying to connect to a new node."
         f"\n\n**Message: {kwargs.get('error')}**",
+        color=discord.Color.yellow(),
+    ),
+    "JOKE_TIMEOUT": lambda ctx: discord.Embed(
+        title="",
+        description=":x: Failed to get joke, try again later.",
+        color=discord.Color.from_rgb(r=220, g=0, b=0),
+    ),
+    "TRACK_EXCEPTION": lambda ctx, **kwargs: discord.Embed(
+        title="",
+        description=":warning: An error occured when playing song, trying to connect to a new node."
+        f"\n\n**Message**: {kwargs.get('message')}"
+        f"\n**Severity**: {kwargs.get('severity')}",
+        color=discord.Color.yellow(),
+    ),
+    "TRACK_STUCK": lambda ctx: discord.Embed(
+        title="",
+        description=":warning: Track got stuck, trying to connect to a new node.",
         color=discord.Color.yellow(),
     ),
     "RADIOMAP_ERROR": lambda ctx: discord.Embed(
@@ -243,6 +260,16 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         description=f"**✅ Left <#{kwargs.get('channel_id')}>**",
         color=discord.Color.blue(),
     ),
+    "DISCONNECTED_INACTIVITY": lambda ctx, **kwargs: discord.Embed(
+        title="",
+        description=f"**Left <#{kwargs.get('channel_id')}> after 10 minutes of inactivity.**",
+        color=discord.Color.blue(),
+    ),
+    "DISCONNECTED_NO_USERS": lambda ctx, **kwargs: discord.Embed(
+        title="",
+        description=f"**Left <#{kwargs.get('channel_id')}>, no users in channel.**",
+        color=discord.Color.blue(),
+    ),
     "JOINED": lambda ctx, **kwargs: discord.Embed(
         title="",
         description=f"**✅ Joined to <#{kwargs.get('channel_id')}>"
@@ -304,7 +331,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
 
 
 async def send_response(
-    ctx: discord.ApplicationContext,
+    ctx: Union[discord.ApplicationContext, discord.TextChannel],
     response_code: str,
     respond: bool = True,
     ephemeral: bool = True,
@@ -328,24 +355,7 @@ async def send_response(
     response_handler = RESPONSE_CODES[response_code]
     embed = response_handler(ctx, **kwargs)
 
-    try:
-        if respond:
-            await ctx.respond(
-                embed=embed, ephemeral=ephemeral, delete_after=delete_after
-            )
-        else:
-            await ctx.send(embed=embed, delete_after=delete_after)
-    except discord.errors.NotFound as e:
-        # Handle "Unknown interaction" errors (10062)
-        if "10062" in str(e):
-            try:
-                # Fallback to sending a regular message if interaction expired
-                await ctx.channel.send(embed=embed, delete_after=delete_after)
-            except Exception:
-                # Last resort - log to console if we can't send a message
-                print(
-                    f"Failed to send response for {response_code}: Interaction timed out and fallback failed."
-                )
-        else:
-            # Re-raise if it's a different type of NotFound error
-            raise
+    if respond:
+        await ctx.respond(embed=embed, ephemeral=ephemeral, delete_after=delete_after)
+    else:
+        await ctx.send(embed=embed, delete_after=delete_after)

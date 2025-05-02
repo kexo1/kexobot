@@ -1,5 +1,3 @@
-from typing import Union
-
 import discord
 import wavelink
 from discord.ext import commands
@@ -12,6 +10,7 @@ from wavelink import (
 )
 
 from app.constants import DISCORD_LOGO
+from app.response_handler import send_response
 from app.utils import fix_audio_title, switch_node
 
 
@@ -53,24 +52,19 @@ class Listeners(commands.Cog):
     async def on_wavelink_track_exception(
         self, payload: TrackExceptionEventPayload
     ) -> None:
-        embed = discord.Embed(
-            title="",
-            description=":warning: An error occured when playing song, trying to connect to a new node."
-            f"\n\n**Message**: {payload.exception['message']}"
-            f"\n**Severity**: {payload.exception['severity']}",
-            color=discord.Color.yellow(),
+        await send_response(
+            payload.player.text_channel,
+            "TRACK_EXCEPTION",
+            respond=False,
+            embed=embed,
+            message=payload.exception["message"],
+            severity=payload.exception["severity"],
         )
-        await payload.player.text_channel.send(embed=embed)
         await switch_node(self.bot.connect_node, payload.player)
 
     @commands.Cog.listener()
     async def on_wavelink_track_stuck(self, payload: TrackStuckEventPayload) -> None:
-        embed = discord.Embed(
-            title="",
-            description=":warning: Song got stuck, trying to connect to a new node.",
-            color=discord.Colour.yellow(),
-        )
-        await payload.player.text_channel.send(embed=embed)
+        await send_response(payload.player.text_channel, "TRACK_STUCK", respond=False)
         await switch_node(
             self.bot.connect_node, player=payload.player, play_after=False
         )
@@ -79,12 +73,12 @@ class Listeners(commands.Cog):
     async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:
         player.cleanup()
         await player.disconnect()
-        embed = discord.Embed(
-            title="",
-            description=f"**Left <#{player.channel.id}> after 10 minutes of inactivity.**",
-            color=discord.Color.blue(),
+        await send_response(
+            player.text_channel,
+            "DISCONNECTED_INACTIVITY",
+            respond=False,
+            channel_id=player.channel.id,
         )
-        await player.text_channel.send(embed=embed)
 
     # noinspection PyUnusedLocal
     @commands.Cog.listener()
@@ -99,12 +93,11 @@ class Listeners(commands.Cog):
             return
 
         if len(player.channel.members) == 1:
-            await player.text_channel.send(
-                embed=discord.Embed(
-                    title="",
-                    description=f"**Left <#{player.channel.id}>, no users in channel.**",
-                    color=discord.Color.blue(),
-                )
+            await send_response(
+                player.text_channel,
+                "DISCONNECTED_NO_USERS",
+                respond=False,
+                channel_id=player.channel.id,
             )
             player.cleanup()
             await player.disconnect()
