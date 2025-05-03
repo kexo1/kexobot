@@ -34,7 +34,8 @@ from app.utils import (
     iso_to_timestamp,
     get_file_age,
     check_node_status,
-    generate_user_data,
+    get_user_data,
+    get_guild_data,
     switch_node,
     make_http_request,
 )
@@ -55,7 +56,6 @@ class CommandCog(commands.Cog):
         self.guild_temp_data: dict = self.bot.guild_temp_data
 
         self.run_time = time.time()
-        self.viewed_jokes: list[str] = []
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
         self.sfd_servers = SFDServers(self.bot_config, self.bot.session)
 
@@ -259,7 +259,7 @@ class CommandCog(commands.Cog):
 
     # -------------------- Joke command -------------------- #
     @slash_command(
-        name="joke", description="Fetches random cringe joke.", guild_ids=[KEXO_SERVER]
+        name="joke", description="Fetches random cringe joke."
     )
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def joke(self, ctx: discord.ApplicationContext) -> None:
@@ -270,6 +270,7 @@ class CommandCog(commands.Cog):
                 joke = await self._get_joke_humorapi()
                 if not joke:
                     joke = await self._get_joke_jokeapi()
+                    self.bot.humor_api_exahusted = True
             else:
                 joke = await self._get_joke_jokeapi()
 
@@ -277,10 +278,12 @@ class CommandCog(commands.Cog):
                 await send_response(ctx, "JOKE_TIMEOUT")
                 return
 
-            if joke in self.viewed_jokes:
+            _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
+            if joke in temp_guild_data["viewed_jokes"]:
                 continue
 
-            self.viewed_jokes.append(joke)
+            temp_guild_data["viewed_jokes"].add(joke)
+            self.bot.temp_guild_data[ctx.guild_id] = temp_guild_data
             break
 
         joke = escape_markdown(joke)
@@ -570,19 +573,7 @@ class CommandCog(commands.Cog):
     )
     async def edit_subreddit(self, ctx: discord.ApplicationContext) -> None:
         user_id = ctx.author.id
-        user_data = await self.user_data_db.find_one({"_id": user_id})
-
-        if not user_data:
-            user_data = generate_user_data()
-            await self.user_data_db.insert_one(
-                {"_id": user_id, "reddit": user_data["reddit"]}
-            )
-
-            await send_response(ctx, "USER_DATA_GENERATED", ephemeral=False)
-            self.user_data[user_id] = user_data
-        else:
-            self.user_data.setdefault(user_id, {})["reddit"] = user_data["reddit"]
-
+        user_data, temp_user_data = await get_user_data(self.bot, ctx)
         current_subreddits = user_data["reddit"]["subreddits"]
         # Create a view with select menu for all available subreddits
         view = SubredditSelectorView(current_subreddits, self.bot, user_id)

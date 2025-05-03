@@ -39,7 +39,7 @@ from app.constants import (
     FREE_STUFF_CHANNEL,
     KEXO_SERVER,
 )
-from app.utils import generate_temp_guild_data, is_older_than
+from app.utils import get_guild_data, is_older_than, generate_temp_guild_data
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
@@ -84,6 +84,8 @@ class KexoBot:
         # Database
         bot.user_data = {}
         bot.temp_user_data = {}
+        bot.guild_data = {}
+        bot.temp_guild_data = {}
         bot.bot_config = self.bot_config
         bot.user_data_db = self.user_data_db
         bot.guild_data_db = self.guild_data_db
@@ -228,7 +230,8 @@ class KexoBot:
 
         if now.hour == 0:
             self.bot.humor_api_exahusted = False
-            self._clear_offline_lavalink_servers()
+            self.offline_lavalink_servers: list[str] = []
+            self._clear_temp_guild_data()
 
         self.lavalink_servers = await self.lavalink_server_manager.get_lavalink_servers(
             self.offline_lavalink_servers
@@ -253,7 +256,7 @@ class KexoBot:
             return self.lavalink_servers[0]
 
         for i in range(len(self.lavalink_servers)):
-            node: wavelink.Node = self.get_node(guild_id)
+            node: wavelink.Node = await self.get_node(guild_id)
             if not node:
                 return None
 
@@ -289,18 +292,17 @@ class KexoBot:
             return node
         return None
 
-    def get_node(self, guild_id: int) -> wavelink.Node:
+    async def get_node(self, guild_id: int) -> wavelink.Node:
         """Get the next lavalink node, cycling is guild based."""
-        lavalink_server_pos = self.guild_temp_data.get(guild_id)
-        if not lavalink_server_pos:
-            self.guild_temp_data[guild_id] = generate_temp_guild_data()
-        lavalink_server_pos = self.guild_temp_data[guild_id]["lavalink_server_pos"]
+        _, temp_guild_data = await get_guild_data(bot, guild_id)
+        lavalink_server_pos = temp_guild_data["lavalink_server_pos"]
 
         lavalink_server_pos += 1
         if lavalink_server_pos >= len(self.lavalink_servers):
             lavalink_server_pos = 0
 
-        self.guild_temp_data[guild_id]["lavalink_server_pos"] = lavalink_server_pos
+        temp_guild_data["lavalink_server_pos"] = lavalink_server_pos
+        bot.temp_guild_data[guild_id] = temp_guild_data
         node: wavelink.Node = self.lavalink_servers[lavalink_server_pos]
         return node
 
@@ -333,10 +335,6 @@ class KexoBot:
         """Get the number of available lavalink nodes."""
         return len(self.lavalink_servers)
 
-    def _clear_offline_lavalink_servers(self) -> None:
-        """Clear offline lavalink servers."""
-        self.offline_lavalink_servers: list[str] = []
-
     @staticmethod
     def _clear_temp_reddit_data() -> None:
         """Clear the temporary user reddit data."""
@@ -349,6 +347,12 @@ class KexoBot:
                 bot.temp_user_data[user_id]["reddit"]["last_used"] = None
                 bot.temp_user_data[user_id]["reddit"]["viewed_posts"] = set()
                 bot.temp_user_data[user_id]["reddit"]["search_limit"] = 3
+
+    @staticmethod
+    def _clear_temp_guild_data() -> None:
+        """Clear the temporary guild data."""
+        for guild_id in bot.temp_guild_data:
+            bot.temp_guild_data[guild_id] = generate_temp_guild_data()
 
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""

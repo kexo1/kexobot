@@ -28,7 +28,7 @@ Discord python bot which is used for:
 ## Acknowledgments
 
 * the.om - Thank you for helping me to manage embed timeouts, and fix py-cord and wavelink compability problems in docker.
-* dsafxP - Your project SFDServerBrowser inspired me to implement it into my BOT.
+* dsafxP - Your project SFDServerBrowser inspired me to implement it into my bot.
 * chillymosh - Thank you for helping me fix wavelink errors.
 
 

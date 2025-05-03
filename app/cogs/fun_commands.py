@@ -28,7 +28,7 @@ from app.constants import (
 from app.response_handler import send_response
 from app.utils import (
     load_text_file,
-    get_selected_user_data,
+    get_user_data,
 )
 
 
@@ -173,10 +173,10 @@ class FunCommands(commands.Cog):
         self.temp_user_data[user_id]["reddit"]["search_limit"] += 1
 
     async def _load_user_data(self, ctx: discord.ApplicationContext) -> tuple:
-        user_data, temp_user_data = await get_selected_user_data(
-            self.bot, ctx, "reddit"
+        user_data, temp_user_data = await get_user_data(
+            self.bot, ctx,
         )
-        return user_data, temp_user_data
+        return user_data['reddit'], temp_user_data['reddit']
 
     async def _create_reddit_embed(
         self, submission: asyncpraw.reddit.Submission
