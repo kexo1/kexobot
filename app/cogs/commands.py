@@ -11,7 +11,6 @@ import discord
 import wavelink
 from discord.commands import slash_command, guild_only, option
 from discord.ext import commands
-from discord.utils import escape_markdown
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.__init__ import __version__
@@ -24,10 +23,6 @@ from app.constants import (
     SFD_TIMEZONE_CHOICE,
     SHITPOST_SUBREDDITS_ALL,
     SUPPORTED_PLATFORMS,
-    HUMOR_SECRET,
-    HUMOR_API_URL,
-    JOKE_API_URL,
-    DAD_JOKE_API_URL,
 )
 from app.response_handler import send_response
 from app.utils import (
@@ -36,9 +31,7 @@ from app.utils import (
     get_file_age,
     check_node_status,
     get_user_data,
-    get_guild_data,
     switch_node,
-    make_http_request,
 )
 
 host_authors = []
@@ -54,7 +47,6 @@ class CommandCog(commands.Cog):
         self.user_data_db: AsyncIOMotorClient = self.bot.user_data_db
         self.user_data: dict = self.bot.user_data
         self.temp_user_data: dict = self.bot.temp_user_data
-        self.guild_temp_data: dict = self.bot.guild_temp_data
 
         self.run_time = time.time()
         self.graphs_dir = os.path.join(os.getcwd(), "graphs")
@@ -257,57 +249,6 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Current Map", value="\n".join(servers_dict["maps"]))
         embed.add_field(name="Players", value="\n".join(servers_dict["players"]))
         await ctx.respond(embed=embed)
-
-    # -------------------- Joke commands -------------------- #
-    @slash_command(name="joke", description="Fetches random joke.")
-    @commands.cooldown(1, 3, commands.BucketType.user)
-    async def joke(self, ctx: discord.ApplicationContext) -> None:
-        _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
-        guild_jokes = temp_guild_data["jokes"]
-
-        if not guild_jokes["loaded_jokes"]:
-            await ctx.defer()
-            guild_jokes["loaded_jokes"] = await self._get_jokes(
-                guild_jokes["viewed_jokes"]
-            )
-            if not guild_jokes["loaded_jokes"]:
-                await send_response(ctx, "JOKE_TIMEOUT")
-                return
-            random.shuffle(guild_jokes["loaded_jokes"])
-
-        joke = guild_jokes["loaded_jokes"].pop(0)
-        guild_jokes["viewed_jokes"].append(joke)
-        temp_guild_data["jokes"] = guild_jokes
-        self.bot.temp_guild_data[ctx.guild_id] = temp_guild_data
-
-        joke = escape_markdown(joke)
-        await ctx.respond(joke)
-
-    @slash_command(
-        name="dad_joke", description="Fetches random dad joke.", guild_ids=[KEXO_SERVER]
-    )
-    @commands.cooldown(1, 3, commands.BucketType.user)
-    async def dad_joke(self, ctx: discord.ApplicationContext) -> None:
-        _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
-        guild_jokes = temp_guild_data["jokes"]
-
-        if not guild_jokes["loaded_dadjokes"]:
-            await ctx.defer()
-            guild_jokes["loaded_dadjokes"] = await self._get_dadjokes(
-                guild_jokes["viewed_jokes"]
-            )
-            if not guild_jokes["loaded_dadjokes"]:
-                await send_response(ctx, "JOKE_TIMEOUT")
-                return
-            random.shuffle(guild_jokes["loaded_dadjokes"])
-
-        joke = guild_jokes["loaded_dadjokes"].pop(0)
-        guild_jokes["viewed_jokes"].append(joke)
-        temp_guild_data["jokes"] = guild_jokes
-        self.bot.temp_guild_data[ctx.guild_id] = temp_guild_data
-
-        joke = escape_markdown(joke)
-        await ctx.respond(joke)
 
     @slash_sfd.command(name="server_info", description="Find searched server.")
     @option("server", description="Server name.")
@@ -657,91 +598,6 @@ class CommandCog(commands.Cog):
         await send_response(
             ctx, "DB_REMOVED", to_remove=to_remove, collection_name=collection_name
         )
-
-    async def _get_jokes(self, viewed_jokes: list[str]) -> list[str] | None:
-        joke_categories = ["racist", "jewish"]
-        fetched_jokes: list[str] = []
-        # Humor API
-        if not self.bot.humor_api_exahusted:
-            for joke_type in joke_categories:
-                jokes = await make_http_request(
-                    self.session,
-                    HUMOR_API_URL
-                    + f"{joke_type}&api-key={HUMOR_SECRET}&max-length=256",
-                    retries=3,
-                )
-                if not jokes:
-                    self.bot.humor_api_exahusted = True
-                    break
-
-                quota_left = jokes.headers.get("x-api-quota-left")
-                print(f"Quota left: {quota_left}")
-                if quota_left == "2":
-                    self.bot.humor_api_exahusted = True
-
-                jokes = jokes.json()
-                if not jokes.get("jokes"):
-                    self.bot.humor_api_exahusted = True
-                    break
-
-                for joke in jokes["jokes"]:
-                    if joke.get("joke") in viewed_jokes:
-                        continue
-                    fetched_jokes.append(joke.get("joke"))
-        # JokeAPI
-        jokes = await make_http_request(
-            self.session,
-            JOKE_API_URL,
-            retries=3,
-            get_json=True,
-        )
-        if not jokes:
-            return fetched_jokes
-
-        if jokes.get("error"):
-            return fetched_jokes
-
-        jokes = jokes.get("jokes")
-        if not jokes:
-            return fetched_jokes
-
-        for joke in jokes:
-            joke = (
-                f"{joke.get('setup')}\n{joke.get('delivery')}"
-                if joke.get("type") == "twopart"
-                else joke.get("joke")
-            )
-            if joke in viewed_jokes:
-                continue
-
-            fetched_jokes.append(joke)
-
-        return fetched_jokes
-
-    async def _get_dadjokes(self, viewed_jokes: list[str]) -> list[str] | None:
-        fetched_jokes: list[str] = []
-        jokes = await make_http_request(
-            self.session,
-            DAD_JOKE_API_URL,
-            retries=3,
-            headers={"Accept": "application/json"},
-            get_json=True,
-        )
-        if not jokes:
-            return None
-
-        jokes = jokes.get("results")
-        if not jokes:
-            return None
-
-        for joke in jokes:
-            joke = joke.get("joke")
-            if joke in viewed_jokes:
-                continue
-
-            fetched_jokes.append(joke)
-
-        return fetched_jokes
 
 
 class HostView(discord.ui.View):

@@ -15,13 +15,17 @@ from asyncprawcore.exceptions import (
 from discord import option
 from discord.commands import slash_command
 from discord.ext import commands
+from discord.utils import escape_markdown
 from pycord.multicog import subcommand
 
 from app.constants import (
     ROAST_COMMANDS_MSG,
     IMGFLIP_PASSWORD,
     IMGFLIP_USERNAME,
-    KYS_MESSAGES,
+    HUMOR_API_URL,
+    JOKE_API_URL,
+    DAD_JOKE_API_URL,
+    JOKE_EXCLUDED_WORDS,
     KEXO_SERVER,
     SISKA_GANG_SERVER,
 )
@@ -29,6 +33,8 @@ from app.response_handler import send_response
 from app.utils import (
     load_text_file,
     get_user_data,
+    get_guild_data,
+    make_http_request,
 )
 
 
@@ -37,11 +43,16 @@ class FunCommands(commands.Cog):
         self.bot = bot
         self.bot_config = self.bot.bot_config
         self.user_data_db = self.bot.user_data_db
+        self.guild_temp_data: dict = self.bot.guild_temp_data
 
         self.user_data = self.bot.user_data
         self.temp_user_data = self.bot.temp_user_data
         self.reddit_agent = self.bot.reddit_agent
         self.session: httpx.AsyncClient = self.bot.session
+
+        self.loaded_jokes: list[str] = self.bot.loaded_jokes
+        self.loaded_dad_jokes: list[str] = self.bot.loaded_dad_jokes
+        self.loaded_yo_mama_jokes: list[str] = self.bot.loaded_yo_mama_jokes
 
         self.topstropscreenshot = load_text_file("topstropscreenshot")
         self.kotrmelce = load_text_file("kotrmelec")
@@ -75,6 +86,90 @@ class FunCommands(commands.Cog):
     )
     async def roast(self, ctx: discord.ApplicationContext) -> None:
         await ctx.respond(ROAST_COMMANDS_MSG)
+
+    # -------------------- Joke commands -------------------- #
+    @slash_command(name="joke", description="Fetches random joke.")
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def joke(self, ctx: discord.ApplicationContext) -> None:
+        _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
+
+        if len(temp_guild_data["jokes"]["viewed_jokes"]) % 10 == 0:
+            await ctx.defer()
+            jokes = await self._get_jokes()
+            if not jokes:
+                await send_response(ctx, "JOKE_TIMEOUT")
+                return
+
+            self.loaded_jokes.extend(jokes)
+            random.shuffle(self.loaded_jokes)
+
+        for joke in self.loaded_jokes:
+            if joke in temp_guild_data["jokes"]["viewed_jokes"]:
+                continue
+            break
+
+        temp_guild_data["jokes"]["viewed_jokes"].append(joke)
+        self.bot.temp_guild_data[ctx.guild_id] = temp_guild_data
+
+        joke = escape_markdown(joke)
+        await ctx.respond(joke)
+
+    @slash_command(name="dad_joke", description="Fetches random dad joke.")
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def dad_joke(self, ctx: discord.ApplicationContext) -> None:
+        _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
+        if len(temp_guild_data["jokes"]["viewed_dad_jokes"]) % 10 == 0:
+            await ctx.defer()
+            jokes = await self._get_dadjokes()
+            if not jokes:
+                await send_response(ctx, "JOKE_TIMEOUT")
+                return
+
+            self.loaded_dad_jokes.extend(jokes)
+            random.shuffle(self.loaded_dad_jokes)
+
+        for joke in self.loaded_dad_jokes:
+            if joke in temp_guild_data["jokes"]["viewed_dad_jokes"]:
+                continue
+            break
+
+        temp_guild_data["jokes"]["viewed_dad_jokes"].append(joke)
+        self.bot.temp_guild_data[ctx.guild_id] = temp_guild_data
+
+        joke = escape_markdown(joke)
+        await ctx.respond(joke)
+
+    @slash_command(
+        name="yo_mama",
+        description="Yo mama joke on a discord member.",
+    )
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @option("member", description="Discord member.")
+    async def yo_mama(
+        self, ctx: discord.ApplicationContext, member: discord.Member
+    ) -> None:
+        _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
+        if len(temp_guild_data["jokes"]["viewed_yo_mama_jokes"]) % 10 == 0:
+            await ctx.defer()
+            jokes = await self._get_yo_mama_jokes()
+            if not jokes:
+                await send_response(ctx, "JOKE_TIMEOUT")
+                return
+
+            self.loaded_yo_mama_jokes.extend(jokes)
+            random.shuffle(self.loaded_yo_mama_jokes)
+
+        for joke in self.loaded_yo_mama_jokes:
+            if joke in temp_guild_data["jokes"]["viewed_yo_mama_jokes"]:
+                continue
+            break
+
+        temp_guild_data["jokes"]["viewed_yo_mama_jokes"].append(joke)
+        self.bot.temp_guild_data[ctx.guild_id] = temp_guild_data
+
+        joke = joke[0].lower() + joke[1:]
+        joke = escape_markdown(joke)
+        await ctx.respond(member.mention + " " + joke)
 
     @slash_command(name="spam", description="Spams words, max is 50.  (Admin)")
     @discord.default_permissions(administrator=True)
@@ -234,6 +329,151 @@ class FunCommands(commands.Cog):
             return False
 
         return True
+
+    async def _get_jokes(self) -> list[str] | None:
+        fetched_jokes: list[str] = []
+        jokes = await self._get_humor_api_jokes()
+        if jokes:
+            fetched_jokes.extend(jokes)
+
+        jokes = await self._get_joke_api_jokes()
+        if jokes:
+            fetched_jokes.extend(jokes)
+
+        return fetched_jokes
+
+    async def _get_dadjokes(self) -> list[str] | None:
+        fetched_jokes: list[str] = []
+        response = await make_http_request(
+            self.session,
+            DAD_JOKE_API_URL,
+            retries=3,
+            headers={"Accept": "application/json"},
+            get_json=True,
+        )
+        if not response:
+            return None
+
+        jokes = response.get("results")
+        if not jokes:
+            return None
+
+        for joke in jokes:
+            joke = joke.get("joke")
+            if joke in self.loaded_dad_jokes:
+                continue
+
+            fetched_jokes.append(joke)
+        return fetched_jokes
+
+    async def _get_yo_mama_jokes(self) -> list[str] | None:
+        token = self._load_humor_api_token()
+        fetched_jokes: list[str] = []
+        if self.bot.humor_api_tokens[token]["exhausted"]:
+            return None
+
+        for _ in range(len(self.bot.humor_api_tokens)):
+            response = await make_http_request(
+                self.session,
+                HUMOR_API_URL + f"yo_mama&api-key={token}&max-length=256",
+            )
+            token = self.is_token_exhausted(response, token)
+            if not token:
+                continue
+            break
+
+        jokes = response.json()
+        for joke in jokes["jokes"]:
+            if joke.get("joke") in self.loaded_yo_mama_jokes:
+                continue
+
+            fetched_jokes.append(joke.get("joke"))
+
+        return fetched_jokes
+
+    async def _get_joke_api_jokes(self) -> list[str] | None:
+        fetched_jokes: list[str] = []
+        response = await make_http_request(
+            self.session,
+            JOKE_API_URL,
+            get_json=True,
+        )
+        if not response:
+            return None
+
+        if response.get("error"):
+            return None
+
+        jokes = response.get("jokes")
+        if not jokes:
+            return None
+
+        for joke in jokes:
+            joke = (
+                f"{joke.get('setup')}\n{joke.get('delivery')}"
+                if joke.get("type") == "twopart"
+                else joke.get("joke")
+            )
+            if joke in self.loaded_jokes:
+                continue
+
+            is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke]
+            if is_filtered:
+                continue
+
+            fetched_jokes.append(joke)
+
+        return fetched_jokes
+
+    async def _get_humor_api_jokes(self) -> list[str] | None:
+        token = self._load_humor_api_token()
+        fetched_jokes: list[str] = []
+        if self.bot.humor_api_tokens[token]["exhausted"]:
+            return None
+
+        for joke_type in ["racist", "jewish"]:
+            for _ in range(len(self.bot.humor_api_tokens)):
+                response = await make_http_request(
+                    self.session,
+                    HUMOR_API_URL + f"{joke_type}&api-key={token}&max-length=256",
+                    retries=3,
+                )
+                token = self.is_token_exhausted(response, token)
+                if not token:
+                    continue
+                break
+
+            jokes = response.json()
+            for joke in jokes["jokes"]:
+                if joke.get("joke") in self.loaded_jokes:
+                    continue
+
+                is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.get("joke")]
+                if is_filtered:
+                    continue
+
+                fetched_jokes.append(joke.get("joke"))
+
+        return fetched_jokes
+
+    def _load_humor_api_token(self) -> str | None:
+        for token in self.bot.humor_api_tokens:
+            if self.bot.humor_api_tokens[token].get("exhausted"):
+                continue
+            return token
+        return None
+
+    def is_token_exhausted(self, response: httpx.Response, token) -> str | None:
+        if not response:
+            self.bot.humor_api_tokens[token]["exhausted"] = True
+            return self._load_humor_api_token()
+
+        quota_left = response.headers.get("x-api-quota-left")
+        if quota_left == "0":
+            self.bot.humor_api_tokens[token]["exhausted"] = True
+            return self._load_humor_api_token()
+
+        return token
 
     @staticmethod
     async def _send_multiple_images(

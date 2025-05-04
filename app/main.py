@@ -37,6 +37,7 @@ from app.constants import (
     ESUTAZE_CHANNEL,
     GAME_UPDATES_CHANNEL,
     FREE_STUFF_CHANNEL,
+    HUMOR_API_SECRET,
     KEXO_SERVER,
 )
 from app.utils import get_guild_data, is_older_than, generate_temp_guild_data
@@ -97,7 +98,10 @@ class KexoBot:
         bot.get_avaiable_nodes = self.get_avaiable_nodes
         bot.guild_temp_data = self.guild_temp_data
         # Other
-        bot.humor_api_exahusted = False
+        bot.humor_api_tokens = {}
+        bot.loaded_jokes = []
+        bot.loaded_dad_jokes = []
+        bot.loaded_yo_mama_jokes = []
 
         # Initialize class variables
         self.reddit_fetcher = None | RedditFetcher
@@ -115,6 +119,7 @@ class KexoBot:
         await self._fetch_users()
         await self._fetch_channels()
         await self._fetch_subreddit_icons()
+        self._load_humor_api_tokens()
         self._create_session()
         self._define_classes()
         bot.sfd_servers = self.sfd_servers
@@ -142,6 +147,15 @@ class KexoBot:
         subreddit_icons = await self.bot_config.find_one(DB_CACHE)
         bot.subreddit_icons = subreddit_icons["subreddit_icons"]
         print("Subreddit icons fetched.")
+
+    @staticmethod
+    def _load_humor_api_tokens() -> None:
+        """Load the humor API tokens."""
+        bot.humor_api_tokens = {}
+        for token in HUMOR_API_SECRET:
+            bot.humor_api_tokens[token] = {
+                "exhausted": False,
+            }
 
     def _define_classes(self) -> None:
         """Define classes for the bot."""
@@ -229,9 +243,12 @@ class KexoBot:
             self._clear_temp_reddit_data()
 
         if now.hour == 0:
-            bot.humor_api_exahusted = False
+            bot.loaded_jokes = []
+            bot.loaded_dad_jokes = []
+            bot.loaded_yo_mama_jokes = []
             self.offline_lavalink_servers: list[str] = []
             self._clear_temp_guild_data()
+            self._load_humor_api_tokens()
 
         self.lavalink_servers = await self.lavalink_server_manager.get_lavalink_servers(
             self.offline_lavalink_servers

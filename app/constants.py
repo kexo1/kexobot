@@ -184,7 +184,35 @@ What?!
 https://www.youtube.com/watch?v=6gJ6VEG8Y4I"""
 IMGFLIP_USERNAME = os.getenv("IMGFLIP_USERNAME")
 IMGFLIP_PASSWORD = os.getenv("IMGFLIP_PASSWORD")
-HUMOR_SECRET = os.getenv("HUMOR_SECRET")
+HUMOR_API_SECRET = os.getenv("HUMOR_API_TOKENS").split(":")
+JOKE_API_URL = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark?amount=10"
+HUMOR_API_URL = "https://api.humorapi.com/jokes/search?number=10&include-tags="
+DAD_JOKE_API_URL = "https://icanhazdadjoke.com/search?limit=10"
+JOKE_EXCLUDED_WORDS = [
+    "muslim",
+    "islam",
+    "allah",
+    "quran",
+    "muhammad",
+    "imam",
+    "mosque",
+    "ramadan",
+    "eid",
+    "sharia",
+    "mecca",
+    "hijab",
+    "burqa",
+    "jihad",
+    "halal",
+    "prophet",
+    "religion",
+    "god",
+    "faith",
+    "prayer",
+    "holy",
+    "scripture",
+    "divine",
+]
 KYS_MESSAGES = (
     "Kys",
     "Skap",
@@ -380,8 +408,3 @@ RADIOGARDEN_PLACES_URL = "https://radio.garden/api/ara/content/places"
 RADIOGARDEN_PAGE_URL = "https://radio.garden/api/ara/content/page/"
 RADIOGARDEN_SEARCH_URL = "https://radio.garden/api/search?q="
 RADIOGARDEN_LISTEN_URL = "https://radio.garden/api/ara/content/listen/"
-
-# -------------------- Jokes -------------------- #
-JOKE_API_URL = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark?amount=10"
-HUMOR_API_URL = "https://api.humorapi.com/jokes/search?number=10&include-tags="
-DAD_JOKE_API_URL = "https://icanhazdadjoke.com/search?limit=10"

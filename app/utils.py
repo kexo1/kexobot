@@ -196,8 +196,8 @@ def generate_temp_guild_data() -> dict:
         "lavalink_server_pos": 0,
         "jokes": {
             "viewed_jokes": [],
-            "loaded_jokes": [],
-            "loaded_dadjokes": [],
+            "viewed_dad_jokes": [],
+            "viewed_yo_mama_jokes": [],
         },
     }
 
