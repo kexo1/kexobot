@@ -229,7 +229,7 @@ class KexoBot:
             self._clear_temp_reddit_data()
 
         if now.hour == 0:
-            self.bot.humor_api_exahusted = False
+            bot.humor_api_exahusted = False
             self.offline_lavalink_servers: list[str] = []
             self._clear_temp_guild_data()
 

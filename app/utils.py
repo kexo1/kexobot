@@ -46,7 +46,7 @@ def get_memory_usage():
 
 
 async def download_video(
-        session: httpx.AsyncClient, url: str, nsfw: bool
+    session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> Optional[discord.File]:
     video_folder = os.path.join(os.getcwd(), "video")
     os.makedirs(video_folder, exist_ok=True)
@@ -70,7 +70,7 @@ async def download_video(
 
 
 async def check_node_status(
-        bot: discord.Bot, uri: str, password: str
+    bot: discord.Bot, uri: str, password: str
 ) -> Optional[wavelink.Node]:
     node = [
         wavelink.Node(
@@ -84,10 +84,10 @@ async def check_node_status(
         await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=3)
         await node[0].fetch_info()
     except (
-            asyncio.TimeoutError,
-            wavelink.exceptions.NodeException,
-            wavelink.LavalinkException,
-            aiohttp.NonHttpUrlClientError,
+        asyncio.TimeoutError,
+        wavelink.exceptions.NodeException,
+        wavelink.LavalinkException,
+        aiohttp.NonHttpUrlClientError,
     ):
         return None
     return node[0]
@@ -146,9 +146,9 @@ def find_track(player: wavelink.Player, to_find: str) -> Optional[int]:
 
 
 async def switch_node(
-        connect_node: Callable[[], wavelink.Node],
-        player: wavelink.Player,
-        play_after: bool = True,
+    connect_node: Callable[[], wavelink.Node],
+    player: wavelink.Player,
+    play_after: bool = True,
 ) -> wavelink.Node | None:
     """
     Attempt to switch to a new node for audio playback.
@@ -177,8 +177,8 @@ async def switch_node(
             await player.text_channel.send(embed=embed)
             return node
         except (
-                wavelink.LavalinkException,
-                wavelink.InvalidNodeException,
+            wavelink.LavalinkException,
+            wavelink.InvalidNodeException,
         ):
             pass
 
@@ -194,20 +194,24 @@ async def switch_node(
 def generate_temp_guild_data() -> dict:
     return {
         "lavalink_server_pos": 0,
-        "viewed_jokes": set(),
+        "jokes": {
+            "viewed_jokes": [],
+            "loaded_jokes": [],
+            "loaded_dadjokes": [],
+        },
     }
 
 
 def generate_guild_data() -> dict:
     return {
-        "autoplay_mode": 1,
-        "volume": 100,
+        "music": {
+            "autoplay_mode": 1,
+            "volume": 100,
+        },
     }
 
 
-async def generate_temp_user_data(
-        bot: discord.Bot, user_id: int
-) -> dict:
+async def generate_temp_user_data(bot: discord.Bot, user_id: int) -> dict:
     multireddit: asyncpraw.models.Multireddit = await bot.reddit_agent.multireddit(
         name=str(user_id), redditor="KexoBOT"
     )
@@ -263,7 +267,7 @@ def fix_guild_data(old_data: dict) -> dict:
 
 
 def fix_data(
-        fixed_data: Dict[str, Any], generator: Callable[[], Dict[str, Any]]
+    fixed_data: Dict[str, Any], generator: Callable[[], Dict[str, Any]]
 ) -> Dict[str, Any]:
     """Generic function to fix data by adding missing keys and values from a generator.
 
@@ -287,9 +291,7 @@ def fix_data(
     return fixed_data
 
 
-async def get_user_data(
-        bot: discord.Bot, ctx: discord.ApplicationContext
-) -> tuple:
+async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tuple:
     user_id = ctx.author.id
     user_data: dict = bot.user_data.get(user_id)
 
@@ -302,27 +304,19 @@ async def get_user_data(
     if user_data:
         fixed_data = fix_user_data(user_data)
         bot.user_data[user_id] = fixed_data
-        temp_user_data = await generate_temp_user_data(
-            bot, user_id
-        )
+        temp_user_data = await generate_temp_user_data(bot, user_id)
     else:  # If not in DB, create new user data
         user_data = generate_user_data()
         print("Creating new user data for user:", await bot.fetch_user(user_id))
-        await bot.user_data_db.insert_one(
-            {"_id": user_id, **user_data}
-        )
+        await bot.user_data_db.insert_one({"_id": user_id, **user_data})
         bot.user_data[user_id] = user_data
 
-        temp_user_data = await generate_temp_user_data(
-            bot, user_id
-        )
+        temp_user_data = await generate_temp_user_data(bot, user_id)
     bot.temp_user_data[user_id] = temp_user_data
     return user_data, temp_user_data
 
 
-async def get_guild_data(
-        bot: discord.Bot, guild_id: int
-) -> tuple:
+async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple:
     guild_data: dict = bot.guild_data.get(guild_id)
 
     if guild_data:
@@ -337,9 +331,7 @@ async def get_guild_data(
         guild_data = generate_guild_data()
         guild_name = await bot.fetch_guild(guild_id)
         print("Creating new guild data for server:", guild_name)
-        await bot.guild_data_db.insert_one(
-            {"_id": guild_id, **guild_data}
-        )
+        await bot.guild_data_db.insert_one({"_id": guild_id, **guild_data})
         bot.guild_data[guild_id] = guild_data
         temp_guild_data = generate_temp_guild_data()
 
@@ -348,14 +340,14 @@ async def get_guild_data(
 
 
 async def make_http_request(
-        session: httpx.AsyncClient,
-        url: str,
-        data: Optional[Dict] = None,
-        headers: Optional[Dict] = None,
-        retries: int = 1,
-        timeout: float = 3.0,
-        get_json: bool = False,
-        binary: bool = False,
+    session: httpx.AsyncClient,
+    url: str,
+    data: Optional[Dict] = None,
+    headers: Optional[Dict] = None,
+    retries: int = 1,
+    timeout: float = 3.0,
+    get_json: bool = False,
+    binary: bool = False,
 ) -> Optional[httpx.Response]:
     """
     Make an HTTP request with retry logic.
@@ -391,10 +383,10 @@ async def make_http_request(
                 return response.json()
             return response
         except (
-                httpx.ReadTimeout,
-                httpx.TimeoutException,
-                httpx.ConnectError,
-                httpx.HTTPError,
+            httpx.ReadTimeout,
+            httpx.TimeoutException,
+            httpx.ConnectError,
+            httpx.HTTPError,
         ) as e:
             if attempt == retries - 1:
                 print(f"Request failed ({type(e).__name__}): ", url)

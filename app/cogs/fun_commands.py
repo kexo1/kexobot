@@ -174,9 +174,10 @@ class FunCommands(commands.Cog):
 
     async def _load_user_data(self, ctx: discord.ApplicationContext) -> tuple:
         user_data, temp_user_data = await get_user_data(
-            self.bot, ctx,
+            self.bot,
+            ctx,
         )
-        return user_data['reddit'], temp_user_data['reddit']
+        return user_data["reddit"], temp_user_data["reddit"]
 
     async def _create_reddit_embed(
         self, submission: asyncpraw.reddit.Submission

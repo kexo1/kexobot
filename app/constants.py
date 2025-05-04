@@ -382,5 +382,6 @@ RADIOGARDEN_SEARCH_URL = "https://radio.garden/api/search?q="
 RADIOGARDEN_LISTEN_URL = "https://radio.garden/api/ara/content/listen/"
 
 # -------------------- Jokes -------------------- #
-JOKE_API_URL = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark"
-HUMOR_API_URL = "https://api.humorapi.com/jokes/random?include-tags="
+JOKE_API_URL = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark?amount=10"
+HUMOR_API_URL = "https://api.humorapi.com/jokes/search?number=10&include-tags="
+DAD_JOKE_API_URL = "https://icanhazdadjoke.com/search?limit=10"
