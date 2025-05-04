@@ -92,8 +92,10 @@ class FunCommands(commands.Cog):
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def joke(self, ctx: discord.ApplicationContext) -> None:
         _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
+        viewed_count = len(temp_guild_data["jokes"]["viewed_jokes"])
+        loaded_count = len(self.loaded_yo_mama_jokes)
 
-        if len(temp_guild_data["jokes"]["viewed_jokes"]) % 10 == 0:
+        if (viewed_count == 0 and loaded_count == 0) or (viewed_count % 10 == 0 and viewed_count != 0):
             await ctx.defer()
             jokes = await self._get_jokes()
             if not jokes:
@@ -118,7 +120,10 @@ class FunCommands(commands.Cog):
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def dad_joke(self, ctx: discord.ApplicationContext) -> None:
         _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
-        if len(temp_guild_data["jokes"]["viewed_dad_jokes"]) % 10 == 0:
+        viewed_count = len(temp_guild_data["jokes"]["viewed_dad_jokes"])
+        loaded_count = len(self.loaded_yo_mama_jokes)
+
+        if (viewed_count == 0 and loaded_count == 0) or (viewed_count % 10 == 0 and viewed_count != 0):
             await ctx.defer()
             jokes = await self._get_dadjokes()
             if not jokes:
@@ -149,7 +154,10 @@ class FunCommands(commands.Cog):
         self, ctx: discord.ApplicationContext, member: discord.Member
     ) -> None:
         _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
-        if len(temp_guild_data["jokes"]["viewed_yo_mama_jokes"]) % 10 == 0:
+        viewed_count = len(temp_guild_data["jokes"]["viewed_yo_mama_jokes"])
+        loaded_count = len(self.loaded_yo_mama_jokes)
+
+        if (viewed_count == 0 and loaded_count == 0) or (viewed_count % 10 == 0 and viewed_count != 0):
             await ctx.defer()
             jokes = await self._get_yo_mama_jokes()
             if not jokes:
