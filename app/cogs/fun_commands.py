@@ -93,9 +93,9 @@ class FunCommands(commands.Cog):
     async def joke(self, ctx: discord.ApplicationContext) -> None:
         _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_jokes"])
-        loaded_count = len(self.loaded_yo_mama_jokes)
+        loaded_count = len(self.loaded_jokes)
 
-        if (viewed_count == 0 and loaded_count == 0) or (viewed_count % 10 == 0 and viewed_count != 0):
+        if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
             await ctx.defer()
             jokes = await self._get_jokes()
             if not jokes:
@@ -121,9 +121,9 @@ class FunCommands(commands.Cog):
     async def dad_joke(self, ctx: discord.ApplicationContext) -> None:
         _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_dad_jokes"])
-        loaded_count = len(self.loaded_yo_mama_jokes)
+        loaded_count = len(self.loaded_dad_jokes)
 
-        if (viewed_count == 0 and loaded_count == 0) or (viewed_count % 10 == 0 and viewed_count != 0):
+        if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
             await ctx.defer()
             jokes = await self._get_dadjokes()
             if not jokes:
@@ -157,7 +157,7 @@ class FunCommands(commands.Cog):
         viewed_count = len(temp_guild_data["jokes"]["viewed_yo_mama_jokes"])
         loaded_count = len(self.loaded_yo_mama_jokes)
 
-        if (viewed_count == 0 and loaded_count == 0) or (viewed_count % 10 == 0 and viewed_count != 0):
+        if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
             await ctx.defer()
             jokes = await self._get_yo_mama_jokes()
             if not jokes:
@@ -387,6 +387,7 @@ class FunCommands(commands.Cog):
             )
             token = self.is_token_exhausted(response, token)
             if not token:
+                token = self._load_humor_api_token()
                 continue
             break
 
@@ -425,7 +426,7 @@ class FunCommands(commands.Cog):
             if joke in self.loaded_jokes:
                 continue
 
-            is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke]
+            is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.lower()]
             if is_filtered:
                 continue
 
@@ -448,6 +449,7 @@ class FunCommands(commands.Cog):
                 )
                 token = self.is_token_exhausted(response, token)
                 if not token:
+                    token = self._load_humor_api_token()
                     continue
                 break
 
@@ -456,7 +458,7 @@ class FunCommands(commands.Cog):
                 if joke.get("joke") in self.loaded_jokes:
                     continue
 
-                is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.get("joke")]
+                is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.get("joke").lower()]
                 if is_filtered:
                     continue
 
@@ -474,12 +476,12 @@ class FunCommands(commands.Cog):
     def is_token_exhausted(self, response: httpx.Response, token) -> str | None:
         if not response:
             self.bot.humor_api_tokens[token]["exhausted"] = True
-            return self._load_humor_api_token()
+            return None
 
         quota_left = response.headers.get("x-api-quota-left")
         if quota_left == "0":
             self.bot.humor_api_tokens[token]["exhausted"] = True
-            return self._load_humor_api_token()
+            return None
 
         return token
 

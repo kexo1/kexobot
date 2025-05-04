@@ -206,12 +206,12 @@ JOKE_EXCLUDED_WORDS = [
     "halal",
     "prophet",
     "religion",
-    "god",
     "faith",
     "prayer",
     "holy",
     "scripture",
     "divine",
+    "jesus",
 ]
 KYS_MESSAGES = (
     "Kys",
