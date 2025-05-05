@@ -1,16 +1,17 @@
 import logging
-import socket
 import os
 import re
+import socket
 
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
 
+# -------------------- Logging Configuration -------------------- #
 logging.basicConfig(level=logging.CRITICAL)
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
 
-
+# -------------------- Environment Configuration -------------------- #
 LOCAL_MACHINE_NAME = "mato"
 if socket.gethostname() == LOCAL_MACHINE_NAME:
     load_dotenv(os.getenv("SECRET_PATH"))
@@ -18,48 +19,17 @@ if socket.gethostname() == LOCAL_MACHINE_NAME:
 else:
     DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
-# -------------------- Discord -------------------- #
-ESUTAZE_CHANNEL = 1302271245919981638
-GAME_UPDATES_CHANNEL = 882185054174994462
-FREE_STUFF_CHANNEL = 1081883673902714953
+# -------------------- Discord Channel IDs -------------------- #
 KEXO_SERVER = 692810367851692032
 SISKA_GANG_SERVER = 765262686908186654
 XTC_SERVER = 723197287861583885
 DUCK_CULT = 484047204202446858
+ESUTAZE_CHANNEL = 1302271245919981638
+GAME_UPDATES_CHANNEL = 882185054174994462
+FREE_STUFF_CHANNEL = 1081883673902714953
+ALIENWARE_ARENA_NEWS_CHANNEL = 1368937624496115853
 
-# -------------------- Lavalink -------------------- #
-LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
-LAVAINFO_GITHUB_URL = (
-    "https://raw.githubusercontent.com/appujet/lavalink-list/refs/heads/main/nodes.json"
-)
-# -------------------- SFD Servers -------------------- #
-SFD_SERVER_URL = "https://mythologicinteractive.com/SFDGameServices.asmx"
-SFD_REQUEST = """<?xml version='1.0' encoding='utf-8'?>
-    <soap12:Envelope xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
-     xmlns:xsd='http://www.w3.org/2001/XMLSchema' xmlns:soap12='http://www.w3.org/2003/05/soap-envelope'>
-        <soap12:Body>
-            <GetGameServers xmlns='https://mythologicinteractive.com/Games/SFD/'>
-                <validationToken></validationToken>
-            </GetGameServers>
-        </soap12:Body>
-    </soap12:Envelope>"""
-SFD_HEADERS = {
-    "Content-Type": "application/soap+xml; charset=utf-8",
-    "SOAPAction": "https://mythologicinteractive.com/Games/SFD/GetGameServers",
-}
-TIMEZONES = {
-    "New_York": "America/New_York",
-    "London": "Europe/London",
-    "Tokyo": "Asia/Tokyo",
-    "Shanghai": "Asia/Shanghai",
-    "Slovakia": "Europe/Bratislava",
-    "Russia": "Europe/Moscow",
-    "Spain": "Europe/Madrid",
-    "Italy": "Europe/Rome",
-}
-SFD_TIMEZONE_CHOICE = list(TIMEZONES.keys())
-
-# -------------------- MongoDB -------------------- #
+# -------------------- MongoDB Configuration -------------------- #
 MONGO_DB_URL = (
     f"mongodb+srv://{os.getenv('MONGO_KEY')}"
     f"@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
@@ -78,13 +48,23 @@ DB_CHOICES = {
     "AlienwareArena Exceptions": "alienwarearena_exceptions",
 }
 
-# -------------------- Reddit -------------------- #
+# -------------------- Reddit Configuration -------------------- #
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
 REDDIT_SECRET = os.getenv("REDDIT_SECRET")
 REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT")
 REDDIT_USERNAME = os.getenv("REDDIT_USERNAME")
 REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD")
 REDDIT_STRIP = (" *", "* ", "*", "---")
+REDDIT_FREEGAME_MAX_POSTS = 5
+REDDIT_CRACKWATCH_POSTS = 5
+
+REDDIT_FREEGAME_ICON = (
+    "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png"
+)
+REDDIT_CRACKWATCH_ICON = (
+    "https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
+)
+
 REDDIT_FREEGAME_EMBEDS = {
     "Default": {
         "title": "",
@@ -105,16 +85,8 @@ REDDIT_FREEGAME_EMBEDS = {
         "/X3K4HfYdxmascX5mRFikhuv8w8BYvg1Ny_R4ndNhF1C7GgjPeIKfROvbcOcjhafFmLdl",
     },
 }
-REDDIT_FREEGAME_MAX_POSTS = 5
-REDDIT_FREEGAME_ICON = (
-    "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png"
-)
-REDDIT_CRACKWATCH_POSTS = 5
-REDDIT_CRACKWATCH_ICON = (
-    "https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
-)
 
-# -------------------- Game3rb -------------------- #
+# -------------------- Game3rb Configuration -------------------- #
 GAME3RB_URL = "https://game3rb.com/category/games-online/"
 GAME3RB_ICON = (
     "https://media.discordapp.net/attachments/796453724713123870"
@@ -147,7 +119,7 @@ GAME3RB_STRIP = (
     ")",
 )
 
-# -------------------- Online-Fix -------------------- #
+# -------------------- Online-Fix Configuration -------------------- #
 ONLINEFIX_MAX_GAMES = 10
 ONLINEFIX_URL = "https://online-fix.me/chat.php"
 ONLINEFIX_ICON = (
@@ -155,28 +127,59 @@ ONLINEFIX_ICON = (
     "796453724713123870/1035951759505506364/favicon-1.png"
 )
 
-# -------------------- Alienwarearena -------------------- #
+# -------------------- AlienwareArena Configuration -------------------- #
 ALIENWAREARENA_MAX_POSTS = 3
 ALIENWAREARENA_URL = "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
+ALIENWAREARENA_NEWS_URL = "https://eu.alienwarearena.com/relay/my-feed"
 ALIENWAREARENA_STRIP = ("Key", "Giveaway", "Steam Game")
+ALIENWAREARENA_ICON = "https://www.pngarts.com/files/12/Alienware-PNG-Photo.png"
 
-# -------------------- Fanatical -------------------- #
+# -------------------- Fanatical Configuration -------------------- #
 FANATICAL_MAX_POSTS = 3
 FANATICAL_URL = "https://www.fanatical.com/api/all-promotions/en"
 FANATICAL_IMG_URL = "https://cdn-ext.fanatical.com/production/product/1280x720/"
 
-# -------------------- Elektrina vypadky -------------------- #
-ELEKTRINA_MAX_ARTICLES = 5
-ELEKTRINA_URL = "https://www.hliniknadhronom.sk/get_rss.php?id=1_atom_1947"
-ELEKTRINA_ICON = (
+# -------------------- Power Outages Configuration -------------------- #
+POWER_OUTAGES_MAX_ARTICLES = 5
+POWER_OUTAGES_URL = "https://www.hliniknadhronom.sk/get_rss.php?id=1_atom_1947"
+POWER_OUTAGES_ICON = (
     "https://www.hliniknadhronom.sk/portals_pictures/i_006868/i_6868718.png"
 )
 
-# -------------------- Esutaze -------------------- #
+# -------------------- Esutaze Configuration -------------------- #
 ESUTAZE_URL = "https://www.esutaze.sk/category/internetove-sutaze/feed/"
 ESUTAZE_ICON = "https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg"
 
-# -------------------- Fun Stuff -------------------- #
+# -------------------- SFD Game Configuration -------------------- #
+SFD_SERVER_URL = "https://mythologicinteractive.com/SFDGameServices.asmx"
+SFD_REQUEST = """<?xml version='1.0' encoding='utf-8'?>
+    <soap12:Envelope xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
+     xmlns:xsd='http://www.w3.org/2001/XMLSchema' xmlns:soap12='http://www.w3.org/2003/05/soap-envelope'>
+        <soap12:Body>
+            <GetGameServers xmlns='https://mythologicinteractive.com/Games/SFD/'>
+                <validationToken></validationToken>
+            </GetGameServers>
+        </soap12:Body>
+    </soap12:Envelope>"""
+SFD_HEADERS = {
+    "Content-Type": "application/soap+xml; charset=utf-8",
+    "SOAPAction": "https://mythologicinteractive.com/Games/SFD/GetGameServers",
+}
+
+# -------------------- Timezone Configuration -------------------- #
+TIMEZONES = {
+    "New_York": "America/New_York",
+    "London": "Europe/London",
+    "Tokyo": "Asia/Tokyo",
+    "Shanghai": "Asia/Shanghai",
+    "Slovakia": "Europe/Bratislava",
+    "Russia": "Europe/Moscow",
+    "Spain": "Europe/Madrid",
+    "Italy": "Europe/Rome",
+}
+SFD_TIMEZONE_CHOICE = list(TIMEZONES.keys())
+
+# -------------------- Fun Stuff Configuration -------------------- #
 ROAST_COMMANDS_MSG = """Wassup, can a loc come up in your crib?
 Man fuck you, I'll see you at work
 Ah, nigga don't hate me cause I"m beautiful nigga
@@ -186,12 +189,12 @@ surgeon or lawyer she fucking with,
 Niggaaa...
 What?!
 https://www.youtube.com/watch?v=6gJ6VEG8Y4I"""
-IMGFLIP_USERNAME = os.getenv("IMGFLIP_USERNAME")
-IMGFLIP_PASSWORD = os.getenv("IMGFLIP_PASSWORD")
+
 HUMOR_API_SECRET = os.getenv("HUMOR_API_TOKENS").split(":")
 JOKE_API_URL = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark?amount=10"
 HUMOR_API_URL = "https://api.humorapi.com/jokes/search?number=10&include-tags="
 DAD_JOKE_API_URL = "https://icanhazdadjoke.com/search?limit=10"
+
 JOKE_EXCLUDED_WORDS = [
     "muslim",
     "islam",
@@ -217,14 +220,7 @@ JOKE_EXCLUDED_WORDS = [
     "divine",
     "jesus",
 ]
-KYS_MESSAGES = (
-    "Kys",
-    "Skap",
-    "Zdechni",
-    "Zahraj sa na luster",
-    "Choď pobozkať kolajnice keď príde vlak",
-    "Zec mi kar",
-)
+
 SHITPOST_SUBREDDITS_DEFAULT = (
     "discordVideos",
     "okbuddyretard",
@@ -232,6 +228,7 @@ SHITPOST_SUBREDDITS_DEFAULT = (
     "MemeVideos",
     "doodoofard",
 )
+
 SHITPOST_SUBREDDITS_ALL = (
     "discordVideos",
     "okbuddyretard",
@@ -247,7 +244,12 @@ SHITPOST_SUBREDDITS_ALL = (
     "197",
 )
 
-# -------------------- Music -------------------- #
+# -------------------- Music Configuration -------------------- #
+LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
+LAVAINFO_GITHUB_URL = (
+    "https://raw.githubusercontent.com/appujet/lavalink-list/refs/heads/main/nodes.json"
+)
+
 SOURCE_PATTERNS = [
     # YouTube Music (music.youtube.com URLs)
     (
@@ -357,6 +359,7 @@ SOURCE_PATTERNS = [
         "qbsearch",
     ),
 ]
+
 SUPPORTED_PLATFORMS = (
     "Youtube",
     "Youtube Music",
@@ -369,9 +372,11 @@ SUPPORTED_PLATFORMS = (
     "Tidal (unlikely)",
     "Qobuz (unlikely)",
 )
-DISCORD_LOGO = (
+
+DISCORD_ICONS = (
     "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
 )
+
 COUNTRIES = (
     "United States",
     "United Kingdom",
@@ -399,6 +404,7 @@ COUNTRIES = (
     "Slovakia",
     "Czech Republic",
 )
+
 SONG_STRIP = (
     ";",
     "*",
@@ -406,9 +412,10 @@ SONG_STRIP = (
     "http:",
     "/",
 )
-YOUTUBE_LOGO = "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
 
-# -------------------- RadioGarden -------------------- #
+YOUTUBE_ICON = "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
+
+# -------------------- RadioGarden Configuration -------------------- #
 RADIOGARDEN_PLACES_URL = "https://radio.garden/api/ara/content/places"
 RADIOGARDEN_PAGE_URL = "https://radio.garden/api/ara/content/page/"
 RADIOGARDEN_SEARCH_URL = "https://radio.garden/api/search?q="

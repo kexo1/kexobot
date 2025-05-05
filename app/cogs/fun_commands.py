@@ -1,12 +1,11 @@
 import random
 from datetime import datetime
+from typing import Optional
 
 import asyncpraw.models
 import asyncpraw.reddit
 import discord
 import httpx
-import imgflip
-import requests
 from asyncprawcore.exceptions import (
     AsyncPrawcoreException,
     ResponseException,
@@ -20,8 +19,6 @@ from pycord.multicog import subcommand
 
 from app.constants import (
     ROAST_COMMANDS_MSG,
-    IMGFLIP_PASSWORD,
-    IMGFLIP_USERNAME,
     HUMOR_API_URL,
     JOKE_API_URL,
     DAD_JOKE_API_URL,
@@ -39,29 +36,37 @@ from app.utils import (
 
 
 class FunCommands(commands.Cog):
+    """Fun commands for the bot.
+
+    This class contains various fun commands for the bot, including jokes,
+    memes, and other humorous content. It also handles the loading of jokes
+    from external APIs and manages the state of viewed jokes to avoid
+    repetition.
+
+    Parameters
+    ----------
+    bot: :class:`commands.Bot`
+        The bot instance that this cog is associated with.
+    """
+
     def __init__(self, bot: commands.Bot) -> None:
-        self.bot = bot
-        self.bot_config = self.bot.bot_config
-        self.user_data_db = self.bot.user_data_db
-        self.guild_temp_data: dict = self.bot.guild_temp_data
+        self._bot = bot
+        self._bot_config = self._bot.bot_config
+        self._user_data_db = self._bot.user_data_db
 
-        self.user_data = self.bot.user_data
-        self.temp_user_data = self.bot.temp_user_data
-        self.reddit_agent = self.bot.reddit_agent
-        self.session: httpx.AsyncClient = self.bot.session
+        self._user_data = self._bot.user_data
+        self._temp_user_data = self._bot.temp_user_data
+        self._temp_guild_data = self._bot.temp_guild_data
+        self._reddit_agent = self._bot.reddit_agent
+        self._session: httpx.AsyncClient = self._bot.session
 
-        self.loaded_jokes: list[str] = self.bot.loaded_jokes
-        self.loaded_dad_jokes: list[str] = self.bot.loaded_dad_jokes
-        self.loaded_yo_mama_jokes: list[str] = self.bot.loaded_yo_mama_jokes
+        self._loaded_jokes: list[str] = self._bot.loaded_jokes
+        self._loaded_dad_jokes: list[str] = self._bot.loaded_dad_jokes
+        self._loaded_yo_mama_jokes: list[str] = self._bot.loaded_yo_mama_jokes
 
-        self.topstropscreenshot = load_text_file("topstropscreenshot")
-        self.kotrmelce = load_text_file("kotrmelec")
-        self.imgflip_client = imgflip.Imgflip(
-            username=IMGFLIP_USERNAME,
-            password=IMGFLIP_PASSWORD,
-            session=requests.Session(),
-        )
-        self.idk_count = 0
+        self._topstropscreenshot = load_text_file("topstropscreenshot")
+        self._kotrmelce = load_text_file("kotrmelec")
+        self._idk_count = 0
 
     @slash_command(
         name="kotrmelec",
@@ -69,7 +74,16 @@ class FunCommands(commands.Cog):
         guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER],
     )
     async def kotrmelec(self, ctx: discord.ApplicationContext) -> None:
-        await ctx.respond(random.choice(self.kotrmelce))
+        """This command sends a random "kotrmelec" message from a file.
+
+        This command is restricted to specific guilds because it's private.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
+        await ctx.respond(random.choice(self._kotrmelce))
 
     @slash_command(
         name="topstropscreenshot",
@@ -77,7 +91,16 @@ class FunCommands(commands.Cog):
         guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER],
     )
     async def top_strop_screenshot(self, ctx: discord.ApplicationContext) -> None:
-        await ctx.respond(random.choice(self.topstropscreenshot))
+        """This command sends a random screenshot from a file.
+
+        This command is restricted to specific guilds because it's private.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
+        await ctx.respond(random.choice(self._topstropscreenshot))
 
     @slash_command(
         name="roast",
@@ -85,15 +108,32 @@ class FunCommands(commands.Cog):
         guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER],
     )
     async def roast(self, ctx: discord.ApplicationContext) -> None:
+        """This command sends a Lamar roast from GTAV.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
+
         await ctx.respond(ROAST_COMMANDS_MSG)
 
     # -------------------- Joke commands -------------------- #
     @slash_command(name="joke", description="Fetches random joke.")
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def joke(self, ctx: discord.ApplicationContext) -> None:
-        _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
+        """This command fetches a random joke from the loaded jokes.
+
+        If all jokes have been viewed, it fetches new jokes from the API.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
+        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild_id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_jokes"])
-        loaded_count = len(self.loaded_jokes)
+        loaded_count = len(self._loaded_jokes)
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
             await ctx.defer()
@@ -102,16 +142,21 @@ class FunCommands(commands.Cog):
                 await send_response(ctx, "JOKE_TIMEOUT")
                 return
 
-            self.loaded_jokes.extend(jokes)
-            random.shuffle(self.loaded_jokes)
+            self._loaded_jokes.extend(jokes)
+            random.shuffle(self._loaded_jokes)
 
-        for joke in self.loaded_jokes:
+        joke = None
+        for joke in self._loaded_jokes:
             if joke in temp_guild_data["jokes"]["viewed_jokes"]:
                 continue
             break
 
+        if not joke:
+            await send_response(ctx, "NO_MORE_JOKES")
+            return
+
         temp_guild_data["jokes"]["viewed_jokes"].append(joke)
-        self.bot.temp_guild_data[ctx.guild_id] = temp_guild_data
+        self._temp_guild_data[ctx.guild_id] = temp_guild_data
 
         joke = escape_markdown(joke)
         await ctx.respond(joke)
@@ -119,9 +164,18 @@ class FunCommands(commands.Cog):
     @slash_command(name="dad_joke", description="Fetches random dad joke.")
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def dad_joke(self, ctx: discord.ApplicationContext) -> None:
-        _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
+        """This command fetches a random dad joke from the loaded dad jokes.
+
+        If all dad jokes have been viewed, it fetches new dad jokes from the API.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
+        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild_id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_dad_jokes"])
-        loaded_count = len(self.loaded_dad_jokes)
+        loaded_count = len(self._loaded_dad_jokes)
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
             await ctx.defer()
@@ -130,16 +184,21 @@ class FunCommands(commands.Cog):
                 await send_response(ctx, "JOKE_TIMEOUT")
                 return
 
-            self.loaded_dad_jokes.extend(jokes)
-            random.shuffle(self.loaded_dad_jokes)
+            self._loaded_dad_jokes.extend(jokes)
+            random.shuffle(self._loaded_dad_jokes)
 
-        for joke in self.loaded_dad_jokes:
+        joke = None
+        for joke in self._loaded_dad_jokes:
             if joke in temp_guild_data["jokes"]["viewed_dad_jokes"]:
                 continue
             break
 
+        if not joke:
+            await send_response(ctx, "NO_MORE_JOKES")
+            return
+
         temp_guild_data["jokes"]["viewed_dad_jokes"].append(joke)
-        self.bot.temp_guild_data[ctx.guild_id] = temp_guild_data
+        self._temp_guild_data[ctx.guild_id] = temp_guild_data
 
         joke = escape_markdown(joke)
         await ctx.respond(joke)
@@ -153,9 +212,20 @@ class FunCommands(commands.Cog):
     async def yo_mama(
         self, ctx: discord.ApplicationContext, member: discord.Member
     ) -> None:
-        _, temp_guild_data = await get_guild_data(self.bot, ctx.guild_id)
+        """This command fetches a random yo mama joke from the loaded yo mama jokes.
+
+        If all yo mama jokes have been viewed, it fetches new yo mama jokes from the API.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        member: :class:`discord.Member`
+            member to roast.
+        """
+        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild_id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_yo_mama_jokes"])
-        loaded_count = len(self.loaded_yo_mama_jokes)
+        loaded_count = len(self._loaded_yo_mama_jokes)
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
             await ctx.defer()
@@ -164,20 +234,28 @@ class FunCommands(commands.Cog):
                 await send_response(ctx, "JOKE_TIMEOUT")
                 return
 
-            self.loaded_yo_mama_jokes.extend(jokes)
-            random.shuffle(self.loaded_yo_mama_jokes)
+            self._loaded_yo_mama_jokes.extend(jokes)
+            random.shuffle(self._loaded_yo_mama_jokes)
 
-        for joke in self.loaded_yo_mama_jokes:
+        joke = None
+        for joke in self._loaded_yo_mama_jokes:
             if joke in temp_guild_data["jokes"]["viewed_yo_mama_jokes"]:
                 continue
             break
 
+        if not joke:
+            await send_response(ctx, "NO_MORE_JOKES")
+            return
+
         temp_guild_data["jokes"]["viewed_yo_mama_jokes"].append(joke)
-        self.bot.temp_guild_data[ctx.guild_id] = temp_guild_data
+        self._temp_guild_data[ctx.guild_id] = temp_guild_data
 
         joke = joke[0].lower() + joke[1:]
         joke = escape_markdown(joke)
-        await ctx.respond(member.mention + " " + joke)
+        if member.name == "KexoBOT":
+            await ctx.respond(ctx.author.mention + " " + joke)
+        else:
+            await ctx.respond(member.mention + " " + joke)
 
     @slash_command(name="spam", description="Spams words, max is 50.  (Admin)")
     @discord.default_permissions(administrator=True)
@@ -186,40 +264,43 @@ class FunCommands(commands.Cog):
     async def spam(
         self, ctx: discord.ApplicationContext, word: str, integer: int
     ) -> None:
+        """This command spams a word a specified number of times.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        word: str
+            The word to spam.
+        integer: int
+            The number of times to spam the word.
+        """
         await ctx.respond(word)
         for _ in range(integer - 1):
             await ctx.send(word)
 
     @slash_command(
-        name="kys",
-        description="Keď niekoho nemáš rád.",
-        guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER],
-    )
-    @commands.cooldown(1, 30, commands.BucketType.user)
-    async def kys(
-        self, ctx: discord.ApplicationContext, member: discord.Member
-    ) -> None:
-        meme_img = await self._generate_meme(ctx, member)
-
-        await ctx.respond(f"**{random.choice(KYS_MESSAGES)}** {member.mention}")
-
-        for _ in range(19):
-            await ctx.send(f"**{random.choice(KYS_MESSAGES)}** {member.mention}")
-        await ctx.send(meme_img)
-
-    @slash_command(
         name="idk", description="Idk.", guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER]
     )
     async def idk(self, ctx: discord.ApplicationContext) -> None:
-        self.idk_count += 1
-        if self.idk_count < 5:
+        """This command sends a random "idk" message.
+
+        After 5 times, it sends a jumpscare.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
+        self._idk_count += 1
+        if self._idk_count < 5:
             await ctx.respond("idk")
             return
         await ctx.respond(
             "https://media.discordapp.net/attachments"
             "/796453724713123870/1042486203842306159/image.png"
         )
-        self.idk_count = 0
+        self._idk_count = 0
 
     @subcommand("reddit")
     @slash_command(
@@ -227,9 +308,26 @@ class FunCommands(commands.Cog):
     )
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def shitpost(self, ctx: discord.ApplicationContext) -> None:
+        """This command cals a method which fetches
+         a random post from various shitposting subreddits.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
         await self.process_shitpost(ctx)
 
     async def process_shitpost(self, ctx: discord.ApplicationContext) -> None:
+        """This command fetches a random post from various shitposting subreddits.
+        It checks if the post is valid and not already viewed. If the post is NSFW,
+        it checks if the channel is NSFW. If the post is valid, it sends the post
+        as an embed and updates the viewed posts in the user data.
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
         user_id = ctx.author.id
         user_data, temp_user_data = await self._load_user_data(ctx)
 
@@ -271,13 +369,13 @@ class FunCommands(commands.Cog):
             await send_response(ctx, "REDDIT_REQUEST_ERROR")
 
     def _update_temp_user_data(self, user_id: int, submission_url: str) -> None:
-        self.temp_user_data[user_id]["reddit"]["viewed_posts"].add(submission_url)
-        self.temp_user_data[user_id]["reddit"]["last_used"] = datetime.now()
-        self.temp_user_data[user_id]["reddit"]["search_limit"] += 1
+        self._temp_user_data[user_id]["reddit"]["viewed_posts"].add(submission_url)
+        self._temp_user_data[user_id]["reddit"]["last_used"] = datetime.now()
+        self._temp_user_data[user_id]["reddit"]["search_limit"] += 1
 
     async def _load_user_data(self, ctx: discord.ApplicationContext) -> tuple:
         user_data, temp_user_data = await get_user_data(
-            self.bot,
+            self._bot,
             ctx,
         )
         return user_data["reddit"], temp_user_data["reddit"]
@@ -294,30 +392,10 @@ class FunCommands(commands.Cog):
         )
         embed.set_footer(
             text=f"r/{subreddit.display_name} ｜🔺{submission.score}｜💬 {submission.num_comments}",
-            icon_url=self.bot.subreddit_icons[subreddit.display_name],
+            icon_url=self._bot.subreddit_icons[subreddit.display_name],
         )
         embed.timestamp = datetime.fromtimestamp(submission.created_utc)
         return embed
-
-    async def _generate_meme(
-        self, ctx: discord.ApplicationContext, member: discord.Member
-    ) -> str:
-        text = random.choice(
-            (
-                f"72598094; ;{member.name};50",
-                f"91545132;tento typek je cisty retard;{member.name};50",
-                f"368961738;{ctx.author.name};{member.name};50",
-                f"369517762;{member.name}; ;65",
-                f"153452716;{member.name}; ;50",
-            )
-        ).split(";")
-
-        return self.imgflip_client.make_meme(
-            template=text[0],
-            top_text=text[1],
-            bottom_text=text[2],
-            max_font_size=text[3],
-        )
 
     @staticmethod
     async def _is_valid_submission(
@@ -338,7 +416,7 @@ class FunCommands(commands.Cog):
 
         return True
 
-    async def _get_jokes(self) -> list[str] | None:
+    async def _get_jokes(self) -> Optional[list[str]]:
         fetched_jokes: list[str] = []
         jokes = await self._get_humor_api_jokes()
         if jokes:
@@ -350,10 +428,10 @@ class FunCommands(commands.Cog):
 
         return fetched_jokes
 
-    async def _get_dadjokes(self) -> list[str] | None:
+    async def _get_dadjokes(self) -> Optional[list[str]]:
         fetched_jokes: list[str] = []
         response = await make_http_request(
-            self.session,
+            self._session,
             DAD_JOKE_API_URL,
             retries=3,
             headers={"Accept": "application/json"},
@@ -368,24 +446,24 @@ class FunCommands(commands.Cog):
 
         for joke in jokes:
             joke = joke.get("joke")
-            if joke in self.loaded_dad_jokes:
+            if joke in self._loaded_dad_jokes:
                 continue
 
             fetched_jokes.append(joke)
         return fetched_jokes
 
-    async def _get_yo_mama_jokes(self) -> list[str] | None:
+    async def _get_yo_mama_jokes(self) -> Optional[list[str]]:
         token = self._load_humor_api_token()
         fetched_jokes: list[str] = []
-        if self.bot.humor_api_tokens[token]["exhausted"]:
+        if self._bot.humor_api_tokens[token]["exhausted"]:
             return None
 
-        for _ in range(len(self.bot.humor_api_tokens)):
+        for _ in range(len(self._bot.humor_api_tokens)):
             response = await make_http_request(
-                self.session,
+                self._session,
                 HUMOR_API_URL + f"yo_mama&api-key={token}&max-length=256",
             )
-            token = self.is_token_exhausted(response, token)
+            token = self._is_token_exhausted(response, token)
             if not token:
                 token = self._load_humor_api_token()
                 continue
@@ -393,17 +471,17 @@ class FunCommands(commands.Cog):
 
         jokes = response.json()
         for joke in jokes["jokes"]:
-            if joke.get("joke") in self.loaded_yo_mama_jokes:
+            if joke.get("joke") in self._loaded_yo_mama_jokes:
                 continue
 
             fetched_jokes.append(joke.get("joke"))
 
         return fetched_jokes
 
-    async def _get_joke_api_jokes(self) -> list[str] | None:
+    async def _get_joke_api_jokes(self) -> Optional[list[str]]:
         fetched_jokes: list[str] = []
         response = await make_http_request(
-            self.session,
+            self._session,
             JOKE_API_URL,
             get_json=True,
         )
@@ -423,7 +501,7 @@ class FunCommands(commands.Cog):
                 if joke.get("type") == "twopart"
                 else joke.get("joke")
             )
-            if joke in self.loaded_jokes:
+            if joke in self._loaded_jokes:
                 continue
 
             is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.lower().split()]
@@ -434,20 +512,20 @@ class FunCommands(commands.Cog):
 
         return fetched_jokes
 
-    async def _get_humor_api_jokes(self) -> list[str] | None:
+    async def _get_humor_api_jokes(self) -> Optional[list[str]]:
         token = self._load_humor_api_token()
         fetched_jokes: list[str] = []
-        if self.bot.humor_api_tokens[token]["exhausted"]:
+        if self._bot.humor_api_tokens[token]["exhausted"]:
             return None
 
         for joke_type in ["racist", "jewish"]:
-            for _ in range(len(self.bot.humor_api_tokens)):
+            for _ in range(len(self._bot.humor_api_tokens)):
                 response = await make_http_request(
-                    self.session,
+                    self._session,
                     HUMOR_API_URL + f"{joke_type}&api-key={token}&max-length=256",
                     retries=3,
                 )
-                token = self.is_token_exhausted(response, token)
+                token = self._is_token_exhausted(response, token)
                 if not token:
                     token = self._load_humor_api_token()
                     continue
@@ -455,7 +533,7 @@ class FunCommands(commands.Cog):
 
             jokes = response.json()
             for joke in jokes["jokes"]:
-                if joke.get("joke") in self.loaded_jokes:
+                if joke.get("joke") in self._loaded_jokes:
                     continue
 
                 is_filtered = [
@@ -470,21 +548,21 @@ class FunCommands(commands.Cog):
 
         return fetched_jokes
 
-    def _load_humor_api_token(self) -> str | None:
-        for token in self.bot.humor_api_tokens:
-            if self.bot.humor_api_tokens[token].get("exhausted"):
+    def _load_humor_api_token(self) -> Optional[str]:
+        for token in self._bot.humor_api_tokens:
+            if self._bot.humor_api_tokens[token].get("exhausted"):
                 continue
             return token
         return None
 
-    def is_token_exhausted(self, response: httpx.Response, token) -> str | None:
+    def _is_token_exhausted(self, response: httpx.Response, token) -> Optional[str]:
         if not response:
-            self.bot.humor_api_tokens[token]["exhausted"] = True
+            self._bot.humor_api_tokens[token]["exhausted"] = True
             return None
 
         quota_left = response.headers.get("x-api-quota-left")
         if quota_left == "0":
-            self.bot.humor_api_tokens[token]["exhausted"] = True
+            self._bot.humor_api_tokens[token]["exhausted"] = True
             return None
 
         return token
@@ -503,4 +581,5 @@ class FunCommands(commands.Cog):
 
 
 def setup(bot: commands.Bot):
+    """This function sets up the FunCommands cog."""
     bot.add_cog(FunCommands(bot))

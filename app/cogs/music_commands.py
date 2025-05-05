@@ -30,10 +30,26 @@ from app.utils import (
 
 
 class MusicCommands(commands.Cog):
+    """Music commands for the bot.
+    This class contains commands for:
+    - Playing music
+    - Searching for music
+    - Playing radio stations
+    - Skipping songs
+    - Pausing and resuming songs
+    - Leaving voice channels
+    - Changing autoplay mode
+    - Getting random radio stations
+
+    Parameters:
+    bot: :class:`commands.Bot`
+        The bot instance that this cog is associated with.
+    """
+
     def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.session = self.bot.session
-        self.radiomap_cache: List[str] = []
+        self._bot = bot
+        self._session = self._bot.session
+        self._radiomap_cache: List[str] = []
 
     music = discord.SlashCommandGroup("music", "All music commands")
     radio = discord.SlashCommandGroup("radio", "All radio commands")
@@ -54,6 +70,19 @@ class MusicCommands(commands.Cog):
     async def play(
         self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
     ) -> None:
+        """Plays a song from a given URL or name.
+
+        This command will search for the song using the provided search query.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        search: :class:`str`
+            The search query for the song.
+        play_next: :class:`bool`
+            If True, the song will be played next in the queue.
+        """
         # Defer the response right away to avoid interaction timeout
         await ctx.defer(ephemeral=False)
 
@@ -107,6 +136,15 @@ class MusicCommands(commands.Cog):
     async def radio_random(
         self, ctx: discord.ApplicationContext, play_next: bool = False
     ) -> None:
+        """Gets a random radio station from RadioMap and plays it.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        play_next: bool
+            If True, the radio station will be played next in the queue.
+        """
         await ctx.defer()
 
         place_ids = await self._get_radiomap_data()
@@ -117,7 +155,7 @@ class MusicCommands(commands.Cog):
         place_id = random.choice(place_ids)
 
         response = await make_http_request(
-            self.session,
+            self._session,
             f"{RADIOGARDEN_PAGE_URL}{place_id}/channels",
             headers={"accept": "application/json"},
         )
@@ -134,7 +172,7 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "RADIOMAP_ERROR")
             return
         response = await make_http_request(
-            self.session,
+            self._session,
             f"{RADIOGARDEN_LISTEN_URL}{station_id}/channel.mp3",
             headers={"accept": "application/json"},
         )
@@ -177,9 +215,23 @@ class MusicCommands(commands.Cog):
         country: str = "",
         play_next: bool = False,
     ) -> None:
+        """Search and play a radio station from RadioGarden.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        station: str
+            The name of the radio station to search for.
+        country: str
+            The country to narrow down the search.
+        play_next: bool
+            If True, the radio station will be played next in the queue.
+        """
+
         encoded_station = discord.utils.escape_markdown(station)
         response = await make_http_request(
-            self.session,
+            self._session,
             f"{RADIOGARDEN_SEARCH_URL}{encoded_station}",
             headers={"accept": "application/json"},
         )
@@ -209,6 +261,13 @@ class MusicCommands(commands.Cog):
     @guild_only()
     @is_playing()
     async def skip_command(self, ctx: discord.ApplicationContext) -> None:
+        """Skip the currently playing song.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
         player: wavelink.Player = ctx.voice_client
         await player.skip()
 
@@ -226,6 +285,15 @@ class MusicCommands(commands.Cog):
     async def skip_to_command(
         self, ctx: discord.ApplicationContext, to_find: str
     ) -> None:
+        """Skip to a specific song in the queue.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        to_find: str
+            The name of the song or its position in the queue.
+        """
         player: wavelink.Player = ctx.voice_client
 
         track_pos = find_track(player, to_find)
@@ -246,6 +314,13 @@ class MusicCommands(commands.Cog):
     @guild_only()
     @is_playing()
     async def pause(self, ctx: discord.ApplicationContext) -> None:
+        """Pause the currently playing song.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
         player: wavelink.Player = ctx.voice_client
 
         if player.paused:
@@ -259,6 +334,13 @@ class MusicCommands(commands.Cog):
     @guild_only()
     @is_playing()
     async def resume(self, ctx: discord.ApplicationContext) -> None:
+        """Resume the currently paused song.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
         player: wavelink.Player = ctx.voice_client
         await player.pause(False)
         await send_response(ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10)
@@ -267,6 +349,13 @@ class MusicCommands(commands.Cog):
     @guild_only()
     @is_joined()
     async def disconnect(self, ctx: discord.ApplicationContext) -> None:
+        """Disconnect the bot from the voice channel.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        """
         player: wavelink.Player = ctx.voice_client
 
         if player.channel.id != ctx.author.voice.channel.id:
@@ -284,7 +373,8 @@ class MusicCommands(commands.Cog):
     )
     @option(
         "mode",
-        description="Normal: Plays next track; Populated: For YouTube links, queues similar songs when the queue is empty",
+        description="Normal: Plays next track; Populated: For YouTube links,"
+        " queues similar songs when the queue is empty",
         choices=["normal", "populated"],
     )
     @guild_only()
@@ -292,6 +382,15 @@ class MusicCommands(commands.Cog):
     async def autoplay_mode(
         self, ctx: discord.ApplicationContext, mode: str = "normal"
     ) -> None:
+        """Change the autoplay mode for the bot.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        mode: str
+            The autoplay mode to set. Can be either "normal" or "populated".
+        """
         player: wavelink.Player = ctx.voice_client
         player.autoplay = (
             wavelink.AutoPlayMode.partial
@@ -299,12 +398,12 @@ class MusicCommands(commands.Cog):
             else wavelink.AutoPlayMode.enabled
         )
 
-        guild_data, _ = await get_guild_data(self.bot, ctx.guild_id)
+        guild_data, _ = await get_guild_data(self._bot, ctx.guild_id)
         guild_data["music"]["autoplay_mode"] = 1 if mode == "normal" else 2
-        await self.bot.guild_data_db.update_one(
+        await self._bot.guild_data_db.update_one(
             {"_id": ctx.guild_id}, {"$set": guild_data}
         )
-        self.bot.guild_data[ctx.guild_id] = guild_data
+        self._bot.guild_data[ctx.guild_id] = guild_data
         await send_response(
             ctx, "AUTOPLAY_MODE_CHANGED", ephemeral=False, autoplay_mode=mode
         )
@@ -362,7 +461,7 @@ class MusicCommands(commands.Cog):
 
         player = ctx.voice_client
         last_error = None
-        for i in range(2):
+        for _ in range(2):
             try:
                 tracks: wavelink.Search = await asyncio.wait_for(
                     wavelink.Playable.search(search, source=source), timeout=3
@@ -372,7 +471,7 @@ class MusicCommands(commands.Cog):
             except TimeoutError:
                 last_error = "NODE_UNRESPONSIVE"
                 await switch_node(
-                    self.bot.connect_node, player=player, play_after=False
+                    self._bot.connect_node, player=player, play_after=False
                 )
             except LavalinkLoadException as e:
                 print("LavalinkLoadException: ", e)
@@ -381,12 +480,12 @@ class MusicCommands(commands.Cog):
                 print("NodeException: ", e)
                 last_error = "NODE_UNRESPONSIVE"
                 await switch_node(
-                    self.bot.connect_node, player=player, play_after=False
+                    self._bot.connect_node, player=player, play_after=False
                 )
             except AttributeError:
                 last_error = "NODE_UNRESPONSIVE"
                 await switch_node(
-                    self.bot.connect_node, player=player, play_after=False
+                    self._bot.connect_node, player=player, play_after=False
                 )
             # Fallback to default search
             source = "ytsearch"
@@ -465,7 +564,7 @@ class MusicCommands(commands.Cog):
             await send_response(
                 ctx, "NODE_REQUEST_ERROR", ephemeral=False, error=e.error
             )
-            await switch_node(self.bot.connect_node, player=player)
+            await switch_node(self._bot.connect_node, player=player)
 
         return True
 
@@ -476,7 +575,7 @@ class MusicCommands(commands.Cog):
         player.should_respond = False
         player.just_joined = True
 
-        guild_data, _ = await get_guild_data(self.bot, ctx.guild_id)
+        guild_data, _ = await get_guild_data(self._bot, ctx.guild_id)
         await player.set_volume(guild_data["music"]["volume"])
 
         if guild_data["music"]["autoplay_mode"] == 1:
@@ -519,14 +618,16 @@ class MusicCommands(commands.Cog):
 
     async def _get_radiomap_data(self) -> List[str]:
         """Get radio map data with caching."""
-        if self.radiomap_cache:
-            return self.radiomap_cache
+        if self._radiomap_cache:
+            return self._radiomap_cache
 
         response = await make_http_request(
-            self.session, RADIOGARDEN_PLACES_URL, headers={"accept": "application/json"}
+            self._session,
+            RADIOGARDEN_PLACES_URL,
+            headers={"accept": "application/json"},
         )
         if not response:
-            return self.radiomap_cache
+            return self._radiomap_cache
 
         data = response.json()
         if "data" in data and "list" in data["data"]:
@@ -535,10 +636,11 @@ class MusicCommands(commands.Cog):
                 for item in data["data"]["list"]
                 if "url" in item
             ]
-            self.radiomap_cache = place_ids
+            self._radiomap_cache = place_ids
             return place_ids
         return []
 
 
 def setup(bot: commands.Bot) -> None:
+    """Setup function for the MusicCommands cog."""
     bot.add_cog(MusicCommands(bot))

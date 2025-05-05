@@ -36,6 +36,7 @@ from app.constants import (
     ESUTAZE_CHANNEL,
     GAME_UPDATES_CHANNEL,
     FREE_STUFF_CHANNEL,
+    ALIENWARE_ARENA_NEWS_CHANNEL,
     HUMOR_API_SECRET,
     KEXO_SERVER,
     LOCAL_MACHINE_NAME,
@@ -49,8 +50,8 @@ bot = Bot()
 
 
 class KexoBot:
-    """Main class for the bot.
-    This class is responsible for initializing the bot, creating the session,
+    """Main class for the _bot.
+    This class is responsible for initializing the _bot, creating the _session,
     and connecting to the lavalink server.
     It also contains the main loop and the hourly loop.
     The main loop is responsible for running the different classes that
@@ -60,21 +61,20 @@ class KexoBot:
     """
 
     def __init__(self):
-        self.user_kexo = None | discord.User
-        self.session = None | httpx.AsyncClient
-        self.subreddit_cache = None | dict
-        self.hostname = socket.gethostname()
-        self.main_loop_counter = 0
+        self._user_kexo = None | discord.User
+        self._session = None | httpx.AsyncClient
+        self._subreddit_cache = None | dict
+        self._hostname = socket.gethostname()
+        self._main_loop_counter = 0
         self.lavalink_servers: list[wavelink.Node] = []
-        self.offline_lavalink_servers: list[str] = []
-        self.guild_temp_data = {}
+        self._offline_lavalink_servers: list[str] = []
 
         database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]
-        self.bot_config = database["BotConfig"]
-        self.user_data_db = database["UserData"]
-        self.guild_data_db = database["GuildData"]
+        self._bot_config = database["BotConfig"]
+        self._user_data_db = database["UserData"]
+        self._guild_data_db = database["GuildData"]
 
-        self.reddit_agent = asyncpraw.Reddit(
+        self._reddit_agent = asyncpraw.Reddit(
             client_id=REDDIT_CLIENT_ID,
             client_secret=REDDIT_SECRET,
             user_agent=REDDIT_USER_AGENT,
@@ -82,22 +82,21 @@ class KexoBot:
             password=REDDIT_PASSWORD,
         )
 
-        # Attach bot, so we can use it in cogs
+        # Attach _bot, so we can use it in cogs
         # Database
         bot.user_data = {}
         bot.temp_user_data = {}
         bot.guild_data = {}
         bot.temp_guild_data = {}
-        bot.bot_config = self.bot_config
-        bot.user_data_db = self.user_data_db
-        bot.guild_data_db = self.guild_data_db
+        bot.bot_config = self._bot_config
+        bot.user_data_db = self._user_data_db
+        bot.guild_data_db = self._guild_data_db
         # Functions
-        bot.reddit_agent = self.reddit_agent
+        bot.reddit_agent = self._reddit_agent
         bot.connect_node = self.connect_node
         bot.close_unused_nodes = self.close_unused_nodes
         bot.get_online_nodes = self.get_online_nodes
         bot.get_avaiable_nodes = self.get_avaiable_nodes
-        bot.guild_temp_data = self.guild_temp_data
         # Other
         bot.humor_api_tokens = {}
         bot.loaded_jokes = []
@@ -105,23 +104,24 @@ class KexoBot:
         bot.loaded_yo_mama_jokes = []
 
         # Initialize class variables
-        self.reddit_fetcher = None | RedditFetcher
-        self.content_monitor = None | ContentMonitor
-        self.lavalink_server_manager = None | LavalinkServerManager
-        self.sfd_servers = None | SFDServers
-        self.esutaze_channel = None | discord.TextChannel
-        self.game_updates_channel = None | discord.TextChannel
-        self.free_stuff_channel = None | discord.TextChannel
+        self._reddit_fetcher = None | RedditFetcher
+        self._content_monitor = None | ContentMonitor
+        self._lavalink_server_manager = None | LavalinkServerManager
+        self._sfd_servers = None | SFDServers
+        self._esutaze_channel = None | discord.TextChannel
+        self._game_updates_channel = None | discord.TextChannel
+        self._free_stuff_channel = None | discord.TextChannel
+        self._alienware_arena_news_channel = None | discord.TextChannel
 
     async def initialize(self) -> None:
-        """Initialize the bot and fetch all channels and users."""
+        """Initialize the _bot and fetch all channels and users."""
         await self._fetch_users()
         await self._fetch_channels()
         await self._fetch_subreddit_icons()
         self._load_humor_api_tokens()
         self._create_session()
         self._define_classes()
-        bot.sfd_servers = self.sfd_servers
+        bot.sfd_servers = self._sfd_servers
 
     @staticmethod
     async def _fetch_channel(channel_id: int) -> discord.TextChannel:
@@ -136,14 +136,17 @@ class KexoBot:
 
     async def _fetch_channels(self) -> None:
         """Fetch all channels for the bot."""
-        self.esutaze_channel = await self._fetch_channel(ESUTAZE_CHANNEL)
-        self.game_updates_channel = await self._fetch_channel(GAME_UPDATES_CHANNEL)
-        self.free_stuff_channel = await self._fetch_channel(FREE_STUFF_CHANNEL)
+        self._esutaze_channel = await self._fetch_channel(ESUTAZE_CHANNEL)
+        self._game_updates_channel = await self._fetch_channel(GAME_UPDATES_CHANNEL)
+        self._free_stuff_channel = await self._fetch_channel(FREE_STUFF_CHANNEL)
+        self._alienware_arena_news_channel = await self._fetch_channel(
+            ALIENWARE_ARENA_NEWS_CHANNEL
+        )
         print("Channels fetched.")
 
     async def _fetch_subreddit_icons(self) -> None:
         """Fetch subreddit icons for the bot."""
-        subreddit_icons = await self.bot_config.find_one(DB_CACHE)
+        subreddit_icons = await self._bot_config.find_one(DB_CACHE)
         bot.subreddit_icons = subreddit_icons["subreddit_icons"]
         print("Subreddit icons fetched.")
 
@@ -158,30 +161,29 @@ class KexoBot:
 
     def _define_classes(self) -> None:
         """Define classes for the bot."""
-        # Initialize the ContentMonitor class
-        self.content_monitor = self._initialize_class(
+        self._content_monitor = self._initialize_class(
             ContentMonitor,
-            self.bot_config,
-            self.session,
-            self.game_updates_channel,
-            self.esutaze_channel,
-            self.user_kexo,
+            self._bot_config,
+            self._session,
+            self._game_updates_channel,
+            self._esutaze_channel,
+            self._alienware_arena_news_channel,
+            self._user_kexo,
         )
 
-        # Keep the original classes for now until we verify the new one works
-        self.reddit_fetcher = self._initialize_class(
+        self._reddit_fetcher = self._initialize_class(
             RedditFetcher,
-            self.bot_config,
-            self.session,
-            self.reddit_agent,
-            self.free_stuff_channel,
-            self.game_updates_channel,
+            self._bot_config,
+            self._session,
+            self._reddit_agent,
+            self._free_stuff_channel,
+            self._game_updates_channel,
         )
-        self.sfd_servers = self._initialize_class(
-            SFDServers, self.bot_config, self.session
+        self._sfd_servers = self._initialize_class(
+            SFDServers, self._bot_config, self._session
         )
-        self.lavalink_server_manager = self._initialize_class(
-            LavalinkServerManager, self.session
+        self._lavalink_server_manager = self._initialize_class(
+            LavalinkServerManager, self._session
         )
 
     async def main_loop(self) -> None:
@@ -191,32 +193,37 @@ class KexoBot:
         It runs the classes in a round-robin fashion.
         """
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
-        if self.main_loop_counter == 0:
-            self.main_loop_counter = 1
-            await self.reddit_fetcher.freegamefindings()
 
-        elif self.main_loop_counter == 1:
-            self.main_loop_counter = 2
-            await self.content_monitor.alienware_arena()
+        if self._main_loop_counter == 0:
+            self._main_loop_counter = 1
+            await self._reddit_fetcher.freegamefindings()
 
-        elif self.main_loop_counter == 2:
-            self.main_loop_counter = 3
-            await self.content_monitor.game3rb()
+        elif self._main_loop_counter == 1:
+            self._main_loop_counter = 2
+            await self._content_monitor.alienware_arena()
 
-        elif self.main_loop_counter == 3:
-            self.main_loop_counter = 4
-            await self.content_monitor.online_fix()
+        elif self._main_loop_counter == 2:
+            self._main_loop_counter = 3
+            await self._content_monitor.game3rb()
 
-        elif self.main_loop_counter == 4:
-            self.main_loop_counter = 5
-            await self.reddit_fetcher.crackwatch()
+        elif self._main_loop_counter == 3:
+            self._main_loop_counter = 4
+            await self._content_monitor.online_fix()
 
-        elif self.main_loop_counter == 5:
-            self.main_loop_counter = 0
-            await self.content_monitor.fanatical()
+        elif self._main_loop_counter == 4:
+            self._main_loop_counter = 5
+            await self._reddit_fetcher.crackwatch()
 
-        if now.minute % 6 == 0 and self.hostname != LOCAL_MACHINE_NAME:
-            await self.sfd_servers.update_stats(now)
+        elif self._main_loop_counter == 5:
+            self._main_loop_counter = 6
+            await self._content_monitor.fanatical()
+
+        elif self._main_loop_counter == 6:
+            self._main_loop_counter = 0
+            await self._content_monitor.alienware_arena_news()
+
+        if now.minute % 6 == 0 and self._hostname != LOCAL_MACHINE_NAME:
+            await self._sfd_servers.update_stats(now)
 
     async def hourly_loop(self) -> None:
         """Hourly loop for the bot.
@@ -235,25 +242,42 @@ class KexoBot:
             self._clear_temp_reddit_data()
 
         if now.hour == 0:
-            self.offline_lavalink_servers: list[str] = []
+            self._offline_lavalink_servers: list[str] = []
             self._load_humor_api_tokens()
 
-        self.lavalink_servers = await self.lavalink_server_manager.get_lavalink_servers(
-            self.offline_lavalink_servers
+        self.lavalink_servers = (
+            await self._lavalink_server_manager.get_lavalink_servers(
+                self._offline_lavalink_servers
+            )
         )
-        await self.content_monitor.power_outages()
-        await self.content_monitor.contests()
+        await self._content_monitor.power_outages()
+        await self._content_monitor.contests()
 
     def _create_session(self) -> None:
         """Create a httpx session for the bot."""
-        self.session = httpx.AsyncClient()
-        self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
+        self._session = httpx.AsyncClient()
+        self._session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
     async def connect_node(
         self, guild_id: int = KEXO_SERVER
     ) -> Optional[wavelink.Node]:
-        """Connect to lavalink node."""
+        """Connect to lavalink node.
+
+        This function will try to connect to the lavalink node
+        and if it fails, it will try to connect to the next node.
+        If all nodes fail, it will return None.
+
+        Parameters
+        ----------
+        guild_id: int
+            The guild ID to connect to.
+
+        Returns
+        -------
+        Optional[wavelink.Node]
+            The lavalink that was connected to.
+        """
         if not self.lavalink_servers:
             print("No lavalink servers found.")
             return None
@@ -277,7 +301,7 @@ class KexoBot:
             except asyncio.TimeoutError:
                 print(f"Node timed out. ({node.uri})")
                 offline_lavalink_server = self.lavalink_servers.pop(i)
-                self.offline_lavalink_servers.append(
+                self._offline_lavalink_servers.append(
                     urlparse(offline_lavalink_server.uri).hostname
                 )
                 continue
@@ -289,7 +313,7 @@ class KexoBot:
             ):
                 print(f"Node failed to connect. ({node.uri})")
                 offline_lavalink_server = self.lavalink_servers.pop(i)
-                self.offline_lavalink_servers.append(
+                self._offline_lavalink_servers.append(
                     urlparse(offline_lavalink_server.uri).hostname
                 )
                 continue
@@ -299,7 +323,18 @@ class KexoBot:
         return None
 
     async def get_node(self, guild_id: int) -> wavelink.Node:
-        """Get the next lavalink node, cycling is guild based."""
+        """Get the next lavalink node, cycling is guild based.
+
+        Parameters
+        ----------
+        guild_id: int
+            The guild ID to get the node for.
+
+        Returns
+        -------
+        wavelink.Node
+            The lavalink node to use.
+        """
         _, temp_guild_data = await get_guild_data(bot, guild_id)
         lavalink_server_pos = temp_guild_data["lavalink_server_pos"]
 
@@ -314,7 +349,11 @@ class KexoBot:
 
     @staticmethod
     async def close_unused_nodes() -> None:
-        """Clear unused lavalink nodes."""
+        """Clear unused lavalink nodes.
+
+        This function will check if there are any lavalink nodes
+        that are not being used and will close them.
+        """
         nodes: list[wavelink.Node] = wavelink.Pool.nodes.values()
         for node in nodes:
             if len(wavelink.Pool.nodes) == 1:
@@ -328,7 +367,13 @@ class KexoBot:
 
     @staticmethod
     def get_online_nodes() -> int:
-        """Get the number of online lavalink nodes."""
+        """Get the number of online lavalink nodes.
+
+        Returns
+        -------
+        int
+            The number of online lavalink nodes.
+        """
         return len(
             [
                 node
@@ -338,7 +383,13 @@ class KexoBot:
         )
 
     def get_avaiable_nodes(self) -> int:
-        """Get the number of available lavalink nodes."""
+        """Get the number of available lavalink nodes.
+
+        Returns
+        -------
+        int
+            The number of available lavalink nodes from Lavalink server manager.
+        """
         return len(self.lavalink_servers)
 
     @staticmethod
@@ -371,7 +422,7 @@ class KexoBot:
         """Refreshes subreddit icons on Sunday."""
         subreddit_icons = {}
         for subreddit_name in SHITPOST_SUBREDDITS_ALL:
-            subreddit: asyncpraw.models.Subreddit = await self.reddit_agent.subreddit(
+            subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
                 subreddit_name
             )
             try:
@@ -387,14 +438,14 @@ class KexoBot:
             subreddit_icons[subreddit.display_name] = subreddit.icon_img
 
         print("Subreddit icons refreshed.")
-        await self.bot_config.update_one(
+        await self._bot_config.update_one(
             DB_CACHE, {"$set": {"subreddit_icons": subreddit_icons}}
         )
 
     async def _fetch_users(self) -> None:
         """Fetch users for the bot."""
-        self.user_kexo = await bot.fetch_user(402221830930432000)
-        print(f"User {self.user_kexo.name} fetched.")
+        self._user_kexo = await bot.fetch_user(402221830930432000)
+        print(f"User {self._user_kexo.name} fetched.")
 
 
 kexobot = KexoBot()
@@ -428,21 +479,25 @@ setup_cogs()
 
 @tasks.loop(minutes=1)
 async def main_loop_task() -> None:
+    """Main loop for the bot."""
     await kexobot.main_loop()
 
 
 @tasks.loop(hours=1)
 async def hourly_loop_task() -> None:
+    """Hourly loop for the bot."""
     await kexobot.hourly_loop()
 
 
 @main_loop_task.before_loop
 async def before_main_loop() -> None:
+    """Wait until the bot is ready before starting the main loop."""
     await bot.wait_until_ready()
 
 
 @hourly_loop_task.before_loop
 async def before_hourly_loop() -> None:
+    """Wait until the bot is ready before starting the hourly loop."""
     await bot.wait_until_ready()
 
 
@@ -467,11 +522,20 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
-    """This event is called when an error occurs in an appliacation command."""
+    """This event is called when an error occurs in an appliacation command.
+
+    Parameters
+    ----------
+    ctx: discord.ApplicationContext
+        The context of the command that caused the error.
+    error: Exception
+        The error that occurred.
+    """
     if isinstance(error, commands.CommandOnCooldown):
         embed = discord.Embed(
             title="",
-            description=f"🚫 You're sending too much!, try again in `{round(error.retry_after, 1)}s`.",
+            description=f"🚫 You're sending too much!,"
+            f" try again in `{round(error.retry_after, 1)}s`.",
             color=discord.Color.from_rgb(r=255, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
@@ -529,6 +593,11 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
 async def on_guild_join(guild: discord.Guild) -> None:
     """Event that runs when the bot joins a new guild.
     This event is responsible for creating the guild data in the database.
+
+    Parameters
+    ----------
+    guild: discord.Guild
+        The guild that the bot joined.
     """
     print(f"Joined new guild: {guild.name}")
 

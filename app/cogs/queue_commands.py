@@ -13,40 +13,92 @@ from app.utils import find_track, fix_audio_title
 
 # noinspection PyUnusedLocal
 class QueuePaginator(discord.ui.View):
+    """A paginator for the queue command.
+
+    This class creates a view with two buttons, "Previous" and Next",
+    that allow the user to navigate through the pages of the queue."
+
+    Parameters
+    ----------
+    embeds : list
+        A list of embeds to be displayed in the paginator.
+    timeout : int
+        The time in seconds before the paginator times out. Default is 600 seconds.
+    """
+
     def __init__(self, embeds: list, timeout: int = 600) -> None:
         super().__init__(timeout=timeout)
-        self.embeds = embeds
-        self.current_page = 0
+        self._embeds = embeds
+        self._current_page = 0
 
     async def update_message(self, interaction: discord.Interaction) -> None:
+        """Updates the message with the current embed.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered the button click.
+        """
         await interaction.response.edit_message(
-            embed=self.embeds[self.current_page], view=self
+            embed=self._embeds[self._current_page], view=self
         )
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple)
     async def previous(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
-        if self.current_page > 0:
-            self.current_page -= 1
+        """Handles the "Previous" button click event.
+
+        Parameters
+        ----------
+        button: :class:`discord.ui.Button`
+            The button that was clicked.
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered the button click.
+        """
+        if self._current_page > 0:
+            self._current_page -= 1
         else:
-            self.current_page = len(self.embeds) - 1
+            self._current_page = len(self._embeds) - 1
         await self.update_message(interaction)
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple)
     async def next(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
-        if self.current_page < len(self.embeds) - 1:
-            self.current_page += 1
+        """Handles the "Next" button click event.
+
+        Parameters
+        ----------
+        button: :class:`discord.ui.Button`
+            The button that was clicked.
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered the button click.
+        """
+        if self._current_page < len(self._embeds) - 1:
+            self._current_page += 1
         else:
-            self.current_page = 0
+            self._current_page = 0
         await self.update_message(interaction)
 
 
 class Queue(commands.Cog):
+    """A cog that handles queue commands for a music bot.
+
+    This cog provides commands to manage the music queue, including
+    displaying the current queue, removing tracks, shuffling the queue,
+    looping the queue, and clearing the queue.
+    It also provides a paginator for the queue command to navigate
+    through multiple pages of the queue.
+
+    Parameters
+    ----------
+    bot: :class:`discord.ext.commands.Bot`
+        The bot instance that this cog is associated with.
+    """
+
     def __init__(self, bot: commands.Bot) -> None:
-        self.bot = bot
+        self._bot = bot
 
     @subcommand("music")
     @slash_command(name="queue", description="Shows the current queue")
@@ -54,6 +106,13 @@ class Queue(commands.Cog):
     @is_joined()
     @is_queue_empty()
     async def queue(self, ctx: discord.ApplicationContext) -> None:
+        """This method displays the current music queue.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         player: wavelink.Player = ctx.voice_client
         pages = await self._get_queue_embeds(ctx, player)
 
@@ -68,6 +127,13 @@ class Queue(commands.Cog):
     @guild_only()
     @is_playing()
     async def playing_command(self, ctx: discord.ApplicationContext) -> None:
+        """This method displays the currently playing track.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         await ctx.respond(embed=await self._get_playing_embed(ctx))
 
     @subcommand("music")
@@ -80,6 +146,15 @@ class Queue(commands.Cog):
     @is_joined()
     @is_queue_empty()
     async def remove(self, ctx: discord.ApplicationContext, to_find: str):
+        """This method removes a song from the queue.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        to_find: str
+            The name of the song to be removed from the queue.
+        """
         player: wavelink.Player = ctx.voice_client
         track_pos = find_track(player, to_find)
         if track_pos is None:
@@ -105,6 +180,13 @@ class Queue(commands.Cog):
     @is_joined()
     @is_queue_empty()
     async def shuffle(self, ctx: discord.ApplicationContext):
+        """This method shuffles the current music queue.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         player: wavelink.Player = ctx.voice_client
 
         if len(player.queue) < 2:
@@ -123,6 +205,13 @@ class Queue(commands.Cog):
     @is_joined()
     @is_queue_empty()
     async def loop_queue(self, ctx: discord.ApplicationContext) -> None:
+        """This method loops the current music queue.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         player: wavelink.Player = ctx.voice_client
 
         if player.queue.mode == wavelink.QueueMode.loop_all:
@@ -143,6 +232,13 @@ class Queue(commands.Cog):
     @guild_only()
     @is_playing()
     async def loop(self, ctx: discord.ApplicationContext) -> None:
+        """This method loops the currently playing song.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         player: wavelink.Player = ctx.voice_client
 
         if player.queue.mode == wavelink.QueueMode.loop:
@@ -164,9 +260,15 @@ class Queue(commands.Cog):
     @guild_only()
     @is_joined()
     async def clear_queue(self, ctx: discord.ApplicationContext):
+        """This method clears the current music queue.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         player: wavelink.Player = ctx.voice_client
         player.queue.clear()
-
         await send_response(ctx, "QUEUE_CLEARED", ephemeral=False)
 
     async def _get_queue_embeds(
@@ -257,4 +359,5 @@ class Queue(commands.Cog):
 
 
 def setup(bot: commands.Bot) -> None:
+    """This function sets up the Queue cog."""
     bot.add_cog(Queue(bot))

@@ -1,7 +1,7 @@
 import datetime
 import re
-from typing import List, Tuple, Optional
 from io import BytesIO
+from typing import List, Tuple
 
 import discord
 import httpx
@@ -16,6 +16,8 @@ from app.constants import (
     ALIENWAREARENA_MAX_POSTS,
     ALIENWAREARENA_STRIP,
     ALIENWAREARENA_URL,
+    ALIENWAREARENA_NEWS_URL,
+    ALIENWAREARENA_ICON,
     GAME3RB_STRIP,
     GAME3RB_URL,
     GAME3RB_ICON,
@@ -25,9 +27,9 @@ from app.constants import (
     ONLINEFIX_MAX_GAMES,
     ONLINEFIX_URL,
     ONLINEFIX_ICON,
-    ELEKTRINA_URL,
-    ELEKTRINA_MAX_ARTICLES,
-    ELEKTRINA_ICON,
+    POWER_OUTAGES_URL,
+    POWER_OUTAGES_MAX_ARTICLES,
+    POWER_OUTAGES_ICON,
     ESUTAZE_URL,
     ESUTAZE_ICON,
 )
@@ -39,7 +41,24 @@ from app.utils import (
 
 
 class ContentMonitor:
-    """Class for monitoring and reporting various content updates including games, contests, and power outages."""
+    """Class for monitoring and reporting various
+    content updates including games, contests, and power outages.
+
+    Parameters
+    ----------
+    bot_config: :class:`AsyncIOMotorClient`
+        MongoDB client for database operations.
+    session: :class:`httpx.AsyncClient`
+        HTTP client for making requests.
+    game_updates_channel: :class:`discord.TextChannel`
+        Discord channel for game updates.
+    esutaze_channel: :class:`discord.TextChannel`
+        Discord channel for contests.
+    alienware_arena_news_channel: :class:`discord.TextChannel`
+        Discord channel for Alienware Arena news.
+    user_kexo: :class:`discord.User`
+        Discord user for sending messages.
+    """
 
     def __init__(
         self,
@@ -47,32 +66,47 @@ class ContentMonitor:
         session: httpx.AsyncClient,
         game_updates_channel: discord.TextChannel,
         esutaze_channel: discord.TextChannel,
-        user_kexo: Optional[discord.User] = None,
+        alienware_arena_news_channel: discord.TextChannel,
+        user_kexo: discord.User = None,
     ) -> None:
-        self.bot_config = bot_config
-        self.session = session
-        self.game_updates_channel = game_updates_channel
-        self.esutaze_channel = esutaze_channel
-        self.user_kexo = user_kexo
+        self._bot_config = bot_config
+        self._session = session
+        self._game_updates_channel = game_updates_channel
+        self._esutaze_channel = esutaze_channel
+        self._alienware_arena_news_channel = alienware_arena_news_channel
+        self._user_kexo = user_kexo
 
     async def alienware_arena(self) -> None:
-        """Check for updates from Alienware Arena."""
-        alienwarearena_cache, to_filter = await self._load_alienware_config()
+        """Checks for free games from Alienware Arena."""
+        alienwarearena_cache, to_filter = await self._load_alienware_cache()
         json_data = await make_http_request(
-            self.session, ALIENWAREARENA_URL, get_json=True
+            self._session, ALIENWAREARENA_URL, get_json=True
         )
         if not json_data:
             return
-        await self._send_alienware_embed(json_data, alienwarearena_cache, to_filter)
+        await self._send_alienware_arena_embed(
+            json_data, alienwarearena_cache, to_filter
+        )
+
+    async def alienware_arena_news(self) -> None:
+        """Checks for news from Alienware Arena."""
+        alienwarearena_news_cache = await self._load_alienware_news_cache()
+        response = await make_http_request(
+            self._session,
+            ALIENWAREARENA_NEWS_URL,
+        )
+        if not response:
+            return
+        await self._send_alienware_arena_news_embed(response, alienwarearena_news_cache)
 
     async def game3rb(self) -> None:
-        """Check for updates from Game3rb."""
-        game3rb_cache = await self.bot_config.find_one(DB_CACHE)
+        """Check for selected games from Game3rb."""
+        game3rb_cache = await self._bot_config.find_one(DB_CACHE)
         game3rb_cache = game3rb_cache["game3rb_cache"]
 
-        game_list = await self.bot_config.find_one(DB_LISTS)
+        game_list = await self._bot_config.find_one(DB_LISTS)
         game_list = "\n".join(game_list["games"])
-        source = await make_http_request(self.session, GAME3RB_URL)
+        source = await make_http_request(self._session, GAME3RB_URL)
         if not source:
             return
 
@@ -114,10 +148,10 @@ class ContentMonitor:
                         game_title.pop(game_title.index(to_remove))
                     except ValueError:
                         if full_title not in game3rb_cache not in to_upload:
-                            await self.bot_config.update_one(
+                            await self._bot_config.update_one(
                                 DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
                             )
-                            await self.user_kexo.send(
+                            await self._user_kexo.send(
                                 f"Game3rb: Broken name - {full_title}"
                             )
                             to_upload.append(full_title)
@@ -157,7 +191,7 @@ class ContentMonitor:
 
             description = []
             source = await make_http_request(
-                self.session,
+                self._session,
                 game["url"],
             )
             if not source:
@@ -209,34 +243,34 @@ class ContentMonitor:
                 icon_url=GAME3RB_ICON,
             )
             embed.set_image(url=game["image"])
-            await self.game_updates_channel.send(embed=embed)
+            await self._game_updates_channel.send(embed=embed)
 
         if to_upload:
-            await self.bot_config.update_one(
+            await self._bot_config.update_one(
                 DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
             )
 
     async def fanatical(self) -> None:
-        """Check for updates from Fanatical."""
-        fanatical_cache = await self._load_fanatical_config()
-        json_data = await make_http_request(self.session, FANATICAL_URL, get_json=True)
+        """Checks for free games from Fanatical."""
+        fanatical_cache = await self._load_fanatical_cache()
+        json_data = await make_http_request(self._session, FANATICAL_URL, get_json=True)
         if not json_data:
             return
         await self._send_fanatical_embed(json_data, fanatical_cache)
 
     async def online_fix(self) -> None:
-        """Check for updates from Online-Fix."""
-        onlinefix_cache, games = await self._load_onlinefix_config()
-        chat_log = await make_http_request(self.session, ONLINEFIX_URL)
+        """Checks for selected games from Online-Fix."""
+        onlinefix_cache, games = await self._load_onlinefix_cache()
+        chat_log = await make_http_request(self._session, ONLINEFIX_URL)
         if not chat_log:
             return
         chat_messages = await self._get_onlinefix_messages(chat_log.text)
         await self._process_onlinefix_messages(chat_messages, onlinefix_cache, games)
 
     async def power_outages(self) -> None:
-        """Check for power outages."""
-        elektrinavypadky_cache = await self._load_power_outages_config()
-        html_content = await make_http_request(self.session, ELEKTRINA_URL)
+        """Checks for power outages."""
+        elektrinavypadky_cache = await self._load_power_outages_cache()
+        html_content = await make_http_request(self._session, POWER_OUTAGES_URL)
         if not html_content:
             return
 
@@ -244,8 +278,8 @@ class ContentMonitor:
         await self._process_power_outage_articles(articles, elektrinavypadky_cache)
 
     async def contests(self) -> None:
-        """Check for contests."""
-        to_filter, esutaze_cache = await self._load_contests_config()
+        """Checks for contests."""
+        to_filter, esutaze_cache = await self._load_contests_cache()
         esutaze_cache_upload = esutaze_cache.copy()
         articles = await self._get_contest_articles()
 
@@ -268,11 +302,11 @@ class ContentMonitor:
 
             await self._send_contest_article(article)
 
-        await self.bot_config.update_one(
+        await self._bot_config.update_one(
             DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache_upload}}
         )
 
-    async def _send_alienware_embed(
+    async def _send_alienware_arena_embed(
         self, json_data: dict, alienwarearena_cache: list, to_filter: list
     ) -> None:
         for giveaway in json_data["data"][:ALIENWAREARENA_MAX_POSTS]:
@@ -312,10 +346,43 @@ class ContentMonitor:
                 title=title, description=description, colour=discord.Colour.dark_theme()
             )
             embed.set_image(url=giveaway["image"])
-            await self.game_updates_channel.send(embed=embed)
+            await self._game_updates_channel.send(embed=embed)
 
-        await self.bot_config.update_one(
+        await self._bot_config.update_one(
             DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
+        )
+
+    async def _send_alienware_arena_news_embed(
+        self, response: httpx.Response, alienware_arena_news_cache: list
+    ) -> None:
+        soup = BeautifulSoup(response.text, "html.parser")
+        news_widget = soup.find("div", class_="widget-table announcements-table")
+
+        for post in news_widget.find_all("div", class_="widget-table-row"):
+            post_info = post.find("a", class_="link relay-announcement-wrap")
+            url = post_info["href"]
+            if url in alienware_arena_news_cache:
+                return
+
+            del alienware_arena_news_cache[0]
+            alienware_arena_news_cache.append(url)
+
+            title = post_info.text
+            post_date = post.find("span", class_="timeago").get("title")
+            post_date = datetime.datetime.strptime(post_date, "%Y-%m-%d %H:%M:%S")
+
+            embed = discord.Embed(
+                title=title,
+                description=f"**[eu.alienwarearena.com](https://eu.alienwarearena.com{url})**",
+                colour=discord.Colour.dark_theme(),
+                timestamp=post_date,
+                thumbnail=ALIENWAREARENA_ICON,
+            )
+            await self._alienware_arena_news_channel.send(embed=embed)
+
+        await self._bot_config.update_one(
+            DB_CACHE,
+            {"$set": {"alienwarearena_news_cache": alienware_arena_news_cache}},
         )
 
     async def _send_fanatical_embed(
@@ -347,14 +414,14 @@ class ContentMonitor:
                 timestamp=iso_to_timestamp(giveaway["valid_from"]),
             )
             embed.set_image(url=img_url)
-            await self.game_updates_channel.send(embed=embed)
+            await self._game_updates_channel.send(embed=embed)
 
-        await self.bot_config.update_one(
+        await self._bot_config.update_one(
             DB_CACHE, {"$set": {"fanatical_cache": fanatical_cache}}
         )
 
     async def _send_onlinefix_embed(self, url: str, game_title: str) -> None:
-        onlinefix_article = await make_http_request(self.session, url)
+        onlinefix_article = await make_http_request(self._session, url)
         if not onlinefix_article:
             return
         soup = BeautifulSoup(onlinefix_article.text, "html.parser")
@@ -390,7 +457,7 @@ class ContentMonitor:
             icon_url=ONLINEFIX_ICON,
         )
         embed.set_thumbnail(url=img_url)
-        await self.game_updates_channel.send(embed=embed)
+        await self._game_updates_channel.send(embed=embed)
 
     async def _process_onlinefix_messages(
         self, messages: list, onlinefix_cache: list, games: list
@@ -422,7 +489,7 @@ class ContentMonitor:
                 break
 
         if to_upload:
-            await self.bot_config.update_one(
+            await self._bot_config.update_one(
                 DB_CACHE, {"$set": {"onlinefix_cache": to_upload}}
             )
 
@@ -468,13 +535,13 @@ class ContentMonitor:
 
             embed.set_footer(
                 text="",
-                icon_url=ELEKTRINA_ICON,
+                icon_url=POWER_OUTAGES_ICON,
             )
-            await self.user_kexo.send(embed=embed)
+            await self._user_kexo.send(embed=embed)
 
             if above_limit:
-                await self.user_kexo.send(description)
-        await self.bot_config.update_one(
+                await self._user_kexo.send(description)
+        await self._bot_config.update_one(
             DB_CACHE,
             {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache_upload}},
         )
@@ -499,7 +566,7 @@ class ContentMonitor:
             return
 
         img_url = img_tag.get("src")
-        image_response = await make_http_request(self.session, img_url, binary=True)
+        image_response = await make_http_request(self._session, img_url, binary=True)
         image = BytesIO(image_response.content)
 
         embed = discord.Embed(
@@ -514,12 +581,12 @@ class ContentMonitor:
             text="www.esutaze.sk",
             icon_url=ESUTAZE_ICON,
         )
-        await self.esutaze_channel.send(
+        await self._esutaze_channel.send(
             embed=embed, file=discord.File(image, "image.png")
         )
 
     async def _get_contest_articles(self) -> list:
-        html_content = await make_http_request(self.session, ESUTAZE_URL)
+        html_content = await make_http_request(self._session, ESUTAZE_URL)
         if not html_content:
             return []
 
@@ -539,32 +606,36 @@ class ContentMonitor:
     def _get_power_outage_articles(html_content: str) -> list:
         soup = BeautifulSoup(html_content, "xml")
         articles = soup.find_all("entry")
-        return articles[:ELEKTRINA_MAX_ARTICLES]
+        return articles[:POWER_OUTAGES_MAX_ARTICLES]
 
-    async def _load_alienware_config(self) -> Tuple[List[str], List[str]]:
-        alienwarearena_cache = await self.bot_config.find_one(DB_CACHE)
-        to_filter = await self.bot_config.find_one(DB_LISTS)
+    async def _load_alienware_cache(self) -> Tuple[List[str], List[str]]:
+        alienwarearena_cache = await self._bot_config.find_one(DB_CACHE)
+        to_filter = await self._bot_config.find_one(DB_LISTS)
         return (
             alienwarearena_cache["alienwarearena_cache"],
             to_filter["alienwarearena_exceptions"],
         )
 
-    async def _load_fanatical_config(self) -> List[str]:
-        fanatical_cache = await self.bot_config.find_one(DB_CACHE)
+    async def _load_fanatical_cache(self) -> List[str]:
+        fanatical_cache = await self._bot_config.find_one(DB_CACHE)
         return fanatical_cache["fanatical_cache"]
 
-    async def _load_onlinefix_config(self) -> Tuple[List[str], List[str]]:
-        onlinefix_cache = await self.bot_config.find_one(DB_CACHE)
-        games = await self.bot_config.find_one(DB_LISTS)
+    async def _load_alienware_news_cache(self) -> List[str]:
+        alienwarearena_news_cache = await self._bot_config.find_one(DB_CACHE)
+        return alienwarearena_news_cache["alienwarearena_news_cache"]
+
+    async def _load_onlinefix_cache(self) -> Tuple[List[str], List[str]]:
+        onlinefix_cache = await self._bot_config.find_one(DB_CACHE)
+        games = await self._bot_config.find_one(DB_LISTS)
         # Remove quotes due to online-fix.me not using quotes
         games = "\n".join(games["games"]).replace("'", "").split("\n")
         return onlinefix_cache["onlinefix_cache"], games
 
-    async def _load_power_outages_config(self) -> list:
-        elektrinavypadky_cache = await self.bot_config.find_one(DB_CACHE)
+    async def _load_power_outages_cache(self) -> list:
+        elektrinavypadky_cache = await self._bot_config.find_one(DB_CACHE)
         return elektrinavypadky_cache["elektrinavypadky_cache"]
 
-    async def _load_contests_config(self) -> tuple:
-        to_filter = await self.bot_config.find_one(DB_LISTS)
-        esutaze_cache = await self.bot_config.find_one(DB_CACHE)
+    async def _load_contests_cache(self) -> tuple:
+        to_filter = await self._bot_config.find_one(DB_LISTS)
+        esutaze_cache = await self._bot_config.find_one(DB_CACHE)
         return to_filter["esutaze_exceptions"], esutaze_cache["esutaze_cache"]

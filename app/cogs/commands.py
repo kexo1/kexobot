@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import aiohttp
 import asyncpraw.models
 import discord
+import httpx
 import wavelink
 from discord.commands import slash_command, guild_only, option
 from discord.ext import commands
@@ -38,22 +39,39 @@ host_authors = []
 
 
 class CommandCog(commands.Cog):
-    """Cog that contains all main commands."""
+    """Cog that contains all main commands.
+
+    This includes commands for:
+    - Bot configuration
+    - Node management
+    - SFD servers
+    - Reddit management
+    - Bot info
+    - Random number generator
+    - Pick a random word from a list
+    - Clear messages
+    - Database management
+
+    Parameters
+    ----------
+    bot: :class:`commands.Bot`
+        The bot instance.
+    """
 
     def __init__(self, bot: commands.Bot) -> None:
-        self.bot = bot
-        self.session = self.bot.session
-        self.bot_config: AsyncIOMotorClient = self.bot.bot_config
-        self.user_data_db: AsyncIOMotorClient = self.bot.user_data_db
-        self.user_data: dict = self.bot.user_data
-        self.temp_user_data: dict = self.bot.temp_user_data
+        self._bot = bot
+        self._session: httpx.AsyncClient = self._bot.session
+        self._bot_config: AsyncIOMotorClient = self._bot.bot_config
+        self._user_data_db: AsyncIOMotorClient = self._bot.user_data_db
+        self._user_data: dict = self._bot.user_data
+        self._temp_user_data: dict = self._bot.temp_user_data
 
-        self.run_time = time.time()
-        self.graphs_dir = os.path.join(os.getcwd(), "graphs")
-        self.sfd_servers = SFDServers(self.bot_config, self.bot.session)
+        self._run_time = time.time()
+        self._graphs_dir = os.path.join(os.getcwd(), "graphs")
+        self._sfd_servers = SFDServers(self._bot_config, self._bot.session)
 
     slash_bot_config = discord.SlashCommandGroup(
-        "bot_config", "Update Bot Configuration"
+        "_bot_config", "Update Bot Configuration"
     )
     slash_node = discord.SlashCommandGroup("node", "Commands for managing nodes")
     slash_reddit = discord.SlashCommandGroup("reddit", "Commands for reddit posts")
@@ -77,16 +95,34 @@ class CommandCog(commands.Cog):
     async def manual_connect(
         self, ctx: discord.ApplicationContext, uri: str, port: int, password: str
     ) -> None:
+        """Method to manually connect to a Lavalink server.
+
+        This method is used to connect to a Lavalink server by providing the
+        server's URI, port, and password. It checks if the server is reachable
+        and if the connection is successful, it sets the node for the bot.
+        If the connection fails, it sends an error message to the user.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        uri: str
+            The URI of the Lavalink server.
+        port: int
+            The port of the Lavalink server.
+        password: str
+            The password for the Lavalink server.
+        """
         await ctx.defer()
         node: wavelink.Node = await check_node_status(
-            self.bot, f"{uri}:{str(port)}", password
+            self._bot, f"{uri}:{str(port)}", password
         )
 
         if not node:
             await send_response(ctx, "NODE_CONNECT_FAILURE", uri=uri)
             return
 
-        self.bot.node = node
+        self._bot.node = node
         await send_response(
             ctx, "NODE_CONNECT_SUCCESS", ephemeral=False, uri=node[0].uri
         )
@@ -97,30 +133,48 @@ class CommandCog(commands.Cog):
     @guild_only()
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def recconect_node(self, ctx: discord.ApplicationContext) -> None:
+        """Method to reconnect to an available Lavalink node.
+
+        This method checks if the bot is connected to a voice channel and if so,
+        it attempts to reconnect to the node. If the bot is not connected to a
+        voice channel, it connects to the node and sets it as the current node.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         await ctx.defer()
         player: wavelink.Player = ctx.voice_client
 
         if player:
             node: wavelink.Node = await switch_node(
-                self.bot.connect_node, player=player, play_after=False
+                self._bot.connect_node, player=player, play_after=False
             )
-            self.bot.node = node
+            self._bot.node = node
             await send_response(
                 ctx,
                 "NODE_RECONNECT_TO_PLAYER_SUCCESS",
                 ephemeral=False,
-                uri=self.bot.node.uri,
+                uri=self._bot.node.uri,
             )
         else:
-            node: wavelink.Node = await self.bot.connect_node(ctx.guild_id)
-            self.bot.node = node
+            node: wavelink.Node = await self._bot.connect_node(ctx.guild_id)
+            self._bot.node = node
             await send_response(
-                ctx, "NODE_RECONNECT_SUCCESS", ephemeral=False, uri=self.bot.node.uri
+                ctx, "NODE_RECONNECT_SUCCESS", ephemeral=False, uri=self._bot.node.uri
             )
 
     @slash_node.command(name="info", description="Information about connected node")
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
-        node: wavelink.Node = self.bot.node
+        """Method to fetch and display information about the connected Lavalink node.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
+        node: wavelink.Node = self._bot.node
         node_info: wavelink.InfoResponsePayload = await node.fetch_info()
         embed = discord.Embed(
             title=urlparse(node.uri).netloc,
@@ -145,8 +199,15 @@ class CommandCog(commands.Cog):
         name="supported_platforms",
         description="Supported music platforms in the current node",
     )
-    async def node_info(self, ctx: discord.ApplicationContext) -> None:
-        node: wavelink.Node = self.bot.node
+    async def node_supported_platforms(self, ctx: discord.ApplicationContext) -> None:
+        """Method to fetch and display supported platforms of the connected Lavalink node.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
+        node: wavelink.Node = self._bot.node
         node_info: wavelink.InfoResponsePayload = await node.fetch_info()
 
         plugins: wavelink.PluginResponsePayload = node_info.plugins
@@ -172,14 +233,14 @@ class CommandCog(commands.Cog):
 
         elif youtube_plugin:
             embed.add_field(
-                name=f"_3 platforms supported_",
+                name="_3 platforms supported_",
                 value="\n".join(f"{i + 1}. {SUPPORTED_PLATFORMS[i]}" for i in range(3)),
             )
         else:
             embed.description = "No platforms supported"
 
         embed.set_footer(
-            text=f"unlikely - depends if node owner added API key for each platform"
+            text="unlikely - depends if node owner added API key for each platform"
             if lavasrc_plugin
             else ""
         )
@@ -187,6 +248,13 @@ class CommandCog(commands.Cog):
 
     @slash_node.command(name="players", description="Information about node players.")
     async def node_players(self, ctx: discord.ApplicationContext) -> None:
+        """Method to fetch and display information about players connected to the Lavalink node.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         nodes: dict[str, wavelink.Node] = wavelink.Pool.nodes.values()
 
         if not nodes:
@@ -212,7 +280,7 @@ class CommandCog(commands.Cog):
             )
 
             for player in players:
-                guild: discord.Guild = await self.bot.fetch_guild(player.guild_id)
+                guild: discord.Guild = await self._bot.fetch_guild(player.guild_id)
                 server_name.append(guild.name)
                 playing.append(player.track.title if player.track else "Nothing")
                 node_uri.append(node.uri)
@@ -234,12 +302,18 @@ class CommandCog(commands.Cog):
     )
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def get_sfd_servers(self, ctx: discord.ApplicationContext) -> None:
-        servers = await self.sfd_servers.get_servers()
-        if not servers:
+        """Method to fetch and display information about available SFD servers.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
+        servers_dict, all_players = await self._sfd_servers.get_servers_info()
+        if not servers_dict:
             await send_response(ctx, "SFD_SERVERS_NOT_FOUND")
             return
 
-        servers_dict, all_players = await self.sfd_servers.get_servers_info()
         embed = discord.Embed(
             title="Available Servers",
             color=discord.Color.blue(),
@@ -256,7 +330,16 @@ class CommandCog(commands.Cog):
     async def get_sfd_server_info(
         self, ctx: discord.ApplicationContext, search: str
     ) -> None:
-        server = self.sfd_servers.get_server(search)
+        """Method to fetch and display information about a specific SFD server.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        search: str
+            The name of the server to search for.
+        """
+        server = self._sfd_servers.get_server(search)
         if not server:
             await send_response(ctx, "SFD_SERVER_NOT_FOUND")
             return
@@ -300,16 +383,27 @@ class CommandCog(commands.Cog):
         graph_range: str,
         timezone: str = "New_York",
     ) -> None:
+        """Method to fetch and display a graph of SFD server activity.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        graph_range: str
+            The range of the graph (Day or Week).
+        timezone: str
+            The timezone to adjust time-based data on the graph.
+        """
         await ctx.defer()
 
         if graph_range == "Day":
             filename = f"sfd_activity_day_{timezone}.png"
-            generator = self.sfd_servers.generate_graph_day
+            generator = self._sfd_servers.generate_graph_day
         else:
             filename = f"sfd_activity_week_{timezone}.png"
-            generator = self.sfd_servers.generate_graph_week
+            generator = self._sfd_servers.generate_graph_week
 
-        image_location = os.path.join(self.graphs_dir, filename)
+        image_location = os.path.join(self._graphs_dir, filename)
 
         if not os.path.exists(image_location) or get_file_age(image_location) >= 3600:
             await generator(timezone)
@@ -381,6 +475,36 @@ class CommandCog(commands.Cog):
         ping: bool = True,
         image: str = None,
     ) -> None:
+        """Method to create a hosting embed for SFD servers.
+
+        This method creates an embed with information about the server being hosted.
+        It also uses class `HostView` to create a button for the user to stop hosting.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        server_name: str
+            The name of the server being hosted.
+        duration: str
+            The duration for which the server will be hosted.
+        branch: str
+            The branch of the server (Stable, Beta, Redux).
+        version: str
+            The version of the server being hosted.
+        password: str
+            The password for the server.
+        region: str
+            The region of the server.
+        scripts: str
+            The scripts enabled on the server.
+        slots: int
+            The number of slots on the server (default is 8).
+        ping: bool
+            Whether to ping the @Exotic role or not (default is True).
+        image: str
+            The URL of the image to be used in the embed.
+        """
         author = ctx.author
 
         if author in host_authors:
@@ -447,18 +571,25 @@ class CommandCog(commands.Cog):
         return None
 
     # -------------------- Discord functions -------------------- #
-    @slash_command(name="info", description="Shows bot info.")
+    @slash_command(name="info", description="Shows _bot info.")
     async def info(self, ctx: discord.ApplicationContext) -> None:
+        """Method to fetch and display information about the bot.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         embed = discord.Embed(title="KexoBOT Info", color=discord.Color.blue())
         embed.add_field(
             name="Run time:ㅤㅤ",
-            value=f"{str(datetime.timedelta(seconds=round(int(time.time()) - self.run_time)))}",
+            value=f"{str(datetime.timedelta(seconds=round(int(time.time()) - self._run_time)))}",
         )
-        embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self.bot.latency * 1000)} ms")
+        embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self._bot.latency * 1000)} ms")
         embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
-        embed.add_field(name="Online nodes:ㅤ", value=self.bot.get_online_nodes())
-        embed.add_field(name="Available nodes:ㅤ", value=self.bot.get_avaiable_nodes())
-        embed.add_field(name="Joined servers:ㅤ", value=len(self.bot.guilds))
+        embed.add_field(name="Online nodes:ㅤ", value=self._bot.get_online_nodes())
+        embed.add_field(name="Available nodes:ㅤ", value=self._bot.get_avaiable_nodes())
+        embed.add_field(name="Joined servers:ㅤ", value=len(self._bot.guilds))
         embed.add_field(name="Bot version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
         embed.add_field(
@@ -472,6 +603,17 @@ class CommandCog(commands.Cog):
     async def random_number(
         self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
     ) -> None:
+        """Method to generate a random number between two integers.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        ineteger1: int
+            The first integer of the range.
+        ineteger2: int
+            The second integer of the range.
+        """
         if ineteger1 > ineteger2:
             ineteger2, ineteger1 = ineteger1, ineteger2
         await ctx.respond(f"I chose `{random.randint(ineteger1, ineteger2)}`")
@@ -482,6 +624,17 @@ class CommandCog(commands.Cog):
     )
     @option("words", description="Seperate words by space.")
     async def pick(self, ctx, words: str) -> None:
+        """Method to pick a random word from a list of words.
+        Parameter is a string of words separated by spaces,
+        but it is split into a list.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        words: str
+            The list of words separated by spaces.
+        """
         words = words.split()
         await ctx.respond("I chose " + "`" + str(random.choice(words)) + "`")
 
@@ -489,6 +642,16 @@ class CommandCog(commands.Cog):
     @discord.default_permissions(administrator=True)
     @option("integer", description="Max is 50.", min_value=1, max_value=50)
     async def clear(self, ctx: discord.ApplicationContext, integer: int) -> None:
+        """Method to clear messages in a channel.
+        This method is only available to administrators.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        integer: int
+            The number of messages to clear (max 50).
+        """
         await ctx.respond(
             f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=True
         )
@@ -504,6 +667,18 @@ class CommandCog(commands.Cog):
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
     @option("to_upload", description="String to upload.")
     async def bot_config_add(self, ctx, collection: str, to_upload: str) -> None:
+        """Method to add a string to a selected database collection.
+        This method is only available to the bot owner.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        collection: str
+            The name of the database collection to add the string to.
+        to_upload: str
+            The string to upload to the database.
+        """
         await self._add_to_bot_config(ctx, collection, to_upload)
 
     @slash_bot_config.command(
@@ -515,6 +690,18 @@ class CommandCog(commands.Cog):
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
     @option("to_remove", description="String to remove.")
     async def bot_config_remove(self, ctx, collection: str, to_remove: str) -> None:
+        """Method to remove a string from a selected database collection.
+        This method is only available to the bot owner.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        collection: str
+            The name of the database collection to remove the string from.
+        to_remove: str
+            The string to remove from the database.
+        """
         await self._remove_from_bot_config(ctx, collection, to_remove)
 
     @slash_bot_config.command(
@@ -525,6 +712,16 @@ class CommandCog(commands.Cog):
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
     async def bot_config_show(self, ctx, collection: str) -> None:
+        """Method to show data from a selected database collection.
+        This method is only available to the bot owner.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        collection: str
+            The name of the database collection to show data from.
+        """
         await self._show_bot_config(ctx, collection)
 
     @slash_reddit.command(
@@ -532,11 +729,21 @@ class CommandCog(commands.Cog):
         description="Change your list of subreddits.",
     )
     async def edit_subreddit(self, ctx: discord.ApplicationContext) -> None:
+        """Method to edit the list of subreddits for the user.
+
+        This method creates a view with a select menu for the user to choose
+        subreddits. The currently selected subreddits are pre-checked.
+
+        Parameters
+        ----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command invocation.
+        """
         user_id = ctx.author.id
-        user_data, temp_user_data = await get_user_data(self.bot, ctx)
+        user_data, _ = await get_user_data(self._bot, ctx)
         current_subreddits = user_data["reddit"]["subreddits"]
         # Create a view with select menu for all available subreddits
-        view = SubredditSelectorView(current_subreddits, self.bot, user_id)
+        view = SubredditSelectorView(current_subreddits, self._bot, user_id)
 
         embed = discord.Embed(
             title="Select Subreddits",
@@ -548,7 +755,7 @@ class CommandCog(commands.Cog):
         await ctx.respond(embed=embed, view=view, ephemeral=True)
 
     async def _show_bot_config(self, ctx, collection: str) -> None:
-        bot_config: dict = await self.bot_config.find_one(DB_LISTS)
+        bot_config: dict = await self._bot_config.find_one(DB_LISTS)
         collection_name = collection
         collection: list = bot_config[DB_CHOICES[collection]]
 
@@ -562,7 +769,7 @@ class CommandCog(commands.Cog):
         await ctx.respond(embed=embed)
 
     async def _add_to_bot_config(self, ctx, collection: str, to_upload: str) -> None:
-        bot_config: dict = await self.bot_config.find_one(DB_LISTS)
+        bot_config: dict = await self._bot_config.find_one(DB_LISTS)
         collection_name = collection
         collection_db_name = DB_CHOICES[collection]
         collection: list = bot_config[collection_db_name]
@@ -572,7 +779,7 @@ class CommandCog(commands.Cog):
             return
 
         collection.append(to_upload)
-        await self.bot_config.update_one(
+        await self._bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
         await send_response(
@@ -582,7 +789,7 @@ class CommandCog(commands.Cog):
     async def _remove_from_bot_config(
         self, ctx, collection: str, to_remove: str
     ) -> None:
-        bot_config: dict = await self.bot_config.find_one(DB_LISTS)
+        bot_config: dict = await self._bot_config.find_one(DB_LISTS)
         collection_name = collection
         collection_db_name = DB_CHOICES[collection]
         collection: list = bot_config[collection_db_name]
@@ -592,7 +799,7 @@ class CommandCog(commands.Cog):
             return
 
         del collection[collection.index(to_remove)]
-        await self.bot_config.update_one(
+        await self._bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
         await send_response(
@@ -601,9 +808,22 @@ class CommandCog(commands.Cog):
 
 
 class HostView(discord.ui.View):
+    """View for the hosting embed.
+
+    This view contains a button that allows the user to stop hosting.
+    When the button is clicked, it disables the embed and removes the
+    user from the list of host authors. If the button is not clicked
+    within 12 hours, the embed is disabled and a message is sent to the user.
+
+    Parameters
+    ----------
+    author: :class:`discord.Member`
+        The author of the hosting embed.
+    """
+
     def __init__(self, author: discord.Member):
         super().__init__(timeout=43200, disable_on_timeout=True)
-        self.author = author
+        self._author = author
 
     # noinspection PyUnusedLocal
     @discord.ui.button(
@@ -612,18 +832,38 @@ class HostView(discord.ui.View):
     async def button_callback(
         self, button: discord.Button, interaction: discord.Interaction
     ) -> None:
+        """Callback for the button in the hosting embed.
+
+        This method is called when the button is clicked.
+        It checks if the user who clicked the button is the same as the author of the embed.
+        If so, it disables the embed and removes the author from the list of host authors.
+        If not, it sends a response indicating that the user is not the author of the embed.
+
+        Parameters
+        ----------
+        button: :class:`discord.Button`
+            The button that was clicked.
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered the button click.
+        """
         if interaction.user.name in host_authors:
-            embed = await self.disable_embed()
+            embed = await self._disable_embed()
             await interaction.response.edit_message(embed=embed, view=None)
-            host_authors.pop(host_authors.index(self.author.name))
+            host_authors.pop(host_authors.index(self._author.name))
             return
 
         await send_response(interaction, "NOT_EMBED_AUTHOR")
 
     async def on_timeout(self) -> None:
-        embed = await self.disable_embed()
+        """Method called when the view times out.
+
+        This method disables the embed and sends a message to the
+        author indicating that they forgot to click the button.
+        It also removes the author from the list of host authors.
+        """
+        embed = await self._disable_embed()
         await self.message.edit(embed=embed, view=None)
-        await self.author.send(
+        await self._author.send(
             f"**You forgot to click button in {self.message.jump_url} you {
                 random.choice(
                     (
@@ -638,15 +878,15 @@ class HostView(discord.ui.View):
                 )
             }.**"
         )
-        del host_authors[host_authors.index(self.author.name)]
+        del host_authors[host_authors.index(self._author.name)]
 
-    async def disable_embed(self) -> discord.Embed:
+    async def _disable_embed(self) -> discord.Embed:
         self.stop()
 
-        embed = self.message.embeds[0]
+        embed = self.message._embeds[0]
         embed.set_author(
-            icon_url=self.author.avatar.url,
-            name=f"{self.author.name} is no longer hosting.",
+            icon_url=self._author.avatar.url,
+            name=f"{self._author.name} is no longer hosting.",
         )
         embed.color = discord.Color.from_rgb(r=200, g=0, b=0)
         embed.set_field_at(
@@ -659,27 +899,39 @@ class HostView(discord.ui.View):
 
 
 class SubredditSelectorView(discord.ui.View):
+    """Class which manages selector
+
+    Parameters
+    ----------
+    current_subreddits: set
+        A set of currently selected subreddits.
+    bot: :class:`discord.Bot`
+        The bot instance.
+    user_id: int
+        The ID of the user who is editing the subreddits.
+    """
+
     def __init__(self, current_subreddits: set, bot: discord.Bot, user_id: int) -> None:
         super().__init__(timeout=600)
-        self.current_subreddits = current_subreddits
-        self.selected_subreddits = set()
-        self.bot = bot
-        self.user_id = user_id
+        self._current_subreddits = current_subreddits
+        self._selected_subreddits = set()
+        self._bot = bot
+        self._user_id = user_id
 
-        self._user_data = self.bot.user_data
-        self._user_data_db = self.bot.user_data_db
-        self._temp_user_data = self.bot.temp_user_data
+        self._user_data = self._bot.user_data
+        self._user_data_db = self._bot.user_data_db
+        self._temp_user_data = self._bot.temp_user_data
 
-        self.select = SubredditSelect(current_subreddits)
-        self.save_button = discord.ui.Button(
+        self._select = SubredditSelect(current_subreddits)
+        self._save_button = discord.ui.Button(
             label="Save Changes",
             style=discord.ButtonStyle.green,
             custom_id="save_changes",
         )
-        self.save_button.callback = self.save_changes
+        self._save_button.callback = self.save_changes
 
         nsfw_status = self._user_data[user_id]["reddit"]["nsfw_posts"]
-        self.nsfw_button = discord.ui.Button(
+        self._nsfw_button = discord.ui.Button(
             label="NSFW ON" if nsfw_status else "NSFW OFF",
             style=(
                 discord.ButtonStyle.green
@@ -688,43 +940,65 @@ class SubredditSelectorView(discord.ui.View):
             ),
             custom_id="nsfw_posts",
         )
-        self.nsfw_button.callback = self.nsfw_posts
+        self._nsfw_button.callback = self.nsfw_posts
 
-        self.add_item(self.select)
-        self.add_item(self.save_button)
-        self.add_item(self.nsfw_button)
+        self.add_item(self._select)
+        self.add_item(self._save_button)
+        self.add_item(self._nsfw_button)
 
     async def nsfw_posts(self, interaction: discord.Interaction) -> None:
-        nsfw_status = not self._user_data[self.user_id]["reddit"]["nsfw_posts"]
+        """Callback for the NSFW button.
 
-        self._user_data[self.user_id]["reddit"]["nsfw_posts"] = nsfw_status
+        This method toggles the NSFW status of the user and updates the database.
+        It also updates the button label and style to reflect the new status.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered the button click.
+        """
+        nsfw_status = not self._user_data[self._user_id]["reddit"]["nsfw_posts"]
+
+        self._user_data[self._user_id]["reddit"]["nsfw_posts"] = nsfw_status
         await self._user_data_db.update_one(
-            {"_id": self.user_id}, {"$set": self._user_data[self.user_id]}
+            {"_id": self._user_id}, {"$set": self._user_data[self._user_id]}
         )
 
-        self.nsfw_button.label = "NSFW ON" if nsfw_status else "NSFW OFF"
-        self.nsfw_button.style = (
+        self._nsfw_button.label = "NSFW ON" if nsfw_status else "NSFW OFF"
+        self._nsfw_button.style = (
             discord.ButtonStyle.green if not nsfw_status else discord.ButtonStyle.red
         )
 
         await interaction.response.edit_message(view=self)
 
     async def save_changes(self, interaction: discord.Interaction) -> None:
-        if self.selected_subreddits:
-            self._user_data[self.user_id]["reddit"]["subreddits"] = list(
-                self.selected_subreddits
+        """Callback for the save changes button.
+
+        This method saves the selected subreddits to the database and updates the multireddit
+        if the user has one. It also sends a response to the user indicating that the changes
+        were saved successfully.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered the button click.
+        """
+        if self._selected_subreddits:
+            self._user_data[self._user_id]["reddit"]["subreddits"] = list(
+                self._selected_subreddits
             )
 
             await self._user_data_db.update_one(
-                {"_id": self.user_id}, {"$set": self._user_data[self.user_id]}
+                {"_id": self._user_id}, {"$set": self._user_data[self._user_id]}
             )
 
-            if self.user_id in self._temp_user_data:
+            if self._user_id in self._temp_user_data:
                 await self._update_multireddit()
 
         embed = discord.Embed(
             title="Changes Saved",
-            description=f"Successfully updated your subreddit list to `{len(self.selected_subreddits)}` subreddits.",
+            description="Successfully updated your subreddit list"
+            f" to `{len(self._selected_subreddits)}` subreddits.",
             color=discord.Color.green(),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
@@ -735,38 +1009,50 @@ class SubredditSelectorView(discord.ui.View):
         self.stop()
 
     async def _update_multireddit(self) -> None:
-        multireddit: asyncpraw.models.Multireddit = self._temp_user_data[self.user_id][
+        multireddit: asyncpraw.models.Multireddit = self._temp_user_data[self._user_id][
             "reddit"
         ]["multireddit"]
         await multireddit.load()
         added_subreddits = set()
 
         for subreddit in multireddit.subreddits:
-            if subreddit.display_name not in self.selected_subreddits:
+            if subreddit.display_name not in self._selected_subreddits:
                 await multireddit.remove(subreddit)
                 continue
             added_subreddits.add(subreddit.display_name)
 
-        for subreddit in self.selected_subreddits:
+        for subreddit in self._selected_subreddits:
             if subreddit in added_subreddits:
                 continue
 
             try:
-                await multireddit.add(await self.bot.reddit_agent.subreddit(subreddit))
+                await multireddit.add(await self._bot.reddit_agent.subreddit(subreddit))
             except asyncpraw.exceptions.RedditAPIException:
                 print(f"Failed to add subreddit `{subreddit}`")
 
-        self._temp_user_data[self.user_id]["reddit"]["multireddit"] = multireddit
+        self._temp_user_data[self._user_id]["reddit"]["multireddit"] = multireddit
 
 
 class SubredditSelect(discord.ui.Select):
+    """Class to create a select menu for subreddit selection.
+
+    This class inherits from discord.ui.Select and is used to create a select menu
+    for the user to choose subreddits. The currently selected subreddits are pre-checked.
+
+    Parameters
+    ----------
+    current_subreddits: set
+        A set of currently selected subreddits.
+    """
+
     def __init__(self, current_subreddits: set):
         options = [
             discord.SelectOption(
                 label=f"r/{subreddit}",
                 value=subreddit,
                 default=subreddit in current_subreddits,
-                description=f"Select to {'remove' if subreddit in current_subreddits else 'add'} this subreddit",
+                description=f"Select to {'remove' if subreddit in current_subreddits else 'add'}"
+                " this subreddit",
             )
             for subreddit in SHITPOST_SUBREDDITS_ALL
         ]
@@ -778,6 +1064,16 @@ class SubredditSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        """Callback for the subreddit select menu.
+
+        This method is called when the user selects or deselects a subreddit.
+        It updates the selected subreddits based on the user's choices.
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered the select menu callback.
+        """
         self.view.selected_subreddits = set()
         for subreddit in self.values:
             self.view.selected_subreddits.add(subreddit)
@@ -785,4 +1081,5 @@ class SubredditSelect(discord.ui.Select):
 
 
 def setup(bot: commands.Bot):
+    """Setup function to add the CommandCog to the bot."""
     bot.add_cog(CommandCog(bot))

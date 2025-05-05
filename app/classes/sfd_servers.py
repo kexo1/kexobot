@@ -1,8 +1,7 @@
 import datetime
 import os
-
 from datetime import timedelta
-from typing import Union, cast
+from typing import Union
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -24,6 +23,35 @@ plt.style.use("cyberpunk")
 
 
 class SFDServer:
+    """Class representing a SFD server.
+
+
+    Attributes:
+    ----------
+    address_ipv4 : str
+        The IPv4 address of the server.
+    port : int
+        The port number of the server.
+    server_name : str
+        The name of the server.
+    game_mode : int
+        The game mode of the server.
+    map_name : str
+        The name of the map being played on the server.
+    players : int
+        The number of players currently on the server.
+    max_players : int
+        The maximum number of players allowed on the server.
+    bots : int
+        The number of bots currently on the server.
+    has_password : bool
+        Whether the server has a password.
+    description : str
+        A description of the server.
+    version : str
+        The version of the server.
+    """
+
     def __init__(
         self,
         address_ipv4,
@@ -53,22 +81,57 @@ class SFDServer:
     def __repr__(self) -> str:
         return f"SFDServer({self.server_name}, {self.map_name}, {self.players}, {self.max_players}, {self.bots})"
 
-    def get_full_server_info(self):
+    @property
+    def get_full_server_info(self) -> str:
+        """Returns a formatted string with the server's full information.
+
+        Returns:
+        -------
+        str
+            A formatted string with the server's full information.
+        """
         return self
 
+    @property
     def get_game_mode(self) -> str:
+        """Returns the game mode of the server as a string.
+
+        Returns:
+        -------
+        str
+            The game mode of the server as a string.
+        """
         game_modes = {1: "Versus", 2: "Custom", 3: "Campaign", 4: "Survival"}
         return game_modes.get(self.game_mode, "Unknown")
 
 
 class SFDServers:
-    def __init__(self, bot_config: AsyncIOMotorClient, session: httpx.AsyncClient):
-        self.session = session
-        self.bot_config = bot_config
-        self.graphs_dir = os.path.join(os.getcwd(), "graphs")
-        os.makedirs(self.graphs_dir, exist_ok=True)
+    """Class to handle SFD server data and activity.
 
-    async def generate_graph_day(self, timezone: str):
+    Attributes:
+    ----------
+    _bot_config : AsyncIOMotorClient
+        The MongoDB client for database operations.
+    _session : httpx.AsyncClient
+        The HTTP client for making requests.
+    _graphs_dir : str
+        The directory where graphs will be saved.
+    """
+
+    def __init__(self, bot_config: AsyncIOMotorClient, session: httpx.AsyncClient):
+        self._session = session
+        self._bot_config = bot_config
+        self._graphs_dir = os.path.join(os.getcwd(), "graphs")
+        os.makedirs(self._graphs_dir, exist_ok=True)
+
+    async def generate_graph_day(self, timezone: str) -> None:
+        """Method to generate a daily activity graph.
+
+        Parameters:
+        ----------
+        timezone : str
+            The timezone to use for the graph.
+        """
         activity = await self._load_sfd_activity_data()
         players, servers = activity["players_day"], activity["servers_day"]
 
@@ -86,11 +149,18 @@ class SFDServers:
         time_positions = [i * 10 + 5 for i in range(24)]
         plt.xticks(time_positions, hours)
         plt.savefig(
-            os.path.join(self.graphs_dir, f"sfd_activity_day_{timezone}.png"), dpi=300
+            os.path.join(self._graphs_dir, f"sfd_activity_day_{timezone}.png"), dpi=300
         )
         plt.close("all")
 
     async def generate_graph_week(self, timezone: str):
+        """Method to generate a weekly activity graph.
+
+        Parameters:
+        ----------
+        timezone : str
+            The timezone to use for the graph.
+        """
         activity = await self._load_sfd_activity_data()
         players, servers = activity["players_week"], activity["servers_week"]
         selected_timezone = ZoneInfo(TIMEZONES[timezone])
@@ -121,16 +191,25 @@ class SFDServers:
         plt.xticks(time_positions, hours, rotation=45)
         plt.subplots_adjust(bottom=0.2)
         plt.savefig(
-            os.path.join(self.graphs_dir, f"sfd_activity_week_{timezone}.png"),
+            os.path.join(self._graphs_dir, f"sfd_activity_week_{timezone}.png"),
             dpi=300,
             bbox_inches="tight",
         )
         plt.close("all")
 
-    async def update_stats(self, now) -> None:
+    async def update_stats(self, now: datetime.datetime) -> None:
+        """Method to update the server statistics.
+
+        Parameters:
+        ----------
+        now : datetime.datetime
+            The current datetime.
+        """
         activity = await self._load_sfd_activity_data()
         players_day, servers_day = activity["players_day"], activity["servers_day"]
         current_players, current_servers = await self._get_players_and_servers()
+        if current_players is None or current_servers is None:
+            return
 
         players_day.pop(0)
         servers_day.pop(0)
@@ -138,7 +217,7 @@ class SFDServers:
         servers_day.append(current_servers)
 
         # Update daily stats
-        await self.bot_config.update_many(
+        await self._bot_config.update_many(
             DB_SFD_ACTIVITY,
             {
                 "$set": {
@@ -188,7 +267,7 @@ class SFDServers:
         next_update = now.replace(hour=rounded_hour, minute=0, second=0, microsecond=0)
         next_update = next_update.replace(tzinfo=ZoneInfo("Europe/Bratislava"))
 
-        await self.bot_config.update_many(
+        await self._bot_config.update_many(
             DB_SFD_ACTIVITY,
             {
                 "$set": {
@@ -200,7 +279,17 @@ class SFDServers:
         )
 
     async def get_servers_info(self) -> tuple:
-        servers: list[SFDServer] = cast(list[SFDServer], await self._parse_servers())
+        """Method to get the server information.
+
+        Returns:
+        -------
+        tuple
+            A tuple containing a dictionary with server information and the total number of players.
+        """
+        servers: list[SFDServer] = await self._parse_servers()
+        if not servers:
+            return None, None
+
         servers_dict: dict = {"server_name": [], "maps": [], "players": []}
         all_players = 0
 
@@ -216,44 +305,58 @@ class SFDServers:
 
         return servers_dict, all_players
 
-    async def get_servers(self) -> list[SFDServer]:
-        servers: list[SFDServer] = await self._parse_servers()
-        return servers
+    async def get_server(self, search: str) -> SFDServer | None:
+        """Method to get a specific server by its name.
 
-    async def get_server(self, search: str) -> SFDServer:
-        return await self._parse_servers(search)
+        Parameters:
+        ----------
+        search : str
+            The name of the server to search for.
+
+        Returns:
+        -------
+        SFDServer | None
+            The server object if found, otherwise None.
+        """
+        server = await self._parse_servers(search)
+        if not server:
+            return None
+        return server
 
     async def _load_sfd_servers(self) -> str:
         response = await make_http_request(
-            self.session, SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS
+            self._session, SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS
         )
         if not response:
-            return ""
+            return None
         return response.text
 
     async def _get_players_and_servers(self) -> tuple:
         servers = await self._parse_servers()
+        if not servers:
+            return None, None
+
         players = 0
         for server in servers:
             players += server.players
         return players, len(servers)
 
     async def _load_sfd_activity_data(self) -> dict:
-        return await self.bot_config.find_one(DB_SFD_ACTIVITY)
+        return await self._bot_config.find_one(DB_SFD_ACTIVITY)
 
     async def _parse_servers(
         self, search: str = None
     ) -> Union[list[SFDServer], SFDServer, None]:
         response = await self._load_sfd_servers()
         if not response:
-            return []
+            return None
 
         soup = BeautifulSoup(response, "xml")
         servers_element = soup.find("GetGameServersResult").find("Servers")
 
         servers = []
         if not servers_element:
-            return []
+            return None
 
         all_servers = servers_element.find_all("SFDGameServer")
         for server_element in all_servers:

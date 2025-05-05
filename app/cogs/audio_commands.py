@@ -13,8 +13,16 @@ from app.utils import get_guild_data
 
 
 class Audio(commands.Cog):
+    """Class for audio commands.
+
+    Parameters
+    ----------
+    bot: class:`discord.Bot`
+        The _bot instance.
+    """
+
     def __init__(self, bot: commands.Bot):
-        self.bot = bot
+        self._bot = bot
 
     @subcommand("music")
     @slash_command(name="volume", description="Sets audio volume.")
@@ -31,18 +39,27 @@ class Audio(commands.Cog):
     async def change_volume(
         self, ctx: discord.ApplicationContext, volume: Optional[int] = None
     ) -> None:
+        """Sets the volume of the player.
+
+        Parameters
+        ----------
+        ctx: class:`discord.ApplicationContext`
+            The context of the command.
+        volume: Optional[int]
+            The volume to set. If not provided, it will return the current volume.
+        """
         player: wavelink.Player = ctx.voice_client
 
         if volume is None:
             await send_response(ctx, "CURRENT_VOLUME", volume=player.volume)
             return
 
-        guild_data, _ = await get_guild_data(self.bot, ctx.guild_id)
+        guild_data, _ = await get_guild_data(self._bot, ctx.guild_id)
         guild_data["music"]["volume"] = volume
-        await self.bot.guild_data_db.update_one(
+        await self._bot.guild_data_db.update_one(
             {"_id": ctx.guild_id}, {"$set": guild_data}
         )
-        self.bot.guild_data[ctx.guild_id] = guild_data
+        self._bot.guild_data[ctx.guild_id] = guild_data
         await player.set_volume(volume)
         await send_response(ctx, "VOLUME_CHANGED", ephemeral=False, volume=volume)
 
@@ -62,6 +79,15 @@ class Audio(commands.Cog):
     async def speed(
         self, ctx: discord.ApplicationContext, multiplier: Optional[int] = 2
     ) -> None:
+        """Sets the speed of the player.
+
+        Parameters
+        ----------
+        ctx: class:`discord.ApplicationContext`
+            The context of the command.
+        multiplier: Optional[int]
+            The multiplier to set. If not provided, it will set it to normal speed.
+        """
         player: wavelink.Player = ctx.voice_client
         filters: wavelink.Filters = player.filters
         filters.timescale.set(speed=multiplier)
@@ -76,6 +102,13 @@ class Audio(commands.Cog):
     @guild_only()
     @is_joined()
     async def clear_effects(self, ctx: discord.ApplicationContext) -> None:
+        """Clears all effects on the player.
+
+        Parameters
+        ----------
+        ctx: class:`discord.ApplicationContext`
+            The context of the command.
+        """
         player: wavelink.Player = ctx.voice_client
         filters: wavelink.Filters = player.filters
 
@@ -85,4 +118,5 @@ class Audio(commands.Cog):
 
 
 def setup(bot: commands.Bot):
+    """Sets up the Audio cog."""
     bot.add_cog(Audio(bot))

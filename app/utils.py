@@ -16,16 +16,47 @@ from constants import SHITPOST_SUBREDDITS_DEFAULT, SONG_STRIP, SOURCE_PATTERNS
 
 
 def load_text_file(name: str) -> list:
+    """This method loads a text file and returns its content as a list of strings.
+
+    Parameters
+    ----------
+    name: str
+        The name of the text file to load (without the .txt extension).
+    """
     with open(f"text_files/{name}.txt", encoding="utf8") as f:
         return f.read().split("\n")
 
 
 def iso_to_timestamp(iso_time: str) -> datetime:
+    """Convert an ISO 8601 formatted string to a datetime object.
+
+    Parameters
+    ----------
+    iso_time: str
+        The ISO 8601 formatted string to convert.
+
+    Returns
+    -------
+    :class:`datetime.datetime`
+        The converted datetime object.
+    """
     timestamp = datetime.fromisoformat(iso_time.replace("Z", "+00:00"))
     return timestamp
 
 
 def get_file_age(file_path: str) -> float:
+    """Get the age of a file in seconds.
+
+    Parameters
+    ----------
+    file_path: str
+        The path to the file.
+
+    Returns
+    -------
+    float
+        The age of the file in seconds.
+    """
     if os.path.exists(file_path):
         file_time = os.path.getmtime(file_path)
         current_time = datetime.now().timestamp()
@@ -34,12 +65,31 @@ def get_file_age(file_path: str) -> float:
 
 
 def average(numbers: list) -> float:
+    """Calculate the average of a list of numbers.
+
+    Parameters
+    ----------
+    numbers: list
+        The list of numbers to calculate the average of.
+
+    Returns
+    -------
+    float
+        The average of the numbers in the list.
+    """
     if not numbers:
         return 0.0
     return sum(numbers) / len(numbers)
 
 
 def get_memory_usage():
+    """Get the current memory usage of the process in MB.
+
+    Returns
+    -------
+    float
+        The current memory usage of the process in MB.
+    """
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
     return mem_info.rss / (1024 * 1024)
@@ -48,6 +98,22 @@ def get_memory_usage():
 async def download_video(
     session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> Optional[discord.File]:
+    """Download a video from a given URL and return it as a discord.File.
+
+    Parameters
+    ----------
+    session: :class:`httpx.AsyncClient`
+        The httpx client session to use for the request.
+    url: str
+        The URL of the video to download.
+    nsfw: bool
+        Whether the video is NSFW (not safe for work).
+
+    Returns
+    -------
+    :class:`discord.File`
+        The downloaded video as a discord.File.
+    """
     video_folder = os.path.join(os.getcwd(), "video")
     os.makedirs(video_folder, exist_ok=True)
     video_path = os.path.join(video_folder, "video.mp4")
@@ -72,6 +138,22 @@ async def download_video(
 async def check_node_status(
     bot: discord.Bot, uri: str, password: str
 ) -> Optional[wavelink.Node]:
+    """Check the status of a Lavalink node and return it if it's online.
+
+    Parameters
+    ----------
+    bot: :class:`discord.Bot`
+        The discord bot instance.
+    uri: str
+        The URI of the Lavalink node to check.
+    password: str
+        The password for the Lavalink node.
+
+    Returns
+    -------
+    :class:`wavelink.Node`
+        The Lavalink node if it's online, None otherwise.
+    """
     node = [
         wavelink.Node(
             uri=uri,
@@ -94,12 +176,38 @@ async def check_node_status(
 
 
 def strip_text(text: str, to_strip: tuple) -> str:
+    """Strip unwanted characters from a string.
+
+    Parameters
+    ----------
+    text: str
+        The string to strip.
+    to_strip: tuple
+        The characters to strip from the string.
+
+    Returns
+    -------
+    str
+        The stripped string.
+    """
     for char in to_strip:
         text = text.replace(char, "")
     return text.strip()
 
 
 def fix_audio_title(track: wavelink.Playable) -> str:
+    """Fix the title of an audio track by removing unwanted characters.
+
+    Parameters
+    ----------
+    track: :class:`wavelink.Playable`
+        The audio track to fix.
+
+    Returns
+    -------
+    str
+        The fixed title of the audio track.
+    """
     if track.title and track.title != "Unknown title":
         title = track.title
     else:
@@ -111,6 +219,20 @@ def fix_audio_title(track: wavelink.Playable) -> str:
 
 
 def is_older_than(hours: int, custom_datetime: datetime) -> bool:
+    """Check if a given datetime is older than a specified number of hours.
+
+    Parameters
+    ----------
+    hours: int
+        The number of hours to check against.
+    custom_datetime: :class:`datetime.datetime`
+        The datetime to check.
+
+    Returns
+    -------
+    bool
+        True if the datetime is older than the specified number of hours, False otherwise.
+    """
     current_time = datetime.now()
 
     if custom_datetime.tzinfo is not None and current_time.tzinfo is None:
@@ -119,7 +241,19 @@ def is_older_than(hours: int, custom_datetime: datetime) -> bool:
     return time_difference.total_seconds() > hours * 3600
 
 
-def get_search_prefix(query: str) -> str | None:
+def get_search_prefix(query: str) -> Optional[str]:
+    """Get the search prefix for a given query.
+
+    Parameters
+    ----------
+    query: str
+        The query to check.
+
+    Returns
+    -------
+    str | None
+        The search prefix if found, None otherwise.
+    """
     for pattern, prefix in SOURCE_PATTERNS:
         if pattern.search(query):
             return prefix
@@ -127,6 +261,20 @@ def get_search_prefix(query: str) -> str | None:
 
 
 def find_track(player: wavelink.Player, to_find: str) -> Optional[int]:
+    """Find a track in the player's queue by title or index.
+
+    Parameters
+    ----------
+    player: :class:`wavelink.Player`
+        The wavelink Player instance.
+    to_find: str
+        The title or index of the track to find.
+
+    Returns
+    -------
+    int | None
+        The index of the track in the queue if found, None otherwise.
+    """
     if not to_find.isdigit():
         for i, track in enumerate(player.queue):
             if to_find.lower() in track.title.lower():
@@ -149,17 +297,23 @@ async def switch_node(
     connect_node: Callable[[], wavelink.Node],
     player: wavelink.Player,
     play_after: bool = True,
-) -> wavelink.Node | None:
+) -> Optional[wavelink.Node]:
     """
     Attempt to switch to a new node for audio playback.
 
-    Args:
-        connect_node: Callable that returns a new wavelink.Node
-        player: The current wavelink Player
-        play_after: If True, play the current track after switching
+    Parameters:
+    ----------
+    connect_node: Callable[[], wavelink.Node]
+        A callable that returns a new wavelink.Node instance.
+    player: :class:`wavelink.Player`
+        The wavelink Player instance to switch the node for.
+    play_after: bool
+        Whether to play the current track after switching nodes.
 
-    Returns:
-        The new wavelink.Node if successful, None otherwise
+    Returns
+    -------
+    :class:`wavelink.Node` | None
+        The new wavelink.Node instance if successful, None otherwise.
     """
     for i in range(5):
         try:
@@ -192,6 +346,13 @@ async def switch_node(
 
 
 def generate_temp_guild_data() -> dict:
+    """Generate temporary guild data for the bot.
+
+    Returns
+    -------
+    dict
+        A dictionary containing temporary guild data.
+    """
     return {
         "lavalink_server_pos": 0,
         "jokes": {
@@ -203,6 +364,13 @@ def generate_temp_guild_data() -> dict:
 
 
 def generate_guild_data() -> dict:
+    """Generate default guild data for the bot.
+
+    Returns
+    -------
+    dict
+        A dictionary containing default guild data.
+    """
     return {
         "music": {
             "autoplay_mode": 1,
@@ -212,6 +380,20 @@ def generate_guild_data() -> dict:
 
 
 async def generate_temp_user_data(bot: discord.Bot, user_id: int) -> dict:
+    """Generate temporary user data for the bot.
+
+    Parameters
+    ----------
+    bot: :class:`discord.Bot`
+        The discord bot instance.
+    user_id: int
+        The ID of the user to generate temporary data for.
+
+    Returns
+    -------
+    dict
+        A dictionary containing temporary user data.
+    """
     multireddit: asyncpraw.models.Multireddit = await bot.reddit_agent.multireddit(
         name=str(user_id), redditor="KexoBOT"
     )
@@ -239,6 +421,13 @@ async def generate_temp_user_data(bot: discord.Bot, user_id: int) -> dict:
 
 
 def generate_user_data() -> dict:
+    """Generate default user data for the bot.
+
+    Returns
+    -------
+    dict
+        A dictionary containing default user data.
+    """
     return {
         "reddit": {
             "subreddits": SHITPOST_SUBREDDITS_DEFAULT,
@@ -248,7 +437,18 @@ def generate_user_data() -> dict:
 
 
 def fix_user_data(old_data: dict) -> dict:
-    """Fixes user data by adding missing keys and values."""
+    """Fixes user data by adding missing keys and values.
+
+    Parameters
+    ----------
+    old_data: dict
+        The old data to be fixed.
+
+    Returns
+    -------
+    dict
+        The fixed data with all required keys and values.
+    """
     data = old_data.copy()
     return fix_data(data, generate_user_data)
 
@@ -256,11 +456,15 @@ def fix_user_data(old_data: dict) -> dict:
 def fix_guild_data(old_data: dict) -> dict:
     """Fixes guild data by adding missing keys and values.
 
-    Args:
-        old_data: The old data to be fixed
+    Parameters
+    ----------
+    old_data: dict
+        The old data to be fixed.
 
-    Returns:
-        The fixed data with all required keys and values
+    Returns
+    -------
+    dict
+        The fixed data with all required keys and values.
     """
     data = old_data.copy()
     return fix_data(data, generate_guild_data)
@@ -271,12 +475,17 @@ def fix_data(
 ) -> Dict[str, Any]:
     """Generic function to fix data by adding missing keys and values from a generator.
 
-    Args:
-        fixed_data: The data to be fixed
-        generator: A function that returns a dictionary with default values
+    Parameters
+    ----------
+    fixed_data: dict
+        The data to be fixed.
+    generator: Callable[[], dict]
+        A callable that generates the default data structure.
 
-    Returns:
-        The fixed data with all required keys and values
+    Returns
+    -------
+    dict
+        The fixed data with all required keys and values.
     """
     default_data = generator()
 
@@ -292,6 +501,20 @@ def fix_data(
 
 
 async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tuple:
+    """Get user data for the given user.
+
+    Parameters
+    ----------
+    bot: :class:`discord.Bot`
+        The discord bot instance.
+    ctx: :class:`discord.ApplicationContext`
+        The context of the command invocation.
+
+    Returns
+    -------
+    tuple
+        A tuple containing the user data and temporary user data.
+    """
     user_id = ctx.author.id
     user_data: dict = bot.user_data.get(user_id)
 
@@ -317,6 +540,20 @@ async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tu
 
 
 async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple:
+    """Get guild data for the given guild.
+
+    Parameters
+    ----------
+    bot: :class:`discord.Bot`
+        The discord bot instance.
+    guild_id: int
+        The ID of the guild to get data for.
+
+    Returns
+    -------
+    tuple
+        A tuple containing the guild data and temporary guild data.
+    """
     guild_data: dict = bot.guild_data.get(guild_id)
 
     if guild_data:
@@ -352,18 +589,29 @@ async def make_http_request(
     """
     Make an HTTP request with retry logic.
 
-    Args:
-        session: The httpx client session to use
-        url: The URL to request
-        data: Optional data to send with the request
-        headers: Optional headers to send with the request
-        retries: Number of retry attempts
-        timeout: Request timeout in seconds
-        get_json: If True, return the response as JSON
-        binary: If True, treat as binary content (like images) and don't raise for status
+    Parameters
+    ----------
+    session: :class:`httpx.AsyncClient`
+        The httpx client session to use for the request.
+    url: str
+        The URL to make the request to.
+    data: dict | None
+        The data to send with the request (for POST requests).
+    headers: dict | None
+        The headers to include with the request.
+    retries: int
+        The number of times to retry the request on failure.
+    timeout: float
+        The timeout for the request in seconds.
+    get_json: bool
+        Whether to return the response as JSON.
+    binary: bool
+        Whether to treat the response as binary content (e.g., MP3 files).
 
-    Returns:
-        The response if successful, None if all retries failed
+    Returns
+    -------
+    :class:`httpx.Response` | None
+        The response from the request, or None if the request failed.
     """
 
     for attempt in range(retries):
@@ -393,5 +641,5 @@ async def make_http_request(
                 return None
             await asyncio.sleep(1 * (attempt + 1))
         except json.decoder.JSONDecodeError:
-            print(f"Failed to decode JSON: ", url)
+            print("Failed to decode JSON: ", url)
     return None

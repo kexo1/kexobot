@@ -6,27 +6,47 @@ from app.utils import make_http_request
 
 
 class LavalinkServerManager:
+    """Class to manage lavalink servers. Checks from various sources and returns
+     a list of lavalink servers.
+
+    It also checks if the server is online or offline and if it is a low quality node.
+    The class is used to get lavalink servers from lavalist and lavainfo GitHub.
+
+    Parameters
+    ----------
+    session: :class:`httpx.AsyncClient`
+        HTTP client for making requests.
+    """
+
     def __init__(self, session: httpx.AsyncClient) -> None:
-        self.session = session
-        self.repeated_hostnames: list[str] = []
-        self.low_quality_nodes: list[str] = ["lavalink-v2.pericsq.ro"]
-        self.offline_lavalink_servers: list[str] = []
+        self._session = session
+        self._repeated_hostnames: list[str] = []
+        self._low_quality_nodes: list[str] = ["lavalink-v2.pericsq.ro"]
+        self._offline_lavalink_servers: list[str] = []
 
     async def get_lavalink_servers(
         self, offline_lavalink_servers: list[str]
     ) -> list[wavelink.Node]:
-        self.offline_lavalink_servers = offline_lavalink_servers
+        """Method to get lavalink servers from lavalist and lavainfo GitHub.
+
+        Args:
+        ----------
+            offline_lavalink_servers (list[str]): List of offline lavalink servers.
+        Returns:
+            list[wavelink.Node]: List of lavalink nodes.
+        """
+        self._offline_lavalink_servers = offline_lavalink_servers
         lavalink_servers = []
         # Lavainfo from github
         json_data: list = await make_http_request(
-            self.session, LAVAINFO_GITHUB_URL, retries=2, get_json=True
+            self._session, LAVAINFO_GITHUB_URL, retries=2, get_json=True
         )
         if json_data:
             lavalink_servers.extend(await self._lavainfo_github_fetch(json_data))
 
         # Lavalist
         json_data: list = await make_http_request(
-            self.session, LAVALIST_URL, retries=2, get_json=True
+            self._session, LAVALIST_URL, retries=2, get_json=True
         )
         if json_data:
             lavalink_servers.extend(await self._lavalist_fetch(json_data))
@@ -46,9 +66,9 @@ class LavalinkServerManager:
 
         for server in json_data:
             if (
-                server["host"] in self.offline_lavalink_servers
-                or server["host"] in self.repeated_hostnames
-                or server["host"] in self.low_quality_nodes
+                server["host"] in self._offline_lavalink_servers
+                or server["host"] in self._repeated_hostnames
+                or server["host"] in self._low_quality_nodes
             ):
                 continue
 
@@ -69,8 +89,8 @@ class LavalinkServerManager:
         lavalink_servers = []
         for server in json_data:
             if (
-                server["host"] in self.offline_lavalink_servers
-                or server["host"] in self.low_quality_nodes
+                server["host"] in self._offline_lavalink_servers
+                or server["host"] in self._low_quality_nodes
             ):
                 continue
 
@@ -84,7 +104,7 @@ class LavalinkServerManager:
                 True if server["secure"] else False,
             )
             lavalink_servers.append(node)
-            self.repeated_hostnames.append(server["host"])
+            self._repeated_hostnames.append(server["host"])
 
         return lavalink_servers
 

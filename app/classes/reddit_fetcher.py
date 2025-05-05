@@ -28,6 +28,26 @@ from app.utils import strip_text
 
 
 class RedditFetcher:
+    """ " Class to game info from subreddits and send it to Discord channels.
+
+    It fetches data from the following subreddits:
+    - r/CrackWatch
+    - r/FreeGameFindings
+
+    Parameters
+    ----------
+    bot_config: :class:`motor.motor_asyncio.AsyncIOMotorClient`
+        MongoDB client for accessing the database.
+    session: :class:`httpx.AsyncClient`
+        HTTP client for making requests.
+    reddit_agent: :class:`asyncpraw.Reddit`
+        Reddit client for accessing the Reddit API.
+    free_stuff: :class:`discord.TextChannel`
+        Discord channel for sending free game info.
+    game_updates: :class:`discord.TextChannel`
+        Discord channel for sending game updates.
+    """
+
     def __init__(
         self,
         bot_config: AsyncIOMotorClient,
@@ -36,18 +56,19 @@ class RedditFetcher:
         free_stuff: discord.TextChannel,
         game_updates: discord.TextChannel,
     ) -> None:
-        self.bot_config = bot_config
-        self.session = session
-        self.reddit_agent = reddit_agent
-        self.free_stuff = free_stuff
-        self.game_updates = game_updates
+        self._bot_config = bot_config
+        self._session = session
+        self._reddit_agent = reddit_agent
+        self._free_stuff = free_stuff
+        self._game_updates = game_updates
 
     async def crackwatch(self) -> None:
+        """Method to fetch game repacks from r/CrackWatch subreddit."""
         crackwatch_cache, to_filter = await self._load_bot_config(
             "crackwatch_cache", "crackwatch_exceptions"
         )
         crackwatch_cache_upload = crackwatch_cache.copy()
-        subreddit: asyncpraw.models.Subreddit = await self.reddit_agent.subreddit(
+        subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
             "CrackWatch"
         )
         try:
@@ -115,21 +136,22 @@ class RedditFetcher:
                     icon_url=REDDIT_CRACKWATCH_ICON,
                 )
                 embed.timestamp = datetime.fromtimestamp(submission.created_utc)
-                await self.game_updates.send(embed=embed)
+                await self._game_updates.send(embed=embed)
 
             if crackwatch_cache != crackwatch_cache_upload:
-                await self.bot_config.update_one(
+                await self._bot_config.update_one(
                     DB_CACHE, {"$set": {"crackwatch_cache": crackwatch_cache_upload}}
                 )
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:
             print(f"Error when accessing crackwatch:\n{e}")
 
     async def freegamefindings(self) -> None:
+        """Method to fetch free games from r/FreeGameFindings subreddit."""
         freegamefindings_cache, to_filter = await self._load_bot_config(
             "freegamefindings_cache", "freegamefindings_exceptions"
         )
         freegamefindings_cache_upload = freegamefindings_cache.copy()
-        subreddit: asyncpraw.models.Subreddit = await self.reddit_agent.subreddit(
+        subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
             "FreeGameFindings"
         )
 
@@ -167,7 +189,7 @@ class RedditFetcher:
             print(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
 
         if freegamefindings_cache_upload != freegamefindings_cache:
-            await self.bot_config.update_one(
+            await self._bot_config.update_one(
                 DB_CACHE,
                 {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}},
             )
@@ -188,7 +210,7 @@ class RedditFetcher:
 
     async def _alienwarearena(self, url) -> None:
         # There might be an occurence where giveaway is not showing in alienwarearena.com
-        alienwarearena_cache = await self.bot_config.find_one(DB_CACHE)
+        alienwarearena_cache = await self._bot_config.find_one(DB_CACHE)
         reddit_path = url[29:]
         for cached_url in alienwarearena_cache["alienwarearena_cache"]:
             if reddit_path in cached_url:
@@ -209,7 +231,7 @@ class RedditFetcher:
             text="I took it from - r/FreeGameFindings",
             icon_url=REDDIT_FREEGAME_ICON,
         )
-        await self.free_stuff.send(embed=embed)
+        await self._free_stuff.send(embed=embed)
 
     @staticmethod
     async def _create_embed_crackwatch(
@@ -234,6 +256,6 @@ class RedditFetcher:
         return image_url[0]
 
     async def _load_bot_config(self, cache: str, exceptions: str) -> tuple:
-        crackwatch_cache = await self.bot_config.find_one(DB_CACHE)
-        to_filter = await self.bot_config.find_one(DB_LISTS)
+        crackwatch_cache = await self._bot_config.find_one(DB_CACHE)
+        to_filter = await self._bot_config.find_one(DB_LISTS)
         return crackwatch_cache[cache], to_filter[exceptions]

@@ -9,7 +9,6 @@ pymongo
 fake-useragent
 websockets
 beautifulsoup4
-imgflip.py
 requests
 deep_translator
 unidecode

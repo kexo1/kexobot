@@ -4,6 +4,9 @@ from app.response_handler import send_response
 
 
 def is_joined():
+    """Check if the user is in a voice channel and the bot is
+    connected to a voice channel."""
+
     def decorator(func) -> None:
         @wraps(func)
         async def wrapper(*args, **kwargs) -> None:
@@ -27,6 +30,8 @@ def is_joined():
 
 
 def is_playing():
+    """Check if the bot is playing a track and the user is in the same voice channel."""
+
     def decorator(func) -> None:
         @wraps(func)
         async def wrapper(*args, **kwargs) -> None:
@@ -48,6 +53,8 @@ def is_playing():
 
 
 def is_queue_empty():
+    """Check if queue is empty."""
+
     def decorator(func) -> None:
         @wraps(func)
         async def wrapper(*args, **kwargs) -> None:
