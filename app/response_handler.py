@@ -297,6 +297,11 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         color=discord.Color.blue(),
         footer=discord.EmbedFooter(text="takes 3 seconds to apply"),
     ),
+    "AUTOPLAY_MODE_CHANGED": lambda ctx, **kwargs: discord.Embed(
+        title="",
+        description=f"**:repeat: Autoplay mode set to `{kwargs.get('autoplay_mode')}`**",
+        color=discord.Color.blue(),
+    ),
     "NODE_CONNECT_SUCCESS": lambda ctx, **kwargs: discord.Embed(
         title="",
         description=f"**✅ Connected to node `{kwargs.get('uri')}`**",

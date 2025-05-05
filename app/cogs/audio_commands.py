@@ -9,6 +9,7 @@ from pycord.multicog import subcommand
 
 from app.decorators import is_joined
 from app.response_handler import send_response
+from app.utils import get_guild_data
 
 
 class Audio(commands.Cog):
@@ -19,25 +20,31 @@ class Audio(commands.Cog):
     @slash_command(name="volume", description="Sets audio volume.")
     @guild_only()
     @option(
-        "vol",
+        "volume",
         type=int,
         required=False,
-        description="Max is 100.",
+        description="Max is 200.",
         min_value=1,
         max_value=200,
     )
     @is_joined()
     async def change_volume(
-        self, ctx: discord.ApplicationContext, vol: Optional[int] = None
+        self, ctx: discord.ApplicationContext, volume: Optional[int] = None
     ) -> None:
         player: wavelink.Player = ctx.voice_client
 
-        if vol is None:
+        if volume is None:
             await send_response(ctx, "CURRENT_VOLUME", volume=player.volume)
             return
 
-        await player.set_volume(vol)
-        await send_response(ctx, "VOLUME_CHANGED", ephemeral=False, volume=vol)
+        guild_data, _ = await get_guild_data(self.bot, ctx.guild_id)
+        guild_data["music"]["volume"] = volume
+        await self.bot.guild_data_db.update_one(
+            {"_id": ctx.guild_id}, {"$set": guild_data}
+        )
+        self.bot.guild_data[ctx.guild_id] = guild_data
+        await player.set_volume(volume)
+        await send_response(ctx, "VOLUME_CHANGED", ephemeral=False, volume=volume)
 
     @subcommand("music")
     @slash_command(name="speed", description="Speeds up music.")

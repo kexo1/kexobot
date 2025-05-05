@@ -9,7 +9,7 @@ from wavelink import (
     TrackStuckEventPayload,
 )
 
-from app.constants import DISCORD_LOGO
+from app.constants import DISCORD_LOGO, YOUTUBE_LOGO
 from app.response_handler import send_response
 from app.utils import fix_audio_title, switch_node
 
@@ -56,7 +56,6 @@ class Listeners(commands.Cog):
             payload.player.text_channel,
             "TRACK_EXCEPTION",
             respond=False,
-            embed=embed,
             message=payload.exception["message"],
             severity=payload.exception["severity"],
         )
@@ -109,10 +108,16 @@ class Listeners(commands.Cog):
             title="Now playing",
             description=f"[**{fix_audio_title(payload.track)}**]({payload.track.uri})",
         )
-        embed.set_footer(
-            text=f"Requested by {payload.player.current.requester.name}",
-            icon_url=self._has_pfp(payload.player.current.requester),
-        )
+        if hasattr(payload.player.current, "requester"):
+            embed.set_footer(
+                text=f"Requested by {payload.player.current.requester.name}",
+                icon_url=self._has_pfp(payload.player.current.requester),
+            )
+        else:
+            embed.set_footer(
+                text=f"YouTube Autoplay",
+                icon_url=YOUTUBE_LOGO,
+            )
         embed.set_thumbnail(url=payload.track.artwork)
         return embed
 

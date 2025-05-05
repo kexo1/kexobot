@@ -25,6 +25,7 @@ from app.utils import (
     make_http_request,
     switch_node,
     get_search_prefix,
+    get_guild_data
 )
 
 
@@ -43,7 +44,7 @@ class MusicCommands(commands.Cog):
     @option(
         "search",
         description="You can either put a url or a name of the song,"
-        " both youtube and spotify are supported.",
+                    " both youtube and spotify are supported.",
     )
     @option(
         "play_next",
@@ -51,7 +52,7 @@ class MusicCommands(commands.Cog):
         type=bool,
     )
     async def play(
-        self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
+            self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
     ) -> None:
         # Defer the response right away to avoid interaction timeout
         await ctx.defer(ephemeral=False)
@@ -104,7 +105,7 @@ class MusicCommands(commands.Cog):
         description="If you want to play this song next in queue, set this to true.",
     )
     async def radio_random(
-        self, ctx: discord.ApplicationContext, play_next: bool = False
+            self, ctx: discord.ApplicationContext, play_next: bool = False
     ) -> None:
         await ctx.defer()
 
@@ -170,11 +171,11 @@ class MusicCommands(commands.Cog):
         choices=COUNTRIES,
     )
     async def play_radio(
-        self,
-        ctx: discord.ApplicationContext,
-        station: str,
-        country: str = "",
-        play_next: bool = False,
+            self,
+            ctx: discord.ApplicationContext,
+            station: str,
+            country: str = "",
+            play_next: bool = False,
     ) -> None:
         encoded_station = discord.utils.escape_markdown(station)
         response = await make_http_request(
@@ -223,7 +224,7 @@ class MusicCommands(commands.Cog):
     @is_playing()
     @is_queue_empty()
     async def skip_to_command(
-        self, ctx: discord.ApplicationContext, to_find: str
+            self, ctx: discord.ApplicationContext, to_find: str
     ) -> None:
         player: wavelink.Player = ctx.voice_client
 
@@ -278,9 +279,32 @@ class MusicCommands(commands.Cog):
         player.cleanup()
         await player.disconnect()
 
+    @music.command(name="autoplay_mode", description="Change autoplay mode when playing music.")
+    @option(
+        "mode",
+        description="Normal: Plays next track; Populated: For YouTube links, queues similar songs when the queue is empty",
+        choices=["normal", "populated"],
+    )
+    @guild_only()
+    @is_joined()
+    async def autoplay_mode(self, ctx: discord.ApplicationContext, mode: str = "normal") -> None:
+        player: wavelink.Player = ctx.voice_client
+        player.autoplay = wavelink.AutoPlayMode.partial if mode == "normal" else wavelink.AutoPlayMode.enabled
+
+        guild_data, _ = await get_guild_data(self.bot, ctx.guild_id)
+        guild_data["music"]["autoplay_mode"] = 1 if mode == "normal" else 2
+        await self.bot.guild_data_db.update_one(
+            {"_id": ctx.guild_id}, {"$set": guild_data}
+        )
+        self.bot.guild_data[ctx.guild_id] = guild_data
+        player
+        await send_response(
+            ctx, "AUTOPLAY_MODE_CHANGED", ephemeral=False, autoplay_mode=mode
+        )
+
     # ----------------------- Helper functions ------------------------ #
     async def _fetch_tracks(
-        self, ctx: discord.ApplicationContext, search: str
+            self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
         if tracks:
@@ -289,8 +313,8 @@ class MusicCommands(commands.Cog):
 
     @staticmethod
     async def _fetch_first_track(
-        ctx: discord.ApplicationContext,
-        tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
+            ctx: discord.ApplicationContext,
+            tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
     ) -> wavelink.Playable:
         player: wavelink.Player = ctx.voice_client
         # If it's a playlist
@@ -307,7 +331,7 @@ class MusicCommands(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description=f"Added the playlist **`{tracks.name}`**"
-                f" ({song_count} songs) to the queue.",
+                            f" ({song_count} songs) to the queue.",
                 color=discord.Color.blue(),
             )
             if player.should_respond:
@@ -323,7 +347,7 @@ class MusicCommands(commands.Cog):
         return track
 
     async def _search_tracks(
-        self, ctx: discord.ApplicationContext, search: str
+            self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
         source = get_search_prefix(search)
         if source is None:
@@ -421,15 +445,15 @@ class MusicCommands(commands.Cog):
         return True
 
     async def _play_track(
-        self, ctx: discord.ApplicationContext, track: wavelink.Playable
+            self, ctx: discord.ApplicationContext, track: wavelink.Playable
     ) -> bool:
         player: wavelink.Player = ctx.voice_client
 
         try:
             await player.play(track)
         except (
-            wavelink.exceptions.NodeException,
-            wavelink.exceptions.LavalinkException,
+                wavelink.exceptions.NodeException,
+                wavelink.exceptions.LavalinkException,
         ) as e:
             await send_response(
                 ctx, "NODE_REQUEST_ERROR", ephemeral=False, error=e.error
@@ -438,14 +462,20 @@ class MusicCommands(commands.Cog):
 
         return True
 
-    @staticmethod
-    async def _prepare_wavelink(ctx: discord.ApplicationContext) -> None:
+    async def _prepare_wavelink(self, ctx: discord.ApplicationContext) -> None:
         player: wavelink.Player = ctx.voice_client
 
-        player.autoplay = wavelink.AutoPlayMode.partial
         player.text_channel = ctx.channel
         player.should_respond = False
         player.just_joined = True
+
+        guild_data, _ = await get_guild_data(self.bot, ctx.guild_id)
+        await player.set_volume(guild_data["music"]["volume"])
+
+        if guild_data["music"]["autoplay_mode"] == 1:
+            player.autoplay = wavelink.AutoPlayMode.partial
+        else:
+            player.autoplay = wavelink.AutoPlayMode.enabled
 
         await send_response(
             ctx,

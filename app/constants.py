@@ -402,6 +402,7 @@ SONG_STRIP = (
     "http:",
     "/",
 )
+YOUTUBE_LOGO = "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
 
 # -------------------- RadioGarden -------------------- #
 RADIOGARDEN_PLACES_URL = "https://radio.garden/api/ara/content/places"

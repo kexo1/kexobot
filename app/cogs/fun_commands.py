@@ -418,7 +418,7 @@ class FunCommands(commands.Cog):
             return None
 
         for joke in jokes:
-            joke = (
+            joke: str = (
                 f"{joke.get('setup')}\n{joke.get('delivery')}"
                 if joke.get("type") == "twopart"
                 else joke.get("joke")
@@ -426,7 +426,7 @@ class FunCommands(commands.Cog):
             if joke in self.loaded_jokes:
                 continue
 
-            is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.lower()]
+            is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.lower().split()]
             if is_filtered:
                 continue
 
@@ -458,7 +458,11 @@ class FunCommands(commands.Cog):
                 if joke.get("joke") in self.loaded_jokes:
                     continue
 
-                is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.get("joke").lower()]
+                is_filtered = [
+                    k
+                    for k in JOKE_EXCLUDED_WORDS
+                    if k in joke.get("joke").lower().split()
+                ]
                 if is_filtered:
                     continue
 

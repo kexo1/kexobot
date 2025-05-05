@@ -112,13 +112,11 @@ class GameUpdates:
         game_list = await self.bot_config.find_one(DB_LISTS)
         game_list = "\n".join(game_list["games"])
         source = await make_http_request(self.session, GAME3RB_URL)
+        if not source:
+            return
 
         game_info = []
         to_upload = []
-
-        if "Bad gateway" in source.text:
-            print("Game3rb: Bad gateway")
-            return
 
         soup = BeautifulSoup(source.text, "html.parser")
         article = soup.find("article")
@@ -311,6 +309,8 @@ class GameUpdates:
 
     async def _send_onlinefix_embed(self, url: str, game_title: str) -> None:
         onlinefix_article = await make_http_request(self.session, url)
+        if not onlinefix_article:
+            return
         soup = BeautifulSoup(onlinefix_article.text, "html.parser")
         head_tag = soup.find("head")
 

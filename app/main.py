@@ -237,17 +237,15 @@ class KexoBot:
         """
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
         if now.day == 6 and now.hour == 0:
+            self._clear_cached_jokes()
+            self._clear_temp_guild_data()
             await self._refresh_subreddit_icons()
 
         if now.hour % 5 == 0:
             self._clear_temp_reddit_data()
 
         if now.hour == 0:
-            bot.loaded_jokes = []
-            bot.loaded_dad_jokes = []
-            bot.loaded_yo_mama_jokes = []
             self.offline_lavalink_servers: list[str] = []
-            self._clear_temp_guild_data()
             self._load_humor_api_tokens()
 
         self.lavalink_servers = await self.lavalink_server_manager.get_lavalink_servers(
@@ -370,6 +368,13 @@ class KexoBot:
         """Clear the temporary guild data."""
         for guild_id in bot.temp_guild_data:
             bot.temp_guild_data[guild_id] = generate_temp_guild_data()
+
+    @staticmethod
+    def _clear_cached_jokes() -> None:
+        """Clear the cached jokes loaded from FunCommands"""
+        bot.loaded_jokes = []
+        bot.loaded_dad_jokes = []
+        bot.loaded_yo_mama_jokes = []
 
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""
