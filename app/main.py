@@ -1,4 +1,5 @@
 import asyncio
+import socket
 from datetime import datetime
 from typing import Optional
 from urllib.parse import urlparse
@@ -18,10 +19,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pycord.multicog import Bot
 from wavelink.enums import NodeStatus
 
-from app.classes.contests import ContestMonitor
-from app.classes.game_updates import GameUpdates
+from app.classes.content_monitor import ContentMonitor
 from app.classes.lavalink_server import LavalinkServerManager
-from app.classes.power_outages import PowerOutageMonitor
 from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
 from app.constants import (
@@ -39,6 +38,7 @@ from app.constants import (
     FREE_STUFF_CHANNEL,
     HUMOR_API_SECRET,
     KEXO_SERVER,
+    LOCAL_MACHINE_NAME,
 )
 from app.utils import get_guild_data, is_older_than, generate_temp_guild_data
 
@@ -63,6 +63,7 @@ class KexoBot:
         self.user_kexo = None | discord.User
         self.session = None | httpx.AsyncClient
         self.subreddit_cache = None | dict
+        self.hostname = socket.gethostname()
         self.main_loop_counter = 0
         self.lavalink_servers: list[wavelink.Node] = []
         self.offline_lavalink_servers: list[str] = []
@@ -105,11 +106,9 @@ class KexoBot:
 
         # Initialize class variables
         self.reddit_fetcher = None | RedditFetcher
-        self.power_outage_monitor = None | PowerOutageMonitor
-        self.contest_monitor = None | ContestMonitor
+        self.content_monitor = None | ContentMonitor
         self.lavalink_server_manager = None | LavalinkServerManager
         self.sfd_servers = None | SFDServers
-        self.game_updates = None | GameUpdates
         self.esutaze_channel = None | discord.TextChannel
         self.game_updates_channel = None | discord.TextChannel
         self.free_stuff_channel = None | discord.TextChannel
@@ -159,12 +158,13 @@ class KexoBot:
 
     def _define_classes(self) -> None:
         """Define classes for the bot."""
-        # Initialize the new GameUpdates class
-        self.game_updates = self._initialize_class(
-            GameUpdates,
+        # Initialize the ContentMonitor class
+        self.content_monitor = self._initialize_class(
+            ContentMonitor,
             self.bot_config,
             self.session,
             self.game_updates_channel,
+            self.esutaze_channel,
             self.user_kexo,
         )
 
@@ -179,12 +179,6 @@ class KexoBot:
         )
         self.sfd_servers = self._initialize_class(
             SFDServers, self.bot_config, self.session
-        )
-        self.power_outage_monitor = self._initialize_class(
-            PowerOutageMonitor, self.bot_config, self.session, self.user_kexo
-        )
-        self.contest_monitor = self._initialize_class(
-            ContestMonitor, self.bot_config, self.session, self.esutaze_channel
         )
         self.lavalink_server_manager = self._initialize_class(
             LavalinkServerManager, self.session
@@ -203,29 +197,25 @@ class KexoBot:
 
         elif self.main_loop_counter == 1:
             self.main_loop_counter = 2
-            await self.game_updates.alienware_arena()
+            await self.content_monitor.alienware_arena()
 
         elif self.main_loop_counter == 2:
             self.main_loop_counter = 3
-            await self.game_updates.game3rb()
+            await self.content_monitor.game3rb()
 
         elif self.main_loop_counter == 3:
             self.main_loop_counter = 4
-            await self.game_updates.online_fix()
+            await self.content_monitor.online_fix()
 
         elif self.main_loop_counter == 4:
             self.main_loop_counter = 5
             await self.reddit_fetcher.crackwatch()
 
         elif self.main_loop_counter == 5:
-            self.main_loop_counter = 6
-            await self.game_updates.fanatical()
-
-        elif self.main_loop_counter == 6:
             self.main_loop_counter = 0
-            await self.contest_monitor.run()
+            await self.content_monitor.fanatical()
 
-        if now.minute % 6 == 0:
+        if now.minute % 6 == 0 and self.hostname != LOCAL_MACHINE_NAME:
             await self.sfd_servers.update_stats(now)
 
     async def hourly_loop(self) -> None:
@@ -251,7 +241,8 @@ class KexoBot:
         self.lavalink_servers = await self.lavalink_server_manager.get_lavalink_servers(
             self.offline_lavalink_servers
         )
-        await self.power_outage_monitor.run()
+        await self.content_monitor.power_outages()
+        await self.content_monitor.contests()
 
     def _create_session(self) -> None:
         """Create a httpx session for the bot."""

@@ -1,4 +1,5 @@
 import logging
+import socket
 import os
 import re
 
@@ -10,11 +11,14 @@ logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
 
 
-# load_dotenv(os.getenv("SECRET_PATH"))
+LOCAL_MACHINE_NAME = "mato"
+if socket.gethostname() == LOCAL_MACHINE_NAME:
+    load_dotenv(os.getenv("SECRET_PATH"))
+    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
+else:
+    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
 # -------------------- Discord -------------------- #
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-# DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
 ESUTAZE_CHANNEL = 1302271245919981638
 GAME_UPDATES_CHANNEL = 882185054174994462
 FREE_STUFF_CHANNEL = 1081883673902714953

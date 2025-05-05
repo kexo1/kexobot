@@ -2,7 +2,6 @@
 ## Bugs
 
 ## Features
-- [ ] Save players volume
 
 ## Improvements
 - [ ] Make Game3rb more readable

@@ -1,6 +1,7 @@
 import datetime
 import re
 from typing import List, Tuple, Optional
+from io import BytesIO
 
 import discord
 import httpx
@@ -24,6 +25,11 @@ from app.constants import (
     ONLINEFIX_MAX_GAMES,
     ONLINEFIX_URL,
     ONLINEFIX_ICON,
+    ELEKTRINA_URL,
+    ELEKTRINA_MAX_ARTICLES,
+    ELEKTRINA_ICON,
+    ESUTAZE_URL,
+    ESUTAZE_ICON,
 )
 from app.utils import (
     make_http_request,
@@ -32,22 +38,23 @@ from app.utils import (
 )
 
 
-class GameUpdates:
-    """Class for monitoring and reporting game updates from multiple sources."""
+class ContentMonitor:
+    """Class for monitoring and reporting various content updates including games, contests, and power outages."""
 
     def __init__(
         self,
         bot_config: AsyncIOMotorClient,
         session: httpx.AsyncClient,
-        channel: discord.TextChannel,
+        game_updates_channel: discord.TextChannel,
+        esutaze_channel: discord.TextChannel,
         user_kexo: Optional[discord.User] = None,
     ) -> None:
         self.bot_config = bot_config
         self.session = session
-        self.channel = channel
+        self.game_updates_channel = game_updates_channel
+        self.esutaze_channel = esutaze_channel
         self.user_kexo = user_kexo
 
-    # AlienwareArena methods
     async def alienware_arena(self) -> None:
         """Check for updates from Alienware Arena."""
         alienwarearena_cache, to_filter = await self._load_alienware_config()
@@ -57,52 +64,6 @@ class GameUpdates:
         if not json_data:
             return
         await self._send_alienware_embed(json_data, alienwarearena_cache, to_filter)
-
-    async def _send_alienware_embed(
-        self, json_data: dict, alienwarearena_cache: list, to_filter: list
-    ) -> None:
-        for giveaway in json_data["data"][:ALIENWAREARENA_MAX_POSTS]:
-            url = "https://eu.alienwarearena.com" + giveaway["url"]
-
-            if url in alienwarearena_cache:
-                break
-
-            title = giveaway["title"]
-
-            is_filtered = [k for k in to_filter if k.lower() in title.lower()]
-            if is_filtered:
-                continue
-
-            for part in ALIENWAREARENA_STRIP:
-                title = title.replace(part, "")
-
-            del alienwarearena_cache[0]
-            alienwarearena_cache.append(url)
-
-            soup = BeautifulSoup(giveaway["description"], "html.parser")
-
-            about_strong = soup.find(
-                "strong", string=lambda text: text and "About" in text
-            )
-            if about_strong:
-                result = []
-                current = about_strong.find_parent("p")
-                while current:
-                    result.append(current.get_text(strip=True))
-                    current = current.find_next_sibling("p")
-                description = "\n".join(result)
-            else:
-                description = "**[eu.alienwarearena.com]({url})**"
-
-            embed = discord.Embed(
-                title=title, description=description, colour=discord.Colour.dark_theme()
-            )
-            embed.set_image(url=giveaway["image"])
-            await self.channel.send(embed=embed)
-
-        await self.bot_config.update_one(
-            DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
-        )
 
     async def game3rb(self) -> None:
         """Check for updates from Game3rb."""
@@ -248,7 +209,7 @@ class GameUpdates:
                 icon_url=GAME3RB_ICON,
             )
             embed.set_image(url=game["image"])
-            await self.channel.send(embed=embed)
+            await self.game_updates_channel.send(embed=embed)
 
         if to_upload:
             await self.bot_config.update_one(
@@ -262,6 +223,100 @@ class GameUpdates:
         if not json_data:
             return
         await self._send_fanatical_embed(json_data, fanatical_cache)
+
+    async def online_fix(self) -> None:
+        """Check for updates from Online-Fix."""
+        onlinefix_cache, games = await self._load_onlinefix_config()
+        chat_log = await make_http_request(self.session, ONLINEFIX_URL)
+        if not chat_log:
+            return
+        chat_messages = await self._get_onlinefix_messages(chat_log.text)
+        await self._process_onlinefix_messages(chat_messages, onlinefix_cache, games)
+
+    async def power_outages(self) -> None:
+        """Check for power outages."""
+        elektrinavypadky_cache = await self._load_power_outages_config()
+        html_content = await make_http_request(self.session, ELEKTRINA_URL)
+        if not html_content:
+            return
+
+        articles = self._get_power_outage_articles(html_content.text)
+        await self._process_power_outage_articles(articles, elektrinavypadky_cache)
+
+    async def contests(self) -> None:
+        """Check for contests."""
+        to_filter, esutaze_cache = await self._load_contests_config()
+        esutaze_cache_upload = esutaze_cache.copy()
+        articles = await self._get_contest_articles()
+
+        if not articles:
+            return
+
+        for article in articles:
+            url = article.find("link").text
+
+            if url in esutaze_cache:
+                break
+
+            title = article.find("title").text
+            is_filtered = [k for k in to_filter if k.lower() in title]
+            if is_filtered:
+                continue
+
+            del esutaze_cache_upload[0]
+            esutaze_cache_upload.append(url)
+
+            await self._send_contest_article(article)
+
+        await self.bot_config.update_one(
+            DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache_upload}}
+        )
+
+    async def _send_alienware_embed(
+        self, json_data: dict, alienwarearena_cache: list, to_filter: list
+    ) -> None:
+        for giveaway in json_data["data"][:ALIENWAREARENA_MAX_POSTS]:
+            url = "https://eu.alienwarearena.com" + giveaway["url"]
+
+            if url in alienwarearena_cache:
+                break
+
+            title = giveaway["title"]
+
+            is_filtered = [k for k in to_filter if k.lower() in title.lower()]
+            if is_filtered:
+                continue
+
+            for part in ALIENWAREARENA_STRIP:
+                title = title.replace(part, "")
+
+            del alienwarearena_cache[0]
+            alienwarearena_cache.append(url)
+
+            soup = BeautifulSoup(giveaway["description"], "html.parser")
+
+            about_strong = soup.find(
+                "strong", string=lambda text: text and "About" in text
+            )
+            if about_strong:
+                result = []
+                current = about_strong.find_parent("p")
+                while current:
+                    result.append(current.get_text(strip=True))
+                    current = current.find_next_sibling("p")
+                description = "\n".join(result)
+            else:
+                description = "**[eu.alienwarearena.com]({url})**"
+
+            embed = discord.Embed(
+                title=title, description=description, colour=discord.Colour.dark_theme()
+            )
+            embed.set_image(url=giveaway["image"])
+            await self.game_updates_channel.send(embed=embed)
+
+        await self.bot_config.update_one(
+            DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
+        )
 
     async def _send_fanatical_embed(
         self, json_data: dict, fanatical_cache: list
@@ -292,20 +347,11 @@ class GameUpdates:
                 timestamp=iso_to_timestamp(giveaway["valid_from"]),
             )
             embed.set_image(url=img_url)
-            await self.channel.send(embed=embed)
+            await self.game_updates_channel.send(embed=embed)
 
         await self.bot_config.update_one(
             DB_CACHE, {"$set": {"fanatical_cache": fanatical_cache}}
         )
-
-    async def online_fix(self) -> None:
-        """Check for updates from Online-Fix."""
-        onlinefix_cache, games = await self._load_onlinefix_config()
-        chat_log = await make_http_request(self.session, ONLINEFIX_URL)
-        if not chat_log:
-            return
-        chat_messages = await self._get_onlinefix_messages(chat_log.text)
-        await self._process_onlinefix_messages(chat_messages, onlinefix_cache, games)
 
     async def _send_onlinefix_embed(self, url: str, game_title: str) -> None:
         onlinefix_article = await make_http_request(self.session, url)
@@ -344,7 +390,7 @@ class GameUpdates:
             icon_url=ONLINEFIX_ICON,
         )
         embed.set_thumbnail(url=img_url)
-        await self.channel.send(embed=embed)
+        await self.game_updates_channel.send(embed=embed)
 
     async def _process_onlinefix_messages(
         self, messages: list, onlinefix_cache: list, games: list
@@ -380,6 +426,106 @@ class GameUpdates:
                 DB_CACHE, {"$set": {"onlinefix_cache": to_upload}}
             )
 
+    async def _process_power_outage_articles(
+        self, articles: list, elektrinavypadky_cache: list
+    ) -> None:
+        elektrinavypadky_cache_upload = elektrinavypadky_cache.copy()
+        above_limit = False
+
+        for article in articles:
+            description = article.find("content").text
+            url = article.find("link")["href"]
+            if url in elektrinavypadky_cache:
+                break
+
+            title = article.find("title").text
+
+            if not (
+                "elektrin" in description
+                or "elektrin" in title.lower()
+                or "odstávka vody" in title.lower()
+            ):
+                continue
+
+            del elektrinavypadky_cache_upload[0]
+            elektrinavypadky_cache_upload.append(url)
+
+            iso_time = article.find("published").text
+            timestamp = iso_to_timestamp(iso_time)
+
+            if len(description) > 2048:
+                embed = discord.Embed(
+                    title=title,
+                    url=url,
+                    description="Under embed (amount of text in embed is restricted",
+                    timestamp=timestamp,
+                )
+                above_limit = True
+            else:
+                embed = discord.Embed(
+                    title=title, url=url, description=description, timestamp=timestamp
+                )
+
+            embed.set_footer(
+                text="",
+                icon_url=ELEKTRINA_ICON,
+            )
+            await self.user_kexo.send(embed=embed)
+
+            if above_limit:
+                await self.user_kexo.send(description)
+        await self.bot_config.update_one(
+            DB_CACHE,
+            {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache_upload}},
+        )
+
+    async def _send_contest_article(self, article) -> None:
+        title = article.find("title").text
+        url = article.find("link").text
+        contest_description = article.find("description")
+        contest_description = (
+            BeautifulSoup(contest_description.text, "html.parser").find("p").text
+        )
+        unix_time = article.find("pubDate").text
+        timestamp = datetime.datetime.strptime(unix_time, "%a, %d %b %Y %H:%M:%S %z")
+
+        article_content = article.find("content:encoded").text
+        soup = BeautifulSoup(article_content, "html.parser")
+        contest_ending_time = soup.find("h4").text.strip()
+
+        img_tag = soup.find("img")
+        if not isinstance(img_tag, Tag):
+            print("Esutaze: Image tag not found")
+            return
+
+        img_url = img_tag.get("src")
+        image_response = await make_http_request(self.session, img_url, binary=True)
+        image = BytesIO(image_response.content)
+
+        embed = discord.Embed(
+            title=title,
+            url=url,
+            description=f"{contest_description}\n\n**{contest_ending_time}**",
+            colour=discord.Colour.brand_red(),
+            timestamp=timestamp,
+        )
+        embed.set_image(url="attachment://image.png")
+        embed.set_footer(
+            text="www.esutaze.sk",
+            icon_url=ESUTAZE_ICON,
+        )
+        await self.esutaze_channel.send(
+            embed=embed, file=discord.File(image, "image.png")
+        )
+
+    async def _get_contest_articles(self) -> list:
+        html_content = await make_http_request(self.session, ESUTAZE_URL)
+        if not html_content:
+            return []
+
+        soup = BeautifulSoup(html_content.content, "xml")
+        return soup.find_all("item")
+
     @staticmethod
     async def _get_onlinefix_messages(chat_log: str) -> list:
         soup = BeautifulSoup(chat_log, "html.parser")
@@ -388,6 +534,12 @@ class GameUpdates:
             print("OnlineFix: Chat element not found")
             return []
         return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
+
+    @staticmethod
+    def _get_power_outage_articles(html_content: str) -> list:
+        soup = BeautifulSoup(html_content, "xml")
+        articles = soup.find_all("entry")
+        return articles[:ELEKTRINA_MAX_ARTICLES]
 
     async def _load_alienware_config(self) -> Tuple[List[str], List[str]]:
         alienwarearena_cache = await self.bot_config.find_one(DB_CACHE)
@@ -407,3 +559,12 @@ class GameUpdates:
         # Remove quotes due to online-fix.me not using quotes
         games = "\n".join(games["games"]).replace("'", "").split("\n")
         return onlinefix_cache["onlinefix_cache"], games
+
+    async def _load_power_outages_config(self) -> list:
+        elektrinavypadky_cache = await self.bot_config.find_one(DB_CACHE)
+        return elektrinavypadky_cache["elektrinavypadky_cache"]
+
+    async def _load_contests_config(self) -> tuple:
+        to_filter = await self.bot_config.find_one(DB_LISTS)
+        esutaze_cache = await self.bot_config.find_one(DB_CACHE)
+        return to_filter["esutaze_exceptions"], esutaze_cache["esutaze_cache"]
