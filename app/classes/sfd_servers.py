@@ -53,23 +53,23 @@ class SFDServer:
     """
 
     def __init__(
-        self,
-        address_ipv4,
-        port,
-        server_name,
-        game_mode,
-        map_name,
-        players,
-        max_players,
-        bots,
-        has_password,
-        description,
-        version,
+            self,
+            address_ipv4,
+            port,
+            server_name,
+            game_mode,
+            map_name,
+            players,
+            max_players,
+            bots,
+            has_password,
+            description,
+            version,
     ):
         self.address_ipv4 = address_ipv4
         self.port = port
         self.server_name = server_name
-        self.game_mode = game_mode
+        self._game_mode = game_mode
         self.map_name = map_name
         self.players = players
         self.max_players = max_players
@@ -82,18 +82,7 @@ class SFDServer:
         return f"SFDServer({self.server_name}, {self.map_name}, {self.players}, {self.max_players}, {self.bots})"
 
     @property
-    def get_full_server_info(self) -> str:
-        """Returns a formatted string with the server's full information.
-
-        Returns:
-        -------
-        str
-            A formatted string with the server's full information.
-        """
-        return self
-
-    @property
-    def get_game_mode(self) -> str:
+    def game_mode(self) -> str:
         """Returns the game mode of the server as a string.
 
         Returns:
@@ -102,7 +91,7 @@ class SFDServer:
             The game mode of the server as a string.
         """
         game_modes = {1: "Versus", 2: "Custom", 3: "Campaign", 4: "Survival"}
-        return game_modes.get(self.game_mode, "Unknown")
+        return game_modes.get(self._game_mode, "Unknown")
 
 
 class SFDServers:
@@ -239,8 +228,8 @@ class SFDServers:
         print(f"Updating weekly stats: {update_count} updates")
         players_week, servers_week = activity["players_week"], activity["servers_week"]
 
-        recent_players = players_day[-60 * update_count :]
-        recent_servers = servers_day[-60 * update_count :]
+        recent_players = players_day[-60 * update_count:]
+        recent_servers = servers_day[-60 * update_count:]
 
         new_players_averages = []
         new_servers_averages = []
@@ -321,7 +310,7 @@ class SFDServers:
         server = await self._parse_servers(search)
         if not server:
             return None
-        return server
+        return server[0]
 
     async def _load_sfd_servers(self) -> str:
         response = await make_http_request(
@@ -345,7 +334,7 @@ class SFDServers:
         return await self._bot_config.find_one(DB_SFD_ACTIVITY)
 
     async def _parse_servers(
-        self, search: str = None
+            self, search: str = None
     ) -> Union[list[SFDServer], SFDServer, None]:
         response = await self._load_sfd_servers()
         if not response:

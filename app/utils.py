@@ -12,7 +12,7 @@ import httpx
 import psutil
 import wavelink
 
-from constants import SHITPOST_SUBREDDITS_DEFAULT, SONG_STRIP, SOURCE_PATTERNS
+from app.constants import SHITPOST_SUBREDDITS_DEFAULT, SONG_STRIP, SOURCE_PATTERNS
 
 
 def load_text_file(name: str) -> list:

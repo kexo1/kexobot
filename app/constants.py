@@ -372,10 +372,7 @@ SUPPORTED_PLATFORMS = (
     "Tidal (unlikely)",
     "Qobuz (unlikely)",
 )
-
-DISCORD_ICONS = (
-    "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
-)
+DISCORD_ICON = "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
 
 COUNTRIES = (
     "United States",

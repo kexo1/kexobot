@@ -1,40 +1,40 @@
-from typing import Dict, Callable, Any
+from typing import Dict, Callable, Any, Union
 
 import discord
 
-ResponseHandler = Callable[..., discord.Embed]
+ResponseHandler = Callable[[discord.ApplicationContext], discord.Embed]
 
 RESPONSE_CODES: Dict[str, ResponseHandler] = {
     # Error responses
     "NO_VOICE_CHANNEL": discord.Embed(
         title="",
-        description=":x: You're not in a voice channel. Type `/play` from vc.",
+        description=f":x: You're not in a voice channel. Type `/play` from vc.",
         color=discord.Color.blue(),
     ),
     "NOT_IN_VOICE_CHANNEL": discord.Embed(
         title="",
-        description=":x: I'm not joined in a voice channel.",
+        description=f":x: I'm not joined in a voice channel.",
         color=discord.Color.blue(),
     ),
     "NOT_IN_SAME_VOICE_CHANNEL": discord.Embed(
         title="",
-        description=":x: I am playing in a different voice channel.",
+        description=f":x: I am playing in a different voice channel.",
         color=discord.Color.blue(),
     ),
     "NOT_IN_SAME_VOICE_CHANNEL_PLAYING": discord.Embed(
         title="",
-        description=":x: I am playing in a different voice channel, wait till song finishes.",
+        description=f":x: I am playing in a different voice channel, wait till song finishes.",
         color=discord.Color.blue(),
     ),
     "NOT_PLAYING": discord.Embed(
         title="",
-        description=":x: I'm not playing anything. Type `/play` from vc.",
+        description=f":x: I'm not playing anything. Type `/play` from vc.",
         color=discord.Color.blue(),
     ),
     "NO_TRACK_FOUND_IN_QUEUE": lambda **kwargs: discord.Embed(
         title="",
         description=f":x: No tracks with index {kwargs.get('to_find')} were found in the queue. Type `/queue` to see "
-        f"the list of tracks.",
+                    f"the list of tracks.",
         color=discord.Color.blue(),
     ),
     "NO_PERMISSIONS": discord.Embed(
@@ -44,7 +44,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "NO_NODES": discord.Embed(
         title="",
-        description=":x: No nodes are currently assigned to the _bot.\nTo fix this, use command `/node reconnect`",
+        description=":x: No nodes are currently assigned to the bot.\nTo fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_NODES_CONNECTED": discord.Embed(
@@ -69,7 +69,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "CONNECTION_TIMEOUT": discord.Embed(
         title="",
-        description=":x: Failed to connect to the voice channel, was _bot disconnected or moved manually before? If yes use `/leave`",
+        description=":x: Failed to connect to the voice channel, was bot disconnected or moved manually before? If yes use `/leave`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_TRACKS_FOUND": lambda **kwargs: discord.Embed(
@@ -95,20 +95,37 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "YOUTUBE_ERROR": discord.Embed(
         title="",
         description=":x: Failed to load tracks, youtube plugin might be disabled, or version is outdated. Try "
-        "`/node reconnect`.\nIf issue persists, it means YouTube updated their site and getting tracks "
-        "won't work until youtube plugin gets fixed.",
+                    "`/node reconnect`.\nIf issue persists, it means YouTube updated their site and getting tracks "
+                    "won't work until youtube plugin gets fixed.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "LAVALINK_ERROR": discord.Embed(
         title="",
         description=":x: Failed to load tracks, you probably inputted wrong link or this Lavalink server doesn't have "
-        "necessary plugins.\nTo fix this, use command `/node reconnect`",
+                    "necessary plugins.\nTo fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NODE_REQUEST_ERROR": lambda **kwargs: discord.Embed(
         title="",
         description=":warning: An error occured when trying to send request to the node, trying to connect to a new node."
-        f"\n\n**Message: {kwargs.get('error')}**",
+                    f"\n\n**Message: {kwargs.get('error')}**",
+        color=discord.Color.yellow(),
+    ),
+    "JOKE_TIMEOUT": discord.Embed(
+        title="",
+        description=":x: Failed to get joke, try again later.",
+        color=discord.Color.from_rgb(r=220, g=0, b=0),
+    ),
+    "TRACK_EXCEPTION": lambda **kwargs: discord.Embed(
+        title="",
+        description=":warning: An error occured when playing song, trying to connect to a new node."
+                    f"\n\n**Message**: {kwargs.get('message')}"
+                    f"\n**Severity**: {kwargs.get('severity')}",
+        color=discord.Color.yellow(),
+    ),
+    "TRACK_STUCK": discord.Embed(
+        title="",
+        description=":warning: Track got stuck, trying to connect to a new node.",
         color=discord.Color.yellow(),
     ),
     "RADIOMAP_ERROR": discord.Embed(
@@ -124,19 +141,19 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "CHANNEL_NOT_NSFW": discord.Embed(
         title="",
         description=":x: You have set NSFW posts to true, yet the channel you requested in is not NSFW,"
-        " skipping shitpost.",
+                    " skipping shitpost.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "REDDIT_REQUEST_ERROR": discord.Embed(
         title="",
         description=":x: Reddit didn't respond, try again in a minute.\nWhat could cause "
-        "error? - Reddit is down, Subreddit is locked, API might be overloaded",
+                    "error? - Reddit is down, Subreddit is locked, API might be overloaded",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "SFD_SERVER_NOT_FOUND": discord.Embed(
         title="",
         description=":x: Server you searched for is not in the list, "
-        " make sure you parsed correct server name.",
+                    " make sure you parsed correct server name.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "SFD_SERVERS_NOT_FOUND": discord.Embed(
@@ -147,7 +164,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "CANT_PING_ROLE": discord.Embed(
         title="",
         description=":x: I can't ping Exotic role, please check if role exists or"
-        " if I have permission to ping it.",
+                    " if I have permission to ping it.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NOT_EMBED_AUTHOR": discord.Embed(
@@ -173,16 +190,6 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "DB_NOT_IN_LIST": lambda **kwargs: discord.Embed(
         title="",
         description=f":x: String `{kwargs.get('to_remove')}` is already in the list, use `/bot_config show`",
-        color=discord.Color.from_rgb(r=220, g=0, b=0),
-    ),
-    "JOKE_TIMEOUT": discord.Embed(
-        title="",
-        description=":x: Timeout while trying to get joke from API, try again later.",
-        color=discord.Color.from_rgb(r=220, g=0, b=0),
-    ),
-    "NO_MORE_JOKES": discord.Embed(
-        title="",
-        description=":x: No more jokes available, try again later.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     # -------------------- Success messages -------------------- #
@@ -253,47 +260,119 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         description=f"**✅ Left <#{kwargs.get('channel_id')}>**",
         color=discord.Color.blue(),
     ),
+    "DISCONNECTED_INACTIVITY": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**Left <#{kwargs.get('channel_id')}> after 10 minutes of inactivity.**",
+        color=discord.Color.blue(),
+    ),
+    "DISCONNECTED_NO_USERS": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**Left <#{kwargs.get('channel_id')}>, no users in channel.**",
+        color=discord.Color.blue(),
+    ),
     "JOINED": lambda **kwargs: discord.Embed(
         title="",
         description=f"**✅ Joined to <#{kwargs.get('channel_id')}>"
-        f" and set text channel to <#{kwargs.get('text_channel_id')}>.**",
+                    f" and set text channel to <#{kwargs.get('text_channel_id')}>.**",
+        color=discord.Color.blue(),
+    ),
+    "MOVED": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**:wheelchair: Moving to <#{kwargs.get('channel_id')}>**",
+        color=discord.Color.blue(),
+    ),
+    "CURRENT_VOLUME": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**🔊 `{kwargs.get('volume')}%`**",
+        color=discord.Color.blue(),
+    ),
+    "SPEED_CHANGED": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**:stopwatch:  Speed increased by `{kwargs.get('multiplier')}x`**",
+        color=discord.Color.blue(),
+    ),
+    "EFFECTS_CLEARED": discord.Embed(
+        title="",
+        description="**:microphone:  Effects were cleared.**",
+        color=discord.Color.blue(),
+        footer=discord.EmbedFooter(text="takes 3 seconds to apply"),
+    ),
+    "AUTOPLAY_MODE_CHANGED": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**:repeat: Autoplay mode set to `{kwargs.get('autoplay_mode')}`**",
+        color=discord.Color.blue(),
+    ),
+    "NODE_CONNECT_SUCCESS": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**✅ Connected to node `{kwargs.get('uri')}`**",
+        color=discord.Color.blue(),
+    ),
+    "NODE_RECONNECT_TO_PLAYER_SUCCESS": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**✅ Reconnected your player to node `{kwargs.get('uri')}`**",
+        color=discord.Color.blue(),
+    ),
+    "NODE_RECONNECT_SUCCESS": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**✅ Reconnected to node `{kwargs.get('uri')}`**",
+        color=discord.Color.blue(),
+    ),
+    "USER_DATA_GENERATED": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**:floppy_disk:  Generated user data.**",
+        color=discord.Color.blue,
+    ),
+    "DB_ADDED": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"✅ String `{kwargs.get('to_upload')}` was added to `{kwargs.get('collection_name')}`",
+        color=discord.Color.blue(),
+    ),
+    "DB_REMOVED": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"✅ String `{kwargs.get('to_remove')}` was removed from `{kwargs.get('collection_name')}`",
         color=discord.Color.blue(),
     ),
 }
 
 
 async def send_response(
-    ctx: discord.ApplicationContext,
-    response_code: str,
-    respond: bool = True,
-    ephemeral: bool = True,
-    delete_after: int = None,
-    **kwargs: Any,
+        ctx: Union[discord.ApplicationContext, discord.TextChannel],
+        response_code: str,
+        respond: bool = True,
+        ephemeral: bool = True,
+        delete_after: int = None,
+        **kwargs: Any,
 ) -> None:
-    """Send a response to the user.
+    """This method sends a response to the user based on the response code.
 
     Parameters
     ----------
-    ctx: discord.ApplicationContext
+    ctx: :class:`discord.ApplicationContext`
         The context of the command.
-    response_code: str
-        The response code to send.
-    respond: bool
-        Whether to respond to the user or not.
-    ephemeral: bool
-        Whether to send the response as ephemeral or not.
-    delete_after: int
-        The time in seconds to wait before deleting the response.
-    kwargs: Any
-        Additional arguments to pass to the response.
+    response_code: :class:`str`
+        The response code to determine the type of response.
+    respond: :class:`bool`
+        Whether to respond to the user or send a message in the channel.
+    ephemeral: :class:`bool`
+        Whether the response should be ephemeral (only visible to the user).
+    delete_after: :class:`int`
+        The time in seconds after which the response should be deleted.
+    kwargs: :class:`Any`
+        Additional keyword arguments to pass to the response handler.
+
+    Raises
+    ------
+    ValueError
+        If the response code is not recognized.
     """
+    if response_code not in RESPONSE_CODES:
+        raise ValueError(f"Unknown response code: {response_code}")
+
     response = RESPONSE_CODES[response_code]
     if callable(response):
         response = response(**kwargs)
 
     if respond:
-        await ctx.respond(
-            embed=response, ephemeral=ephemeral, delete_after=delete_after
-        )
+        await ctx.respond(embed=response, ephemeral=ephemeral, delete_after=delete_after)
     else:
         await ctx.send(embed=response, delete_after=delete_after)

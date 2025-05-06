@@ -9,7 +9,7 @@ from wavelink import (
     TrackStuckEventPayload,
 )
 
-from app.constants import DISCORD_ICONS, YOUTUBE_ICON
+from app.constants import DISCORD_ICON, YOUTUBE_ICON
 from app.response_handler import send_response
 from app.utils import fix_audio_title, switch_node
 
@@ -203,7 +203,6 @@ class Listeners(commands.Cog):
         embed.set_thumbnail(url=payload.track.artwork)
         return embed
 
-    @property
     def _is_bot_node_connected(self) -> bool:
         return hasattr(self.bot, "node")
 
@@ -211,7 +210,7 @@ class Listeners(commands.Cog):
     def _has_pfp(member: discord.Member) -> str:
         if hasattr(member.avatar, "url"):
             return member.avatar.url
-        return DISCORD_ICONS
+        return DISCORD_ICON
 
 
 def setup(bot: commands.Bot) -> None:

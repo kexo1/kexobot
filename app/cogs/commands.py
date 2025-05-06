@@ -71,7 +71,7 @@ class CommandCog(commands.Cog):
         self._sfd_servers = SFDServers(self._bot_config, self._bot.session)
 
     slash_bot_config = discord.SlashCommandGroup(
-        "_bot_config", "Update Bot Configuration"
+        "bot_config", "Update Bot Configuration"
     )
     slash_node = discord.SlashCommandGroup("node", "Commands for managing nodes")
     slash_reddit = discord.SlashCommandGroup("reddit", "Commands for reddit posts")
@@ -339,12 +339,12 @@ class CommandCog(commands.Cog):
         search: str
             The name of the server to search for.
         """
-        server = self._sfd_servers.get_server(search)
+        server = await self._sfd_servers.get_server(search)
         if not server:
             await send_response(ctx, "SFD_SERVER_NOT_FOUND")
             return
 
-        server = server.get_full_server_info()
+        print(server)
 
         embed = discord.Embed(
             title=server.server_name,
@@ -357,7 +357,7 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Botsㅤㅤ", value=server.bots)
         embed.add_field(name="Map Nameㅤㅤ", value=server.map_name)
         embed.add_field(name="Has Passwordㅤㅤ", value=server.has_password)
-        embed.add_field(name="Game Modeㅤㅤ", value=await server.get_game_mode())
+        embed.add_field(name="Game Modeㅤㅤ", value=server.game_mode)
         await ctx.respond(embed=embed)
 
     @slash_sfd.command(
@@ -571,7 +571,7 @@ class CommandCog(commands.Cog):
         return None
 
     # -------------------- Discord functions -------------------- #
-    @slash_command(name="info", description="Shows _bot info.")
+    @slash_command(name="info", description="Shows bot info.")
     async def info(self, ctx: discord.ApplicationContext) -> None:
         """Method to fetch and display information about the bot.
 
@@ -883,7 +883,7 @@ class HostView(discord.ui.View):
     async def _disable_embed(self) -> discord.Embed:
         self.stop()
 
-        embed = self.message._embeds[0]
+        embed = self.message.embeds[0]
         embed.set_author(
             icon_url=self._author.avatar.url,
             name=f"{self._author.name} is no longer hosting.",
