@@ -25,30 +25,29 @@ plt.style.use("cyberpunk")
 class SFDServer:
     """Class representing a SFD server.
 
-
     Attributes:
     ----------
-    address_ipv4 : str
+    address_ipv4: str
         The IPv4 address of the server.
-    port : int
+    port: int
         The port number of the server.
-    server_name : str
+    server_name: str
         The name of the server.
-    game_mode : int
+    game_mode: int
         The game mode of the server.
-    map_name : str
+    map_name: str
         The name of the map being played on the server.
-    players : int
+    players: int
         The number of players currently on the server.
-    max_players : int
+    max_players: int
         The maximum number of players allowed on the server.
-    bots : int
+    bots: int
         The number of bots currently on the server.
-    has_password : bool
+    has_password: bool
         Whether the server has a password.
-    description : str
+    description: str
         A description of the server.
-    version : str
+    version: str
         The version of the server.
     """
 
@@ -79,7 +78,8 @@ class SFDServer:
         self.version = version
 
     def __repr__(self) -> str:
-        return f"SFDServer({self.server_name}, {self.map_name}, {self.players}, {self.max_players}, {self.bots})"
+        return (f"SFDServer({self.server_name}, {self.map_name},"
+                f" {self.players}, {self.max_players}, {self.bots})")
 
     @property
     def game_mode(self) -> str:
@@ -99,11 +99,11 @@ class SFDServers:
 
     Attributes:
     ----------
-    _bot_config : AsyncIOMotorClient
+    _bot_config: AsyncIOMotorClient
         The MongoDB client for database operations.
-    _session : httpx.AsyncClient
+    _session: httpx.AsyncClient
         The HTTP client for making requests.
-    _graphs_dir : str
+    _graphs_dir: str
         The directory where graphs will be saved.
     """
 
@@ -118,7 +118,7 @@ class SFDServers:
 
         Parameters:
         ----------
-        timezone : str
+        timezone: str
             The timezone to use for the graph.
         """
         activity = await self._load_sfd_activity_data()
@@ -147,7 +147,7 @@ class SFDServers:
 
         Parameters:
         ----------
-        timezone : str
+        timezone: str
             The timezone to use for the graph.
         """
         activity = await self._load_sfd_activity_data()
@@ -191,7 +191,7 @@ class SFDServers:
 
         Parameters:
         ----------
-        now : datetime.datetime
+        now: datetime.datetime
             The current datetime.
         """
         activity = await self._load_sfd_activity_data()
@@ -299,7 +299,7 @@ class SFDServers:
 
         Parameters:
         ----------
-        search : str
+        search: str
             The name of the server to search for.
 
         Returns:

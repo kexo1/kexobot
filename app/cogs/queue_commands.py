@@ -6,9 +6,10 @@ from discord.commands import slash_command, option, guild_only
 from discord.ext import commands
 from pycord.multicog import subcommand
 
+from app.constants import YOUTUBE_ICON
 from app.decorators import is_playing, is_joined, is_queue_empty
 from app.response_handler import send_response
-from app.utils import find_track, fix_audio_title
+from app.utils import find_track, fix_audio_title, has_pfp
 
 
 # noinspection PyUnusedLocal
@@ -277,8 +278,10 @@ class Queue(commands.Cog):
         queue_status, footer = await self._get_queue_status(player.queue.mode)
 
         header = (
-            f"\n***__{queue_status}:__***\n **[{fix_audio_title(player.current)}]({player.current.uri})**\n"
-            f" `{int(divmod(player.current.length, 60000)[0])}:{round(divmod(player.current.length, 60000)[1] / 1000):02} | "
+            f"\n***__{queue_status}:__***\n **[{fix_audio_title(player.current)}]"
+            f"({player.current.uri})**\n"
+            f" `{int(divmod(player.current.length, 60000)[0])}:"
+            f"{round(divmod(player.current.length, 60000)[1] / 1000):02} | "
             f"Requested by: {player.current.requester.name}`\n\n ***__Next:__***\n"
         )
 
@@ -288,7 +291,8 @@ class Queue(commands.Cog):
         for pos, track in enumerate(player.queue):
             song_line = (
                 f"`{pos + 1}.` **[{fix_audio_title(track)}]({track.uri})**\n"
-                f" `{int(divmod(track.length, 60000)[0])}:{round(divmod(track.length, 60000)[1] / 1000):02} | "
+                f" `{int(divmod(track.length, 60000)[0])}:"
+                f"{round(divmod(track.length, 60000)[1] / 1000):02} | "
                 f"Requested by: {track.requester.name}`\n"
             )
             if len(current_description) + len(song_line) > 4000:
@@ -332,10 +336,17 @@ class Queue(commands.Cog):
             timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
         embed.set_author(name="Playback Information")
-        embed.set_footer(
-            text=f"Requested by {player.current.requester.name}",
-            icon_url=ctx.author.display_avatar.url,
-        )
+
+        if hasattr(player.current, "requester"):
+            embed.set_footer(
+                text=f"Requested by {player.current.requester.name}",
+                icon_url=has_pfp(ctx.author),
+            )
+        else:
+            embed.set_footer(
+                text="YouTube Autoplay",
+                icon_url=YOUTUBE_ICON,
+            )
         embed.add_field(
             name="Track title",
             value=f"**[{player.current.title}]({player.current.uri})**",

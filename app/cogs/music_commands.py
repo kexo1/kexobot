@@ -83,6 +83,7 @@ class MusicCommands(commands.Cog):
         play_next: :class:`bool`
             If True, the song will be played next in the queue.
         """
+
         # Defer the response right away to avoid interaction timeout
         await ctx.defer(ephemeral=False)
 
@@ -490,7 +491,7 @@ class MusicCommands(commands.Cog):
             # Fallback to default search
             source = "ytsearch"
 
-        should_respond = False if player.just_joined else True
+        should_respond = not player.just_joined
         if last_error:
             await send_response(
                 ctx,
@@ -535,7 +536,7 @@ class MusicCommands(commands.Cog):
             await ctx.defer()
 
         try:
-            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
+            player = await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
         except wavelink.InvalidChannelStateException:
             await send_response(ctx, "NO_PERMISSIONS")
             return False
@@ -544,9 +545,10 @@ class MusicCommands(commands.Cog):
             return False
         except wavelink.exceptions.ChannelTimeoutException:
             await send_response(ctx, "CONNECTION_TIMEOUT")
-            vc: wavelink.Player = ctx.guild.voice_client
-            print(vc.channel.name)
-            vc.cleanup()
+            print(player.channel.name)
+            print(player.connected)
+            player.cleanup()
+            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
             return False
         return True
 

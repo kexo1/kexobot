@@ -661,7 +661,6 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="add",
         description="Adds string to selected list.",
-        guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
@@ -684,7 +683,6 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="remove",
         description="Removes string from selected list.",
-        guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
@@ -707,7 +705,6 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="show",
         description="Shows data from selected lists.",
-        guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
@@ -914,7 +911,7 @@ class SubredditSelectorView(discord.ui.View):
     def __init__(self, current_subreddits: set, bot: discord.Bot, user_id: int) -> None:
         super().__init__(timeout=600)
         self._current_subreddits = current_subreddits
-        self._selected_subreddits = set()
+        self.selected_subreddits = set()
         self._bot = bot
         self._user_id = user_id
 
@@ -983,9 +980,9 @@ class SubredditSelectorView(discord.ui.View):
         interaction: :class:`discord.Interaction`
             The interaction that triggered the button click.
         """
-        if self._selected_subreddits:
+        if self.selected_subreddits:
             self._user_data[self._user_id]["reddit"]["subreddits"] = list(
-                self._selected_subreddits
+                self.selected_subreddits
             )
 
             await self._user_data_db.update_one(
@@ -998,7 +995,7 @@ class SubredditSelectorView(discord.ui.View):
         embed = discord.Embed(
             title="Changes Saved",
             description="Successfully updated your subreddit list"
-            f" to `{len(self._selected_subreddits)}` subreddits.",
+            f" to `{len(self.selected_subreddits)}` subreddits.",
             color=discord.Color.green(),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
@@ -1016,12 +1013,12 @@ class SubredditSelectorView(discord.ui.View):
         added_subreddits = set()
 
         for subreddit in multireddit.subreddits:
-            if subreddit.display_name not in self._selected_subreddits:
+            if subreddit.display_name not in self.selected_subreddits:
                 await multireddit.remove(subreddit)
                 continue
             added_subreddits.add(subreddit.display_name)
 
-        for subreddit in self._selected_subreddits:
+        for subreddit in self.selected_subreddits:
             if subreddit in added_subreddits:
                 continue
 
@@ -1029,8 +1026,6 @@ class SubredditSelectorView(discord.ui.View):
                 await multireddit.add(await self._bot.reddit_agent.subreddit(subreddit))
             except asyncpraw.exceptions.RedditAPIException:
                 print(f"Failed to add subreddit `{subreddit}`")
-
-        self._temp_user_data[self._user_id]["reddit"]["multireddit"] = multireddit
 
 
 class SubredditSelect(discord.ui.Select):

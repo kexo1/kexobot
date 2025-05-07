@@ -12,7 +12,7 @@ import httpx
 import psutil
 import wavelink
 
-from app.constants import SHITPOST_SUBREDDITS_DEFAULT, SONG_STRIP, SOURCE_PATTERNS
+from app.constants import SHITPOST_SUBREDDITS_DEFAULT, SONG_STRIP, SOURCE_PATTERNS, DISCORD_ICON
 
 
 def load_text_file(name: str) -> list:
@@ -96,7 +96,7 @@ def get_memory_usage():
 
 
 async def download_video(
-    session: httpx.AsyncClient, url: str, nsfw: bool
+        session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> Optional[discord.File]:
     """Download a video from a given URL and return it as a discord.File.
 
@@ -136,7 +136,7 @@ async def download_video(
 
 
 async def check_node_status(
-    bot: discord.Bot, uri: str, password: str
+        bot: discord.Bot, uri: str, password: str
 ) -> Optional[wavelink.Node]:
     """Check the status of a Lavalink node and return it if it's online.
 
@@ -166,10 +166,10 @@ async def check_node_status(
         await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=3)
         await node[0].fetch_info()
     except (
-        asyncio.TimeoutError,
-        wavelink.exceptions.NodeException,
-        wavelink.LavalinkException,
-        aiohttp.NonHttpUrlClientError,
+            asyncio.TimeoutError,
+            wavelink.exceptions.NodeException,
+            wavelink.LavalinkException,
+            aiohttp.NonHttpUrlClientError,
     ):
         return None
     return node[0]
@@ -293,10 +293,30 @@ def find_track(player: wavelink.Player, to_find: str) -> Optional[int]:
     return to_find
 
 
+def has_pfp(member: discord.Member) -> str:
+    """Check if a member has a profile picture and return its URL.
+
+    If not, return a default discord icon URL.
+
+    Parameters
+    ----------
+    member: :class:`discord.Member`
+        The member to check.
+
+    Returns
+    -------
+    str
+        The URL of the member's profile picture or a default icon.
+    """
+    if hasattr(member.avatar, "url"):
+        return member.display_avatar.url
+    return DISCORD_ICON
+
+
 async def switch_node(
-    connect_node: Callable[[], wavelink.Node],
-    player: wavelink.Player,
-    play_after: bool = True,
+        connect_node: Callable[[], wavelink.Node],
+        player: wavelink.Player,
+        play_after: bool = True,
 ) -> Optional[wavelink.Node]:
     """
     Attempt to switch to a new node for audio playback.
@@ -331,8 +351,8 @@ async def switch_node(
             await player.text_channel.send(embed=embed)
             return node
         except (
-            wavelink.LavalinkException,
-            wavelink.InvalidNodeException,
+                wavelink.LavalinkException,
+                wavelink.InvalidNodeException,
         ):
             pass
 
@@ -471,7 +491,7 @@ def fix_guild_data(old_data: dict) -> dict:
 
 
 def fix_data(
-    fixed_data: Dict[str, Any], generator: Callable[[], Dict[str, Any]]
+        fixed_data: Dict[str, Any], generator: Callable[[], Dict[str, Any]]
 ) -> Dict[str, Any]:
     """Generic function to fix data by adding missing keys and values from a generator.
 
@@ -577,14 +597,14 @@ async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple:
 
 
 async def make_http_request(
-    session: httpx.AsyncClient,
-    url: str,
-    data: Optional[Dict] = None,
-    headers: Optional[Dict] = None,
-    retries: int = 1,
-    timeout: float = 3.0,
-    get_json: bool = False,
-    binary: bool = False,
+        session: httpx.AsyncClient,
+        url: str,
+        data: Optional[Dict] = None,
+        headers: Optional[Dict] = None,
+        retries: int = 1,
+        timeout: float = 3.0,
+        get_json: bool = False,
+        binary: bool = False,
 ) -> Optional[httpx.Response]:
     """
     Make an HTTP request with retry logic.
@@ -631,10 +651,10 @@ async def make_http_request(
                 return response.json()
             return response
         except (
-            httpx.ReadTimeout,
-            httpx.TimeoutException,
-            httpx.ConnectError,
-            httpx.HTTPError,
+                httpx.ReadTimeout,
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                httpx.HTTPError,
         ) as e:
             if attempt == retries - 1:
                 print(f"Request failed ({type(e).__name__}): ", url)

@@ -29,6 +29,29 @@ GAME_UPDATES_CHANNEL = 882185054174994462
 FREE_STUFF_CHANNEL = 1081883673902714953
 ALIENWARE_ARENA_NEWS_CHANNEL = 1368937624496115853
 
+# -------------------- Icons -------------------- #
+YOUTUBE_ICON = "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
+DISCORD_ICON = "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
+REDDIT_FREEGAME_ICON = ("https://styles.redditmedia.com/t5_30mv3"
+                        "/styles/communityIcon_xnoh6m7g9qh71.png")
+REDDIT_CRACKWATCH_ICON = ("https://b.thumbs.redditmedia.com/"
+                          "zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png")
+REDDIT_ICON = "https://www.pngkit.com/png/full/207-2074270_reddit-icon-png.png"
+GAME3RB_ICON = (
+    "https://media.discordapp.net/attachments/796453724713123870"
+    "/1162443171209433088/d95X3.png?ex=653bf491&is=65297f91&hm"
+    "=c36058433d50580eeec7cd89ddfe60965ec297d6fc8054994fee5ae976bedfd3&="
+)
+ONLINEFIX_ICON = (
+    "https://media.discordapp.net/attachments/"
+    "796453724713123870/1035951759505506364/favicon-1.png"
+)
+ALIENWAREARENA_ICON = "https://www.pngarts.com/files/12/Alienware-PNG-Photo.png"
+POWER_OUTAGES_ICON = (
+    "https://www.hliniknadhronom.sk/portals_pictures/i_006868/i_6868718.png"
+)
+ESUTAZE_ICON = "https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg"
+
 # -------------------- MongoDB Configuration -------------------- #
 MONGO_DB_URL = (
     f"mongodb+srv://{os.getenv('MONGO_KEY')}"
@@ -58,12 +81,7 @@ REDDIT_STRIP = (" *", "* ", "*", "---")
 REDDIT_FREEGAME_MAX_POSTS = 5
 REDDIT_CRACKWATCH_POSTS = 5
 
-REDDIT_FREEGAME_ICON = (
-    "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png"
-)
-REDDIT_CRACKWATCH_ICON = (
-    "https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
-)
+
 
 REDDIT_FREEGAME_EMBEDS = {
     "Default": {
@@ -88,11 +106,6 @@ REDDIT_FREEGAME_EMBEDS = {
 
 # -------------------- Game3rb Configuration -------------------- #
 GAME3RB_URL = "https://game3rb.com/category/games-online/"
-GAME3RB_ICON = (
-    "https://media.discordapp.net/attachments/796453724713123870"
-    "/1162443171209433088/d95X3.png?ex=653bf491&is=65297f91&hm"
-    "=c36058433d50580eeec7cd89ddfe60965ec297d6fc8054994fee5ae976bedfd3&="
-)
 GAME3RB_STRIP = (
     "Download ",
     " + OnLine",
@@ -122,17 +135,12 @@ GAME3RB_STRIP = (
 # -------------------- Online-Fix Configuration -------------------- #
 ONLINEFIX_MAX_GAMES = 10
 ONLINEFIX_URL = "https://online-fix.me/chat.php"
-ONLINEFIX_ICON = (
-    "https://media.discordapp.net/attachments/"
-    "796453724713123870/1035951759505506364/favicon-1.png"
-)
 
 # -------------------- AlienwareArena Configuration -------------------- #
 ALIENWAREARENA_MAX_POSTS = 3
 ALIENWAREARENA_URL = "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
 ALIENWAREARENA_NEWS_URL = "https://eu.alienwarearena.com/relay/my-feed"
 ALIENWAREARENA_STRIP = ("Key", "Giveaway", "Steam Game")
-ALIENWAREARENA_ICON = "https://www.pngarts.com/files/12/Alienware-PNG-Photo.png"
 
 # -------------------- Fanatical Configuration -------------------- #
 FANATICAL_MAX_POSTS = 3
@@ -142,13 +150,9 @@ FANATICAL_IMG_URL = "https://cdn-ext.fanatical.com/production/product/1280x720/"
 # -------------------- Power Outages Configuration -------------------- #
 POWER_OUTAGES_MAX_ARTICLES = 5
 POWER_OUTAGES_URL = "https://www.hliniknadhronom.sk/get_rss.php?id=1_atom_1947"
-POWER_OUTAGES_ICON = (
-    "https://www.hliniknadhronom.sk/portals_pictures/i_006868/i_6868718.png"
-)
 
 # -------------------- Esutaze Configuration -------------------- #
 ESUTAZE_URL = "https://www.esutaze.sk/category/internetove-sutaze/feed/"
-ESUTAZE_ICON = "https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg"
 
 # -------------------- SFD Game Configuration -------------------- #
 SFD_SERVER_URL = "https://mythologicinteractive.com/SFDGameServices.asmx"
@@ -372,7 +376,7 @@ SUPPORTED_PLATFORMS = (
     "Tidal (unlikely)",
     "Qobuz (unlikely)",
 )
-DISCORD_ICON = "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
+
 
 COUNTRIES = (
     "United States",
@@ -410,7 +414,7 @@ SONG_STRIP = (
     "/",
 )
 
-YOUTUBE_ICON = "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
+
 
 # -------------------- RadioGarden Configuration -------------------- #
 RADIOGARDEN_PLACES_URL = "https://radio.garden/api/ara/content/places"

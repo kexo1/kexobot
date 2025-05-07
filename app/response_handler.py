@@ -8,33 +8,33 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     # Error responses
     "NO_VOICE_CHANNEL": discord.Embed(
         title="",
-        description=f":x: You're not in a voice channel. Type `/play` from vc.",
+        description=":x: You're not in a voice channel. Type `/play` from vc.",
         color=discord.Color.blue(),
     ),
     "NOT_IN_VOICE_CHANNEL": discord.Embed(
         title="",
-        description=f":x: I'm not joined in a voice channel.",
+        description=":x: I'm not joined in a voice channel.",
         color=discord.Color.blue(),
     ),
     "NOT_IN_SAME_VOICE_CHANNEL": discord.Embed(
         title="",
-        description=f":x: I am playing in a different voice channel.",
+        description=":x: I am playing in a different voice channel.",
         color=discord.Color.blue(),
     ),
     "NOT_IN_SAME_VOICE_CHANNEL_PLAYING": discord.Embed(
         title="",
-        description=f":x: I am playing in a different voice channel, wait till song finishes.",
+        description=":x: I am playing in a different voice channel, wait till song finishes.",
         color=discord.Color.blue(),
     ),
     "NOT_PLAYING": discord.Embed(
         title="",
-        description=f":x: I'm not playing anything. Type `/play` from vc.",
+        description=":x: I'm not playing anything. Type `/play` from vc.",
         color=discord.Color.blue(),
     ),
     "NO_TRACK_FOUND_IN_QUEUE": lambda **kwargs: discord.Embed(
         title="",
-        description=f":x: No tracks with index {kwargs.get('to_find')} were found in the queue. Type `/queue` to see "
-                    f"the list of tracks.",
+        description=f":x: No tracks with index {kwargs.get('to_find')} were found in the queue."
+                    " Type `/queue` to see the list of tracks.",
         color=discord.Color.blue(),
     ),
     "NO_PERMISSIONS": discord.Embed(
@@ -44,7 +44,8 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "NO_NODES": discord.Embed(
         title="",
-        description=":x: No nodes are currently assigned to the bot.\nTo fix this, use command `/node reconnect`",
+        description=":x: No nodes are currently assigned to the bot.\n"
+                    "To fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_NODES_CONNECTED": discord.Embed(
@@ -69,7 +70,10 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "CONNECTION_TIMEOUT": discord.Embed(
         title="",
-        description=":x: Failed to connect to the voice channel, was bot disconnected or moved manually before? If yes use `/leave`",
+        description=":x: Failed to connect to the voice channel,"
+                    " was bot disconnected or moved manually before?\n"
+                    " If yes bot probably broke, contact dev to restart bot."
+                    " Don't disconnect bot manually or else it might break again.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_TRACKS_FOUND": lambda **kwargs: discord.Embed(
@@ -94,20 +98,24 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "YOUTUBE_ERROR": discord.Embed(
         title="",
-        description=":x: Failed to load tracks, youtube plugin might be disabled, or version is outdated. Try "
-                    "`/node reconnect`.\nIf issue persists, it means YouTube updated their site and getting tracks "
-                    "won't work until youtube plugin gets fixed.",
+        description=":x: Failed to load tracks, youtube plugin"
+                    " might be disabled, or version is outdated."
+                    " Try `/node reconnect`.\nIf issue persists,"
+                    " it means YouTube updated their site and getting"
+                    " tracks won't work until youtube plugin gets fixed.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "LAVALINK_ERROR": discord.Embed(
         title="",
-        description=":x: Failed to load tracks, you probably inputted wrong link or this Lavalink server doesn't have "
+        description=":x: Failed to load tracks, you probably inputted"
+                    " wrong link or this Lavalink server doesn't have "
                     "necessary plugins.\nTo fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NODE_REQUEST_ERROR": lambda **kwargs: discord.Embed(
         title="",
-        description=":warning: An error occured when trying to send request to the node, trying to connect to a new node."
+        description=":warning: An error occured when trying to send"
+                    " request to the node, trying to connect to a new node."
                     f"\n\n**Message: {kwargs.get('error')}**",
         color=discord.Color.yellow(),
     ),
@@ -140,7 +148,8 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "CHANNEL_NOT_NSFW": discord.Embed(
         title="",
-        description=":x: You have set NSFW posts to true, yet the channel you requested in is not NSFW,"
+        description=":x: You have set NSFW posts to true,"
+                    " yet the channel you requested in is not NSFW,"
                     " skipping shitpost.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
@@ -174,22 +183,25 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "ALREADY_HOSTING": discord.Embed(
         title="",
-        description=":x: You have already created host embed!\nClick on button embed to stop it from beign active..",
+        description=":x: You have already created host embed!\n"
+                    "Click on button embed to stop it from beign active.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "INCORRECT_IMAGE_URL": discord.Embed(
         title="",
-        description=":x: Image URL needs to end with .png, .gif and etc..",
+        description=":x: Image URL needs to end with .png, .gif and etc.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "DB_ALREADY_IN_LIST": lambda **kwargs: discord.Embed(
         title="",
-        description=f":x: String `{kwargs.get('to_upload')}` is already in the list, use `/bot_config show`",
+        description=f":x: String `{kwargs.get('to_upload')}`"
+                    f" is already in the list, use `/bot_config show`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "DB_NOT_IN_LIST": lambda **kwargs: discord.Embed(
         title="",
-        description=f":x: String `{kwargs.get('to_remove')}` is already in the list, use `/bot_config show`",
+        description=f":x: String `{kwargs.get('to_remove')}`"
+                    f" is already in the list, use `/bot_config show`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     # -------------------- Success messages -------------------- #
@@ -270,6 +282,12 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         description=f"**Left <#{kwargs.get('channel_id')}>, no users in channel.**",
         color=discord.Color.blue(),
     ),
+    "DISCONNECTED_MANUALLY": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"**Disconnected from <#{kwargs.get('channel_id')}>,"
+                    f" please next time use command `/leave`**",
+        color=discord.Color.blue(),
+    ),
     "JOINED": lambda **kwargs: discord.Embed(
         title="",
         description=f"**✅ Joined to <#{kwargs.get('channel_id')}>"
@@ -319,17 +337,19 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "USER_DATA_GENERATED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**:floppy_disk:  Generated user data.**",
+        description="**:floppy_disk:  Generated user data.**",
         color=discord.Color.blue,
     ),
     "DB_ADDED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"✅ String `{kwargs.get('to_upload')}` was added to `{kwargs.get('collection_name')}`",
+        description=f"✅ String `{kwargs.get('to_upload')}`"
+                    f" was added to `{kwargs.get('collection_name')}`",
         color=discord.Color.blue(),
     ),
     "DB_REMOVED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"✅ String `{kwargs.get('to_remove')}` was removed from `{kwargs.get('collection_name')}`",
+        description=f"✅ String `{kwargs.get('to_remove')}`"
+                    f" was removed from `{kwargs.get('collection_name')}`",
         color=discord.Color.blue(),
     ),
 }

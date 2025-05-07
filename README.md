@@ -23,7 +23,6 @@ Discord python bot which is used for:
 * [asyncpraw](https://asyncpraw.readthedocs.io/en/stable/) - Asynchronous Python Reddit API Wrapper
 * [wavelink](https://wavelink.dev/en/latest/) - Fully asynchronous Python Lavalink wrapper for discord.py
 * [MongoDB](https://www.mongodb.com/) - Document database with the scalability and flexibility for querying and indexing collections.
-* [imgflip.py](https://pypi.org/project/imgflip.py/) - A simple Python wrapper for the Imgflip API
 
 ## Acknowledgments
 

@@ -40,6 +40,7 @@ from app.constants import (
     HUMOR_API_SECRET,
     KEXO_SERVER,
     LOCAL_MACHINE_NAME,
+    REDDIT_ICON,
 )
 from app.utils import get_guild_data, is_older_than, generate_temp_guild_data
 
@@ -125,13 +126,26 @@ class KexoBot:
 
     @staticmethod
     async def _fetch_channel(channel_id: int) -> discord.TextChannel:
-        """Helper to fetch a channel by ID."""
+        """Helper to fetch a channel by ID, returns :class:`discord.TextChannel`.
 
+        Parameters
+        ----------
+        channel_id: int
+            The ID of the channel to fetch.
+        """
         return await bot.fetch_channel(channel_id)
 
     @staticmethod
-    def _initialize_class(cls, *args):
-        """Helper to initialize a class with arguments."""
+    def _initialize_class(cls, *args) -> object:
+        """Helper to initialize a class with arguments.
+
+        Parameters
+        ----------
+        cls: type
+            The class to initialize.
+        *args: tuple
+            The arguments to pass to the class.
+        """
         return cls(*args)
 
     async def _fetch_channels(self) -> None:
@@ -367,12 +381,8 @@ class KexoBot:
 
     @staticmethod
     def get_online_nodes() -> int:
-        """Get the number of online lavalink nodes.
-
-        Returns
-        -------
-        int
-            The number of online lavalink nodes.
+        """Get the number of online lavalink nodes,
+         returns ``int`` of online nodes.
         """
         return len(
             [
@@ -383,27 +393,24 @@ class KexoBot:
         )
 
     def get_avaiable_nodes(self) -> int:
-        """Get the number of available lavalink nodes.
-
-        Returns
-        -------
-        int
-            The number of available lavalink nodes from Lavalink server manager.
+        """Get the number of available lavalink nodes,
+        returns ``int`` of available nodes.
         """
         return len(self.lavalink_servers)
 
     @staticmethod
     def _clear_temp_reddit_data() -> None:
         """Clear the temporary user reddit data."""
-        for user_id in bot.temp_user_data:
-            last_used = bot.temp_user_data[user_id]["reddit"]["last_used"]
+        for _, user_data in bot.temp_user_data.items():
+            reddit_data = user_data["reddit"]
+            last_used = reddit_data["last_used"]
             if not last_used:
                 continue
 
             if is_older_than(5, last_used):
-                bot.temp_user_data[user_id]["reddit"]["last_used"] = None
-                bot.temp_user_data[user_id]["reddit"]["viewed_posts"] = set()
-                bot.temp_user_data[user_id]["reddit"]["search_limit"] = 3
+                reddit_data["last_used"] = None
+                reddit_data["viewed_posts"] = set()
+                reddit_data["search_limit"] = 3
 
     @staticmethod
     def _clear_temp_guild_data() -> None:
@@ -431,9 +438,7 @@ class KexoBot:
                 pass
 
             if not subreddit.icon_img:
-                subreddit_icons[subreddit.display_name] = (
-                    "https://www.pngkit.com/png/full/207-2074270_reddit-icon-png.png"
-                )
+                subreddit_icons[subreddit.display_name] = REDDIT_ICON
                 continue
             subreddit_icons[subreddit.display_name] = subreddit.icon_img
 
@@ -596,7 +601,7 @@ async def on_guild_join(guild: discord.Guild) -> None:
 
     Parameters
     ----------
-    guild: discord.Guild
+    guild: :class:`discord.Guild`
         The guild that the bot joined.
     """
     print(f"Joined new guild: {guild.name}")

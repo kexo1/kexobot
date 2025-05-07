@@ -1,3 +1,5 @@
+import random
+
 import discord
 import wavelink
 from discord.ext import commands
@@ -7,11 +9,13 @@ from wavelink import (
     TrackStartEventPayload,
     TrackExceptionEventPayload,
     TrackStuckEventPayload,
+    WebsocketClosedEventPayload,
+    PlayerUpdateEventPayload,
 )
 
-from app.constants import DISCORD_ICON, YOUTUBE_ICON
+from app.constants import YOUTUBE_ICON
 from app.response_handler import send_response
-from app.utils import fix_audio_title, switch_node
+from app.utils import fix_audio_title, switch_node, has_pfp
 
 
 class Listeners(commands.Cog):
@@ -28,7 +32,7 @@ class Listeners(commands.Cog):
     """
 
     def __init__(self, bot: commands.Bot):
-        self.bot = bot
+        self._bot = bot
 
     @commands.Cog.listener()  # noinspection PyUnusedLocal
     async def on_wavelink_track_start(self, payload: TrackStartEventPayload) -> None:
@@ -44,14 +48,20 @@ class Listeners(commands.Cog):
         if not payload.player.should_respond:
             await payload.player.text_channel.send(embed=self._playing_embed(payload))
 
-        if payload.player.queue.history.count == 3:
+        if payload.player.queue.history.count == 3 and random.randint(0, 1) == 0:
             await payload.player.text_channel.send(
                 "-# Not happy with the current node performance?\n"
-                f"-# You can switch between {self.bot.get_avaiable_nodes()}"
+                f"-# You can switch between {self._bot.get_avaiable_nodes()}"
                 " nodes by using /node reconnect."
             )
 
-        if payload.player.queue.history.count == 10:
+        if payload.player.queue.history.count == 10 and random.randint(0, 2) == 0:
+            await payload.player.text_channel.send(
+                "-# Use the /music autoplay_mode command and\n"
+                "-# set the mode to populated to enable automatic queuing of similar tracks."
+            )
+
+        if payload.player.queue.history.count == 15 and random.randint(0, 2) == 0:
             await payload.player.text_channel.send(
                 "-# Would you like to see which platforms are supported by this node?"
                 " Use the /node supported_platforms."
@@ -69,12 +79,12 @@ class Listeners(commands.Cog):
             The payload containing information about the node that is ready.
         """
         print(f"Node ({payload.node.uri}) is ready!")
-        if self.bot.get_online_nodes() > 1 and self._is_bot_node_connected():
-            await self.bot.close_unused_nodes()
+        if self._bot.get_online_nodes() > 1 and self._is_bot_node_connected():
+            await self._bot.close_unused_nodes()
 
     @commands.Cog.listener()
     async def on_wavelink_node_disconnected(
-        self, payload: NodeDisconnectedEventPayload
+            self, payload: NodeDisconnectedEventPayload
     ) -> None:
         """This event is triggered when a Wavelink node is disconnected.
 
@@ -85,13 +95,13 @@ class Listeners(commands.Cog):
         payload: :class:`NodeDisconnectedEventPayload`
             The payload containing information about the node that is disconnected.
         """
-        if self.bot.get_online_nodes() == 0 and self._is_bot_node_connected():
+        if self._bot.get_online_nodes() == 0 and self._is_bot_node_connected():
             print(f"Node got disconnected, connecting new node. ({payload.node.uri})")
-            await self.bot.connect_node()
+            await self._bot.connect_node()
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(
-        self, payload: TrackExceptionEventPayload
+            self, payload: TrackExceptionEventPayload
     ) -> None:
         """This event is triggered when a track encounters an exception.
 
@@ -109,7 +119,7 @@ class Listeners(commands.Cog):
             message=payload.exception["message"],
             severity=payload.exception["severity"],
         )
-        await switch_node(self.bot.connect_node, payload.player)
+        await switch_node(self._bot.connect_node, payload.player)
 
     @commands.Cog.listener()
     async def on_wavelink_track_stuck(self, payload: TrackStuckEventPayload) -> None:
@@ -122,9 +132,10 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStuckEventPayload`
             The payload containing information about the track that got stuck.
         """
+        print(f"Track got stuck. ({payload.player.node.uri})")
         await send_response(payload.player.text_channel, "TRACK_STUCK", respond=False)
         await switch_node(
-            self.bot.connect_node, player=payload.player, play_after=False
+            self._bot.connect_node, player=payload.player, play_after=False
         )
 
     @commands.Cog.listener()
@@ -147,13 +158,31 @@ class Listeners(commands.Cog):
             channel_id=player.channel.id,
         )
 
+    @commands.Cog.listener()
+    async def on_wavelink_websocket_closed(self, payload: WebsocketClosedEventPayload) -> None:
+        """This event is triggered when the websocket connection is closed.
+
+        Parameters
+        ----------
+        payload: :class:`WebsocketClosedEventPayload`
+            The payload containing information about the closed websocket.
+        """
+
+        if payload.player:
+            print(f"Websocket closed. ({payload.player.node.uri})")
+
+        print("Reason:", payload.reason)
+        print("Code:", payload.code.value)
+        print("By remote:", payload.by_remote)
+        print(wavelink.Pool.nodes)
+
     # noinspection PyUnusedLocal
     @commands.Cog.listener()
     async def on_voice_state_update(
-        self,
-        member: discord.Member,
-        before: discord.VoiceState,
-        after: discord.VoiceState,
+            self,
+            member: discord.Member,
+            before: discord.VoiceState,
+            after: discord.VoiceState,
     ) -> None:
         """This event is triggered when a voice state update occurs.
 
@@ -184,7 +213,8 @@ class Listeners(commands.Cog):
             await player.disconnect()
             return
 
-    def _playing_embed(self, payload: TrackStartEventPayload) -> discord.Embed:
+    @staticmethod
+    def _playing_embed(payload: TrackStartEventPayload) -> discord.Embed:
         embed = discord.Embed(
             color=discord.Colour.green(),
             title="Now playing",
@@ -193,7 +223,7 @@ class Listeners(commands.Cog):
         if hasattr(payload.player.current, "requester"):
             embed.set_footer(
                 text=f"Requested by {payload.player.current.requester.name}",
-                icon_url=self._has_pfp(payload.player.current.requester),
+                icon_url=has_pfp(payload.player.current.requester),
             )
         else:
             embed.set_footer(
@@ -204,13 +234,7 @@ class Listeners(commands.Cog):
         return embed
 
     def _is_bot_node_connected(self) -> bool:
-        return hasattr(self.bot, "node")
-
-    @staticmethod
-    def _has_pfp(member: discord.Member) -> str:
-        if hasattr(member.avatar, "url"):
-            return member.avatar.url
-        return DISCORD_ICON
+        return hasattr(self._bot, "node")
 
 
 def setup(bot: commands.Bot) -> None:
