@@ -18,7 +18,6 @@ from discord.utils import escape_markdown
 from pycord.multicog import subcommand
 
 from app.constants import (
-    ROAST_COMMANDS_MSG,
     HUMOR_API_URL,
     JOKE_API_URL,
     DAD_JOKE_API_URL,
@@ -66,7 +65,6 @@ class FunCommands(commands.Cog):
 
         self._topstropscreenshot = load_text_file("topstropscreenshot")
         self._kotrmelce = load_text_file("kotrmelec")
-        self._idk_count = 0
 
     @slash_command(
         name="kotrmelec",
@@ -101,22 +99,6 @@ class FunCommands(commands.Cog):
             The context of the command.
         """
         await ctx.respond(random.choice(self._topstropscreenshot))
-
-    @slash_command(
-        name="roast",
-        description="Lamar roast",
-        guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER],
-    )
-    async def roast(self, ctx: discord.ApplicationContext) -> None:
-        """This command sends a Lamar roast from GTAV.
-
-        Parameters
-        ----------
-        ctx: :class:`discord.ApplicationContext`
-            The context of the command.
-        """
-
-        await ctx.respond(ROAST_COMMANDS_MSG)
 
     # -------------------- Joke commands -------------------- #
     @slash_command(name="joke", description="Fetches random joke.")
@@ -279,29 +261,6 @@ class FunCommands(commands.Cog):
         for _ in range(integer - 1):
             await ctx.send(word)
 
-    @slash_command(
-        name="idk", description="Idk.", guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER]
-    )
-    async def idk(self, ctx: discord.ApplicationContext) -> None:
-        """This command sends a random "idk" message.
-
-        After 5 times, it sends a jumpscare.
-
-        Parameters
-        ----------
-        ctx: :class:`discord.ApplicationContext`
-            The context of the command.
-        """
-        self._idk_count += 1
-        if self._idk_count < 5:
-            await ctx.respond("idk")
-            return
-        await ctx.respond(
-            "https://media.discordapp.net/attachments"
-            "/796453724713123870/1042486203842306159/image.png"
-        )
-        self._idk_count = 0
-
     @subcommand("reddit")
     @slash_command(
         name="shitpost", description="Random post from various shitposting subreddits."
@@ -419,12 +378,10 @@ class FunCommands(commands.Cog):
     async def _get_jokes(self) -> Optional[list[str]]:
         fetched_jokes: list[str] = []
         jokes = await self._get_humor_api_jokes()
-        if jokes:
-            fetched_jokes.extend(jokes)
+        fetched_jokes.extend(jokes)
 
         jokes = await self._get_joke_api_jokes()
-        if jokes:
-            fetched_jokes.extend(jokes)
+        fetched_jokes.extend(jokes)
 
         return fetched_jokes
 
@@ -478,7 +435,7 @@ class FunCommands(commands.Cog):
 
         return fetched_jokes
 
-    async def _get_joke_api_jokes(self) -> Optional[list[str]]:
+    async def _get_joke_api_jokes(self) -> list[str]:
         fetched_jokes: list[str] = []
         response = await make_http_request(
             self._session,
@@ -486,14 +443,14 @@ class FunCommands(commands.Cog):
             get_json=True,
         )
         if not response:
-            return None
+            return []
 
         if response.get("error"):
-            return None
+            return []
 
         jokes = response.get("jokes")
         if not jokes:
-            return None
+            return []
 
         for joke in jokes:
             joke: str = (
@@ -512,13 +469,13 @@ class FunCommands(commands.Cog):
 
         return fetched_jokes
 
-    async def _get_humor_api_jokes(self) -> Optional[list[str]]:
+    async def _get_humor_api_jokes(self) -> list[str]:
         token = self._load_humor_api_token()
         fetched_jokes: list[str] = []
         if self._bot.humor_api_tokens[token]["exhausted"]:
-            return None
+            return []
 
-        for joke_type in ["racist", "jewish"]:
+        for joke_type in ["racist", "jewish", "nsfw"]:
             for _ in range(len(self._bot.humor_api_tokens)):
                 response = await make_http_request(
                     self._session,

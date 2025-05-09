@@ -84,7 +84,7 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_node_disconnected(
-            self, payload: NodeDisconnectedEventPayload
+        self, payload: NodeDisconnectedEventPayload
     ) -> None:
         """This event is triggered when a Wavelink node is disconnected.
 
@@ -101,7 +101,7 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(
-            self, payload: TrackExceptionEventPayload
+        self, payload: TrackExceptionEventPayload
     ) -> None:
         """This event is triggered when a track encounters an exception.
 
@@ -159,7 +159,9 @@ class Listeners(commands.Cog):
         )
 
     @commands.Cog.listener()
-    async def on_wavelink_websocket_closed(self, payload: WebsocketClosedEventPayload) -> None:
+    async def on_wavelink_websocket_closed(
+        self, payload: WebsocketClosedEventPayload
+    ) -> None:
         """This event is triggered when the websocket connection is closed.
 
         Parameters
@@ -174,15 +176,14 @@ class Listeners(commands.Cog):
         print("Reason:", payload.reason)
         print("Code:", payload.code.value)
         print("By remote:", payload.by_remote)
-        print(wavelink.Pool.nodes)
 
     # noinspection PyUnusedLocal
     @commands.Cog.listener()
     async def on_voice_state_update(
-            self,
-            member: discord.Member,
-            before: discord.VoiceState,
-            after: discord.VoiceState,
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
     ) -> None:
         """This event is triggered when a voice state update occurs.
 

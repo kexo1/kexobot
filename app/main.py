@@ -83,7 +83,7 @@ class KexoBot:
             password=REDDIT_PASSWORD,
         )
 
-        # Attach _bot, so we can use it in cogs
+        # Attach to bot, so we can use it in cogs
         # Database
         bot.user_data = {}
         bot.temp_user_data = {}
@@ -103,12 +103,12 @@ class KexoBot:
         bot.loaded_jokes = []
         bot.loaded_dad_jokes = []
         bot.loaded_yo_mama_jokes = []
-
-        # Initialize class variables
+        # Classes
         self._reddit_fetcher = None | RedditFetcher
         self._content_monitor = None | ContentMonitor
         self._lavalink_server_manager = None | LavalinkServerManager
         self._sfd_servers = None | SFDServers
+        # Channels
         self._esutaze_channel = None | discord.TextChannel
         self._game_updates_channel = None | discord.TextChannel
         self._free_stuff_channel = None | discord.TextChannel
@@ -122,7 +122,6 @@ class KexoBot:
         self._load_humor_api_tokens()
         self._create_session()
         self._define_classes()
-        bot.sfd_servers = self._sfd_servers
 
     @staticmethod
     async def _fetch_channel(channel_id: int) -> discord.TextChannel:
@@ -382,7 +381,7 @@ class KexoBot:
     @staticmethod
     def get_online_nodes() -> int:
         """Get the number of online lavalink nodes,
-         returns ``int`` of online nodes.
+        returns ``int`` of online nodes.
         """
         return len(
             [

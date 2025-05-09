@@ -268,7 +268,12 @@ class CommandCog(commands.Cog):
         for node in nodes:
             try:
                 players: wavelink.PlayerResponsePayload = await node.fetch_players()
-            except aiohttp.client_exceptions.ClientConnectorError:
+            except (
+                wavelink.exceptions.LavalinkException,
+                wavelink.exceptions.NodeException,
+                aiohttp.client_exceptions.ServerDisconnectedError,
+                aiohttp.client_exceptions.ClientConnectorError,
+            ):
                 continue
 
             if not players:
@@ -412,7 +417,7 @@ class CommandCog(commands.Cog):
         await ctx.respond(files=[file], embed=None)
 
     # -------------------- SFD Hosting -------------------- #
-    @slash_command(
+    @slash_sfd.command(
         name="host",
         description="Creates hosting embed, you can also choose some optional info.",
         guild_ids=[XTC_SERVER, KEXO_SERVER],

@@ -220,7 +220,10 @@ class ContentMonitor:
                         description.append(f"[Crack link]({crack_url['href']})")
 
             game_update_url, game_update_name = [], []
-            update_pattern = r'>Update (.*?)</strong>.*?<a\s+id="download-link"\s+class="update"\s+href="(.*?)"'
+            update_pattern = (
+                r">Update (.*?)</strong>.*?<a\s+"
+                r'id="download-link"\s+class="update"\s+href="(.*?)"'
+            )
             for match in re.finditer(update_pattern, source.text, re.DOTALL):
                 update_name = re.sub(r"<.*?>", "", match.group(1)).strip()
                 game_update_name.append(unidecode.unidecode(update_name))
@@ -474,15 +477,15 @@ class ContentMonitor:
 
             url = message.find_all("a")[1].get("href")
 
-            if message_id in onlinefix_cache:
-                continue
-
             game_title = message.find_all("a")[1].text.replace(" по сети", "")
             if game_title not in games:
                 continue
 
-            await self._send_onlinefix_embed(url, game_title)
             to_upload.append(message_id)
+            if message_id in onlinefix_cache:
+                break
+
+            await self._send_onlinefix_embed(url, game_title)
 
             limit -= 1
             if limit == 0:

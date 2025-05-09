@@ -52,18 +52,18 @@ class SFDServer:
     """
 
     def __init__(
-            self,
-            address_ipv4,
-            port,
-            server_name,
-            game_mode,
-            map_name,
-            players,
-            max_players,
-            bots,
-            has_password,
-            description,
-            version,
+        self,
+        address_ipv4,
+        port,
+        server_name,
+        game_mode,
+        map_name,
+        players,
+        max_players,
+        bots,
+        has_password,
+        description,
+        version,
     ):
         self.address_ipv4 = address_ipv4
         self.port = port
@@ -78,8 +78,10 @@ class SFDServer:
         self.version = version
 
     def __repr__(self) -> str:
-        return (f"SFDServer({self.server_name}, {self.map_name},"
-                f" {self.players}, {self.max_players}, {self.bots})")
+        return (
+            f"SFDServer({self.server_name}, {self.map_name},"
+            f" {self.players}, {self.max_players}, {self.bots})"
+        )
 
     @property
     def game_mode(self) -> str:
@@ -99,11 +101,11 @@ class SFDServers:
 
     Attributes:
     ----------
-    _bot_config: AsyncIOMotorClient
+    bot_config: AsyncIOMotorClient
         The MongoDB client for database operations.
-    _session: httpx.AsyncClient
+    session: httpx.AsyncClient
         The HTTP client for making requests.
-    _graphs_dir: str
+    graphs_dir: str
         The directory where graphs will be saved.
     """
 
@@ -228,8 +230,8 @@ class SFDServers:
         print(f"Updating weekly stats: {update_count} updates")
         players_week, servers_week = activity["players_week"], activity["servers_week"]
 
-        recent_players = players_day[-60 * update_count:]
-        recent_servers = servers_day[-60 * update_count:]
+        recent_players = players_day[-60 * update_count :]
+        recent_servers = servers_day[-60 * update_count :]
 
         new_players_averages = []
         new_servers_averages = []
@@ -334,7 +336,7 @@ class SFDServers:
         return await self._bot_config.find_one(DB_SFD_ACTIVITY)
 
     async def _parse_servers(
-            self, search: str = None
+        self, search: str = None
     ) -> Union[list[SFDServer], SFDServer, None]:
         response = await self._load_sfd_servers()
         if not response:

@@ -34,7 +34,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "NO_TRACK_FOUND_IN_QUEUE": lambda **kwargs: discord.Embed(
         title="",
         description=f":x: No tracks with index {kwargs.get('to_find')} were found in the queue."
-                    " Type `/queue` to see the list of tracks.",
+        " Type `/queue` to see the list of tracks.",
         color=discord.Color.blue(),
     ),
     "NO_PERMISSIONS": discord.Embed(
@@ -45,7 +45,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "NO_NODES": discord.Embed(
         title="",
         description=":x: No nodes are currently assigned to the bot.\n"
-                    "To fix this, use command `/node reconnect`",
+        "To fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_NODES_CONNECTED": discord.Embed(
@@ -60,7 +60,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "NODE_UNRESPONSIVE": discord.Embed(
         title="",
-        description=":x: Node is unresponsive, trying to connect to a new node.",
+        description=":warning: Node is unresponsive, trying to connect to a new node.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_PLAYERS_CONNECTED": discord.Embed(
@@ -71,9 +71,8 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "CONNECTION_TIMEOUT": discord.Embed(
         title="",
         description=":x: Failed to connect to the voice channel,"
-                    " was bot disconnected or moved manually before?\n"
-                    " If yes bot probably broke, contact dev to restart bot."
-                    " Don't disconnect bot manually or else it might break again.",
+        " might be due to being manually disconnected or node is unresponsive."
+        "\nTry using `/node reconnect`.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_TRACKS_FOUND": lambda **kwargs: discord.Embed(
@@ -99,24 +98,24 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "YOUTUBE_ERROR": discord.Embed(
         title="",
         description=":x: Failed to load tracks, youtube plugin"
-                    " might be disabled, or version is outdated."
-                    " Try `/node reconnect`.\nIf issue persists,"
-                    " it means YouTube updated their site and getting"
-                    " tracks won't work until youtube plugin gets fixed.",
+        " might be disabled, or version is outdated."
+        " Try `/node reconnect`.\nIf issue persists,"
+        " it means YouTube updated their site and getting"
+        " tracks won't work until youtube plugin gets fixed.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "LAVALINK_ERROR": discord.Embed(
         title="",
         description=":x: Failed to load tracks, you probably inputted"
-                    " wrong link or this Lavalink server doesn't have "
-                    "necessary plugins.\nTo fix this, use command `/node reconnect`",
+        " wrong link or this Lavalink server doesn't have "
+        "necessary plugins.\nTo fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NODE_REQUEST_ERROR": lambda **kwargs: discord.Embed(
         title="",
         description=":warning: An error occured when trying to send"
-                    " request to the node, trying to connect to a new node."
-                    f"\n\n**Message: {kwargs.get('error')}**",
+        " request to the node, trying to connect to a new node."
+        f"\n\n**Message: {kwargs.get('error')}**",
         color=discord.Color.yellow(),
     ),
     "JOKE_TIMEOUT": discord.Embed(
@@ -127,8 +126,8 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "TRACK_EXCEPTION": lambda **kwargs: discord.Embed(
         title="",
         description=":warning: An error occured when playing song, trying to connect to a new node."
-                    f"\n\n**Message**: {kwargs.get('message')}"
-                    f"\n**Severity**: {kwargs.get('severity')}",
+        f"\n\n**Message**: {kwargs.get('message')}"
+        f"\n**Severity**: {kwargs.get('severity')}",
         color=discord.Color.yellow(),
     ),
     "TRACK_STUCK": discord.Embed(
@@ -149,20 +148,20 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "CHANNEL_NOT_NSFW": discord.Embed(
         title="",
         description=":x: You have set NSFW posts to true,"
-                    " yet the channel you requested in is not NSFW,"
-                    " skipping shitpost.",
+        " yet the channel you requested in is not NSFW,"
+        " skipping shitpost.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "REDDIT_REQUEST_ERROR": discord.Embed(
         title="",
         description=":x: Reddit didn't respond, try again in a minute.\nWhat could cause "
-                    "error? - Reddit is down, Subreddit is locked, API might be overloaded",
+        "error? - Reddit is down, Subreddit is locked, API might be overloaded",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "SFD_SERVER_NOT_FOUND": discord.Embed(
         title="",
         description=":x: Server you searched for is not in the list, "
-                    " make sure you parsed correct server name.",
+        " make sure you parsed correct server name.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "SFD_SERVERS_NOT_FOUND": discord.Embed(
@@ -173,7 +172,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "CANT_PING_ROLE": discord.Embed(
         title="",
         description=":x: I can't ping Exotic role, please check if role exists or"
-                    " if I have permission to ping it.",
+        " if I have permission to ping it.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NOT_EMBED_AUTHOR": discord.Embed(
@@ -184,7 +183,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "ALREADY_HOSTING": discord.Embed(
         title="",
         description=":x: You have already created host embed!\n"
-                    "Click on button embed to stop it from beign active.",
+        "Click on button embed to stop it from beign active.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "INCORRECT_IMAGE_URL": discord.Embed(
@@ -195,13 +194,13 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "DB_ALREADY_IN_LIST": lambda **kwargs: discord.Embed(
         title="",
         description=f":x: String `{kwargs.get('to_upload')}`"
-                    f" is already in the list, use `/bot_config show`",
+        f" is already in the list, use `/bot_config show`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "DB_NOT_IN_LIST": lambda **kwargs: discord.Embed(
         title="",
         description=f":x: String `{kwargs.get('to_remove')}`"
-                    f" is already in the list, use `/bot_config show`",
+        f" is already in the list, use `/bot_config show`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     # -------------------- Success messages -------------------- #
@@ -285,13 +284,13 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "DISCONNECTED_MANUALLY": lambda **kwargs: discord.Embed(
         title="",
         description=f"**Disconnected from <#{kwargs.get('channel_id')}>,"
-                    f" please next time use command `/leave`**",
+        f" please next time use command `/leave`**",
         color=discord.Color.blue(),
     ),
     "JOINED": lambda **kwargs: discord.Embed(
         title="",
         description=f"**✅ Joined to <#{kwargs.get('channel_id')}>"
-                    f" and set text channel to <#{kwargs.get('text_channel_id')}>.**",
+        f" and set text channel to <#{kwargs.get('text_channel_id')}>.**",
         color=discord.Color.blue(),
     ),
     "MOVED": lambda **kwargs: discord.Embed(
@@ -343,25 +342,25 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "DB_ADDED": lambda **kwargs: discord.Embed(
         title="",
         description=f"✅ String `{kwargs.get('to_upload')}`"
-                    f" was added to `{kwargs.get('collection_name')}`",
+        f" was added to `{kwargs.get('collection_name')}`",
         color=discord.Color.blue(),
     ),
     "DB_REMOVED": lambda **kwargs: discord.Embed(
         title="",
         description=f"✅ String `{kwargs.get('to_remove')}`"
-                    f" was removed from `{kwargs.get('collection_name')}`",
+        f" was removed from `{kwargs.get('collection_name')}`",
         color=discord.Color.blue(),
     ),
 }
 
 
 async def send_response(
-        ctx: Union[discord.ApplicationContext, discord.TextChannel],
-        response_code: str,
-        respond: bool = True,
-        ephemeral: bool = True,
-        delete_after: int = None,
-        **kwargs: Any,
+    ctx: Union[discord.ApplicationContext, discord.TextChannel],
+    response_code: str,
+    respond: bool = True,
+    ephemeral: bool = True,
+    delete_after: int = None,
+    **kwargs: Any,
 ) -> None:
     """This method sends a response to the user based on the response code.
 
@@ -393,6 +392,8 @@ async def send_response(
         response = response(**kwargs)
 
     if respond:
-        await ctx.respond(embed=response, ephemeral=ephemeral, delete_after=delete_after)
+        await ctx.respond(
+            embed=response, ephemeral=ephemeral, delete_after=delete_after
+        )
     else:
         await ctx.send(embed=response, delete_after=delete_after)

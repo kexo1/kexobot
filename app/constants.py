@@ -31,11 +31,15 @@ ALIENWARE_ARENA_NEWS_CHANNEL = 1368937624496115853
 
 # -------------------- Icons -------------------- #
 YOUTUBE_ICON = "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
-DISCORD_ICON = "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
-REDDIT_FREEGAME_ICON = ("https://styles.redditmedia.com/t5_30mv3"
-                        "/styles/communityIcon_xnoh6m7g9qh71.png")
-REDDIT_CRACKWATCH_ICON = ("https://b.thumbs.redditmedia.com/"
-                          "zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png")
+DISCORD_ICON = (
+    "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
+)
+REDDIT_FREEGAME_ICON = (
+    "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png"
+)
+REDDIT_CRACKWATCH_ICON = (
+    "https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
+)
 REDDIT_ICON = "https://www.pngkit.com/png/full/207-2074270_reddit-icon-png.png"
 GAME3RB_ICON = (
     "https://media.discordapp.net/attachments/796453724713123870"
@@ -80,7 +84,6 @@ REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD")
 REDDIT_STRIP = (" *", "* ", "*", "---")
 REDDIT_FREEGAME_MAX_POSTS = 5
 REDDIT_CRACKWATCH_POSTS = 5
-
 
 
 REDDIT_FREEGAME_EMBEDS = {
@@ -184,16 +187,6 @@ TIMEZONES = {
 SFD_TIMEZONE_CHOICE = list(TIMEZONES.keys())
 
 # -------------------- Fun Stuff Configuration -------------------- #
-ROAST_COMMANDS_MSG = """Wassup, can a loc come up in your crib?
-Man fuck you, I'll see you at work
-Ah, nigga don't hate me cause I"m beautiful nigga
-Maybe if you got rid of that yee yee ass hair cut you get some bitches on your dick.
-Oh, better yet, Maybe Tanisha'll call your dog-ass if she ever stop fucking with that brain 
-surgeon or lawyer she fucking with,
-Niggaaa...
-What?!
-https://www.youtube.com/watch?v=6gJ6VEG8Y4I"""
-
 HUMOR_API_SECRET = os.getenv("HUMOR_API_TOKENS").split(":")
 JOKE_API_URL = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark?amount=10"
 HUMOR_API_URL = "https://api.humorapi.com/jokes/search?number=10&include-tags="
@@ -413,7 +406,6 @@ SONG_STRIP = (
     "http:",
     "/",
 )
-
 
 
 # -------------------- RadioGarden Configuration -------------------- #

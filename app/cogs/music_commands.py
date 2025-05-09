@@ -526,8 +526,7 @@ class MusicCommands(commands.Cog):
         player.should_respond = False
         return True
 
-    @staticmethod
-    async def _join_channel(ctx: discord.ApplicationContext) -> bool:
+    async def _join_channel(self, ctx: discord.ApplicationContext) -> bool:
         if not ctx.author.voice or not ctx.author.voice.channel:
             await send_response(ctx, "NO_VOICE_CHANNEL")
             return False
@@ -536,7 +535,7 @@ class MusicCommands(commands.Cog):
             await ctx.defer()
 
         try:
-            player = await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
+            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
         except wavelink.InvalidChannelStateException:
             await send_response(ctx, "NO_PERMISSIONS")
             return False
@@ -544,12 +543,17 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "NO_NODES")
             return False
         except wavelink.exceptions.ChannelTimeoutException:
-            await send_response(ctx, "CONNECTION_TIMEOUT")
-            print(player.channel.name)
-            print(player.connected)
-            player.cleanup()
+            print("Connection timeout, reconnecting new node...")
+            await send_response(
+                ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
+            )
+            await self._bot.connect_node()
             await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
-            return False
+            if not ctx.voice_client:
+                await send_response(
+                    ctx, "CONNECTION_TIMEOUT", respond=False, ephemeral=False
+                )
+                return False
         return True
 
     async def _play_track(
