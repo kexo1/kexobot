@@ -9,8 +9,6 @@ from wavelink import (
     TrackStartEventPayload,
     TrackExceptionEventPayload,
     TrackStuckEventPayload,
-    WebsocketClosedEventPayload,
-    PlayerUpdateEventPayload,
 )
 
 from app.constants import YOUTUBE_ICON
@@ -157,25 +155,6 @@ class Listeners(commands.Cog):
             respond=False,
             channel_id=player.channel.id,
         )
-
-    @commands.Cog.listener()
-    async def on_wavelink_websocket_closed(
-        self, payload: WebsocketClosedEventPayload
-    ) -> None:
-        """This event is triggered when the websocket connection is closed.
-
-        Parameters
-        ----------
-        payload: :class:`WebsocketClosedEventPayload`
-            The payload containing information about the closed websocket.
-        """
-
-        if payload.player:
-            print(f"Websocket closed. ({payload.player.node.uri})")
-
-        print("Reason:", payload.reason)
-        print("Code:", payload.code.value)
-        print("By remote:", payload.by_remote)
 
     # noinspection PyUnusedLocal
     @commands.Cog.listener()

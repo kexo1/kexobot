@@ -460,7 +460,7 @@ class MusicCommands(commands.Cog):
         if source is None:
             source = "ytsearch"
 
-        player = ctx.voice_client
+        player: wavelink.Player = ctx.voice_client
         last_error = None
         for _ in range(2):
             try:
@@ -507,6 +507,7 @@ class MusicCommands(commands.Cog):
                 respond=should_respond,
                 search=search,
             )
+        player.just_joined = False
         return None
 
     @staticmethod
@@ -535,7 +536,7 @@ class MusicCommands(commands.Cog):
             await ctx.defer()
 
         try:
-            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
+            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=2)
         except wavelink.InvalidChannelStateException:
             await send_response(ctx, "NO_PERMISSIONS")
             return False
@@ -543,7 +544,9 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "NO_NODES")
             return False
         except wavelink.exceptions.ChannelTimeoutException:
-            print("Connection timeout, reconnecting new node...")
+            print(
+                f"Connection timeout, reconnecting new node... ({self._bot.node.uri})"
+            )
             await send_response(
                 ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
             )

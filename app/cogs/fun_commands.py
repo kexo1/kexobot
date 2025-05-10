@@ -419,6 +419,7 @@ class FunCommands(commands.Cog):
             response = await make_http_request(
                 self._session,
                 HUMOR_API_URL + f"yo_mama&api-key={token}&max-length=256",
+                retries=3,
             )
             token = self._is_token_exhausted(response, token)
             if not token:

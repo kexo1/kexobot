@@ -83,8 +83,17 @@ class KexoBot:
             password=REDDIT_PASSWORD,
         )
 
+        self._reddit_fetcher = None | RedditFetcher
+        self._content_monitor = None | ContentMonitor
+        self._lavalink_server_manager = None | LavalinkServerManager
+        self._sfd_servers = None | SFDServers
+
+        self._esutaze_channel = None | discord.TextChannel
+        self._game_updates_channel = None | discord.TextChannel
+        self._free_stuff_channel = None | discord.TextChannel
+        self._alienware_arena_news_channel = None | discord.TextChannel
+
         # Attach to bot, so we can use it in cogs
-        # Database
         bot.user_data = {}
         bot.temp_user_data = {}
         bot.guild_data = {}
@@ -92,27 +101,17 @@ class KexoBot:
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
         bot.guild_data_db = self._guild_data_db
-        # Functions
+
         bot.reddit_agent = self._reddit_agent
         bot.connect_node = self.connect_node
         bot.close_unused_nodes = self.close_unused_nodes
         bot.get_online_nodes = self.get_online_nodes
         bot.get_avaiable_nodes = self.get_avaiable_nodes
-        # Other
+
         bot.humor_api_tokens = {}
         bot.loaded_jokes = []
         bot.loaded_dad_jokes = []
         bot.loaded_yo_mama_jokes = []
-        # Classes
-        self._reddit_fetcher = None | RedditFetcher
-        self._content_monitor = None | ContentMonitor
-        self._lavalink_server_manager = None | LavalinkServerManager
-        self._sfd_servers = None | SFDServers
-        # Channels
-        self._esutaze_channel = None | discord.TextChannel
-        self._game_updates_channel = None | discord.TextChannel
-        self._free_stuff_channel = None | discord.TextChannel
-        self._alienware_arena_news_channel = None | discord.TextChannel
 
     async def initialize(self) -> None:
         """Initialize the _bot and fetch all channels and users."""
