@@ -46,20 +46,32 @@ class Listeners(commands.Cog):
         if not payload.player.should_respond:
             await payload.player.text_channel.send(embed=self._playing_embed(payload))
 
-        if payload.player.queue.history.count == 3 and random.randint(0, 1) == 0:
+        if (
+            payload.player.queue.history.count == 3
+            and payload.player.autoplay != wavelink.AutoPlayMode.enabled
+            and random.randint(0, 1) == 0
+        ):
             await payload.player.text_channel.send(
                 "-# Not happy with the current node performance?\n"
                 f"-# You can switch between {self._bot.get_avaiable_nodes()}"
                 " nodes by using /node reconnect."
             )
 
-        if payload.player.queue.history.count == 10 and random.randint(0, 2) == 0:
+        if (
+            payload.player.queue.history.count == 10
+            and payload.player.autoplay != wavelink.AutoPlayMode.enabled
+            and random.randint(0, 2) == 0
+        ):
             await payload.player.text_channel.send(
                 "-# Use the /music autoplay_mode command and\n"
                 "-# set the mode to populated to enable automatic queuing of similar tracks."
             )
 
-        if payload.player.queue.history.count == 15 and random.randint(0, 2) == 0:
+        if (
+            payload.player.queue.history.count == 15
+            and payload.player.autoplay != wavelink.AutoPlayMode.enabled
+            and random.randint(0, 2) == 0
+        ):
             await payload.player.text_channel.send(
                 "-# Would you like to see which platforms are supported by this node?"
                 " Use the /node supported_platforms."
@@ -117,7 +129,12 @@ class Listeners(commands.Cog):
             message=payload.exception["message"],
             severity=payload.exception["severity"],
         )
-        await switch_node(self._bot.connect_node, payload.player)
+        await switch_node(
+            connect_node=self._bot.connect_node,
+            player=payload.player,
+            offline_node=payload.player.node.uri,
+        )
+        payload.player.should_respond = False
 
     @commands.Cog.listener()
     async def on_wavelink_track_stuck(self, payload: TrackStuckEventPayload) -> None:
@@ -133,8 +150,12 @@ class Listeners(commands.Cog):
         print(f"Track got stuck. ({payload.player.node.uri})")
         await send_response(payload.player.text_channel, "TRACK_STUCK", respond=False)
         await switch_node(
-            self._bot.connect_node, player=payload.player, play_after=False
+            connect_node=self._bot.connect_node,
+            player=payload.player,
+            play_after=False,
+            offline_node=payload.player.node.uri,
         )
+        payload.player.should_respond = False
 
     @commands.Cog.listener()
     async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:

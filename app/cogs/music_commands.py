@@ -270,7 +270,10 @@ class MusicCommands(commands.Cog):
             The context of the command.
         """
         player: wavelink.Player = ctx.voice_client
-        await player.skip()
+        try:
+            await player.skip()
+        except LavalinkLoadException:
+            await switch_node(self._bot.connect_node, player=player, play_after=False)
 
         player.should_respond = False
         await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
@@ -328,7 +331,10 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "ALREADY_PAUSED")
             return
 
-        await player.pause(True)
+        try:
+            await player.pause(True)
+        except LavalinkLoadException:
+            await switch_node(self._bot.connect_node, player=player, play_after=False)
         await send_response(ctx, "TRACK_PAUSED", ephemeral=False, delete_after=10)
 
     @music.command(name="resume", description="Resumes paused song.")
@@ -343,7 +349,10 @@ class MusicCommands(commands.Cog):
             The context of the command.
         """
         player: wavelink.Player = ctx.voice_client
-        await player.pause(False)
+        try:
+            await player.pause(False)
+        except LavalinkLoadException:
+            await switch_node(self._bot.connect_node, player=player, play_after=False)
         await send_response(ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10)
 
     @music.command(name="leave", description="Leaves voice channel.")
@@ -456,8 +465,14 @@ class MusicCommands(commands.Cog):
     async def _search_tracks(
         self, ctx: discord.ApplicationContext, search: str
     ) -> Optional[wavelink.Search]:
+        is_spotify = False
         source = get_search_prefix(search)
         if source is None:
+            source = "ytsearch"
+
+        # Prefer youtube over spotify, but if youtube fails, try spotify
+        if source == "spsearch":
+            is_spotify = True
             source = "ytsearch"
 
         player: wavelink.Player = ctx.voice_client
@@ -490,6 +505,8 @@ class MusicCommands(commands.Cog):
                 )
             # Fallback to default search
             source = "ytsearch"
+            if is_spotify:
+                source = "spsearch"
 
         should_respond = not player.just_joined
         if last_error:
@@ -544,13 +561,14 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "NO_NODES")
             return False
         except wavelink.exceptions.ChannelTimeoutException:
-            print(
-                f"Connection timeout, reconnecting new node... ({self._bot.node.uri})"
-            )
+            # For some reason there's like a tiny chance the fucking node suddenly stops
+            # responding, even though it was working minutes before, seems like some nodes
+            # actively disconnect players if they are not used for a while
+            print(f"Node join timeout. ({self._bot.node.uri})")
             await send_response(
                 ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
             )
-            await self._bot.connect_node()
+            await self._bot.connect_node(offline_node=self._bot.node.uri)
             await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
             if not ctx.voice_client:
                 await send_response(

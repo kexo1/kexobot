@@ -159,7 +159,7 @@ class CommandCog(commands.Cog):
                 uri=self._bot.node.uri,
             )
         else:
-            node: wavelink.Node = await self._bot.connect_node(ctx.guild_id)
+            node: wavelink.Node = await self._bot.connect_node(guild_id=ctx.guild_id)
             self._bot.node = node
             await send_response(
                 ctx, "NODE_RECONNECT_SUCCESS", ephemeral=False, uri=self._bot.node.uri
@@ -324,9 +324,9 @@ class CommandCog(commands.Cog):
             color=discord.Color.blue(),
         )
         embed.set_footer(text=f"Total players: {all_players}")
-        embed.add_field(name="Servers", value="\n".join(servers_dict["server_name"]))
-        embed.add_field(name="Current Map", value="\n".join(servers_dict["maps"]))
-        embed.add_field(name="Players", value="\n".join(servers_dict["players"]))
+        embed.add_field(name="Servers:", value="\n".join(servers_dict["server_name"]))
+        embed.add_field(name="Current Map:", value="\n".join(servers_dict["maps"]))
+        embed.add_field(name="Players:", value="\n".join(servers_dict["players"]))
         await ctx.respond(embed=embed)
 
     @slash_sfd.command(name="server_info", description="Find searched server.")
@@ -357,12 +357,12 @@ class CommandCog(commands.Cog):
             color=discord.Color.blue(),
         )
         embed.set_footer(text=f"Version: {server.version}")
-        embed.add_field(name="Playersㅤㅤ", value=server.players)
-        embed.add_field(name="Max Playersㅤㅤ", value=server.max_players)
-        embed.add_field(name="Botsㅤㅤ", value=server.bots)
-        embed.add_field(name="Map Nameㅤㅤ", value=server.map_name)
-        embed.add_field(name="Has Passwordㅤㅤ", value=server.has_password)
-        embed.add_field(name="Game Modeㅤㅤ", value=server.game_mode)
+        embed.add_field(name="Players:ㅤㅤ", value=server.players)
+        embed.add_field(name="Max Players:ㅤㅤ", value=server.max_players)
+        embed.add_field(name="Bots:ㅤㅤ", value=server.bots)
+        embed.add_field(name="Map Name:ㅤㅤ", value=server.map_name)
+        embed.add_field(name="Has Password:ㅤㅤ", value=server.has_password)
+        embed.add_field(name="Game Mode:ㅤㅤ", value=server.game_mode)
         await ctx.respond(embed=embed)
 
     @slash_sfd.command(
@@ -896,7 +896,7 @@ class HostView(discord.ui.View):
         )
 
         timestamp = embed.fields[2].value.replace("R", "t")
-        embed.set_field_at(2, name="Hosted atㅤ", value=timestamp)
+        embed.set_field_at(2, name="Hosted at:ㅤ", value=timestamp)
         return embed
 
 

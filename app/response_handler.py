@@ -61,7 +61,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "NODE_UNRESPONSIVE": discord.Embed(
         title="",
         description=":warning: Node is unresponsive, trying to connect to a new node.",
-        color=discord.Color.from_rgb(r=220, g=0, b=0),
+        color=discord.Color.yellow(),
     ),
     "NO_PLAYERS_CONNECTED": discord.Embed(
         title="",

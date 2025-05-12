@@ -21,7 +21,7 @@ from app.constants import (
 
 
 def load_text_file(name: str) -> list:
-    """This method loads a text file and returns its content as a list of strings.
+    """This function loads a text file and returns its content as a list of strings.
 
     Parameters
     ----------
@@ -318,10 +318,13 @@ def has_pfp(member: discord.Member) -> str:
     return DISCORD_ICON
 
 
+# I don't know if passing callable is the best way to do this, yet since connect_node is a
+# method of KexoBot, I don't see another way to do it
 async def switch_node(
     connect_node: Callable[[], wavelink.Node],
     player: wavelink.Player,
     play_after: bool = True,
+    offline_node: str = None,
 ) -> Optional[wavelink.Node]:
     """
     Attempt to switch to a new node for audio playback.
@@ -342,8 +345,15 @@ async def switch_node(
     """
     for i in range(5):
         try:
-            node: wavelink.Node = await connect_node(player.guild.id)
+            node: wavelink.Node = await connect_node(player.guild.id, offline_node)
             await player.switch_node(node)
+
+            if not play_after and player.autoplay == wavelink.AutoPlayMode.enabled:
+                try:
+                    del player.queue[0]
+                except IndexError:
+                    pass
+
             if play_after:
                 await player.play(player.temp_current)
 
@@ -638,7 +648,6 @@ async def make_http_request(
     :class:`httpx.Response` | None
         The response from the request, or None if the request failed.
     """
-
     for attempt in range(retries):
         try:
             if data:

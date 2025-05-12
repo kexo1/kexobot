@@ -21,7 +21,6 @@ class LavalinkServerManager:
     def __init__(self, session: httpx.AsyncClient) -> None:
         self._session = session
         self._repeated_hostnames: list[str] = []
-        self._low_quality_nodes: list[str] = ["lavalink-v2.pericsq.ro"]
         self._offline_lavalink_servers: list[str] = []
 
     async def get_lavalink_servers(
@@ -68,7 +67,6 @@ class LavalinkServerManager:
             if (
                 server["host"] in self._offline_lavalink_servers
                 or server["host"] in self._repeated_hostnames
-                or server["host"] in self._low_quality_nodes
             ):
                 continue
 
@@ -79,7 +77,7 @@ class LavalinkServerManager:
                 server["host"],
                 server["port"],
                 server["password"],
-                True if server["secure"] else False,
+                server["secure"],
             )
             lavalink_servers.append(node)
 
@@ -88,10 +86,7 @@ class LavalinkServerManager:
     async def _lavainfo_github_fetch(self, json_data: list) -> list[wavelink.Node]:
         lavalink_servers = []
         for server in json_data:
-            if (
-                server["host"] in self._offline_lavalink_servers
-                or server["host"] in self._low_quality_nodes
-            ):
+            if server["host"] in self._offline_lavalink_servers:
                 continue
 
             if server["restVersion"] != "v4":
@@ -101,7 +96,7 @@ class LavalinkServerManager:
                 server["host"],
                 server["port"],
                 server["password"],
-                True if server["secure"] else False,
+                server["secure"],
             )
             lavalink_servers.append(node)
             self._repeated_hostnames.append(server["host"])

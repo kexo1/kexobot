@@ -288,7 +288,7 @@ SOURCE_PATTERNS = [
             (?:track|album|playlist|artist)/\w+
             """
         ),
-        "ytsearch",
+        "spsearch",
     ),
     # Apple Music
     (

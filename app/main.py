@@ -62,13 +62,12 @@ class KexoBot:
     """
 
     def __init__(self):
+        self.lavalink_servers: list[wavelink.Node] = []
         self._user_kexo = None | discord.User
         self._session = None | httpx.AsyncClient
         self._subreddit_cache = None | dict
         self._hostname = socket.gethostname()
         self._main_loop_counter = 0
-        self.lavalink_servers: list[wavelink.Node] = []
-        self._offline_lavalink_servers: list[str] = []
 
         database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]
         self._bot_config = database["BotConfig"]
@@ -98,6 +97,7 @@ class KexoBot:
         bot.temp_user_data = {}
         bot.guild_data = {}
         bot.temp_guild_data = {}
+        bot.offline_lavalink_servers = []
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
         bot.guild_data_db = self._guild_data_db
@@ -254,12 +254,14 @@ class KexoBot:
             self._clear_temp_reddit_data()
 
         if now.hour == 0:
-            self._offline_lavalink_servers: list[str] = []
             self._load_humor_api_tokens()
+
+        if now.day % 2 == 0 and now.hour == 0:
+            bot.offline_lavalink_servers = []
 
         self.lavalink_servers = (
             await self._lavalink_server_manager.get_lavalink_servers(
-                self._offline_lavalink_servers
+                bot.offline_lavalink_servers
             )
         )
         await self._content_monitor.power_outages()
@@ -272,7 +274,7 @@ class KexoBot:
         print("Httpx session initialized.")
 
     async def connect_node(
-        self, guild_id: int = KEXO_SERVER
+        self, guild_id: int = KEXO_SERVER, offline_node: str = None
     ) -> Optional[wavelink.Node]:
         """Connect to lavalink node.
 
@@ -284,6 +286,8 @@ class KexoBot:
         ----------
         guild_id: int
             The guild ID to connect to.
+        offline_node: str
+            The node to remove from the list of nodes.
 
         Returns
         -------
@@ -291,11 +295,22 @@ class KexoBot:
             The lavalink that was connected to.
         """
         if not self.lavalink_servers:
-            print("No lavalink servers found.")
-            return None
+            # If somehow all nodes are offline, reset the list of offline nodes
+            bot.offline_lavalink_servers = []
+            self.lavalink_servers = (
+                await self._lavalink_server_manager.get_lavalink_servers(
+                    bot.offline_lavalink_servers
+                )
+            )
+            if not self.lavalink_servers:
+                print("No lavalink servers found.")
+                return None
 
         if len(self.lavalink_servers) == 1:
             return self.lavalink_servers[0]
+
+        if offline_node:
+            self._remove_node(offline_node)
 
         for i in range(len(self.lavalink_servers)):
             node: wavelink.Node = await self.get_node(guild_id)
@@ -312,22 +327,17 @@ class KexoBot:
 
             except asyncio.TimeoutError:
                 print(f"Node timed out. ({node.uri})")
-                offline_lavalink_server = self.lavalink_servers.pop(i)
-                self._offline_lavalink_servers.append(
-                    urlparse(offline_lavalink_server.uri).hostname
-                )
+                self._remove_node(self.lavalink_servers[i].uri)
                 continue
             except (
                 wavelink.exceptions.LavalinkException,
                 wavelink.exceptions.NodeException,
                 aiohttp.client_exceptions.ServerDisconnectedError,
                 aiohttp.client_exceptions.ClientConnectorError,
+                AttributeError,
             ):
                 print(f"Node failed to connect. ({node.uri})")
-                offline_lavalink_server = self.lavalink_servers.pop(i)
-                self._offline_lavalink_servers.append(
-                    urlparse(offline_lavalink_server.uri).hostname
-                )
+                self._remove_node(self.lavalink_servers[i].uri)
                 continue
 
             bot.node = node
@@ -376,6 +386,27 @@ class KexoBot:
                 # noinspection PyProtectedMember
                 await node._pool_closer()  # Node is not properly closed
                 await node.close(eject=True)
+
+    def _remove_node(self, node_uri: str) -> str:
+        """Remove a lavalink node from the list of nodes.
+
+        Parameters
+        ----------
+        node_uri: str
+            The uri of the node to remove.
+
+        Returns
+        -------
+        str
+            The uri of the node that was removed.
+        """
+        for node in self.lavalink_servers:
+            if node.uri == node_uri:
+                self.lavalink_servers.remove(node)
+                break
+
+        bot.offline_lavalink_servers.append(urlparse(node_uri).hostname)
+        return node_uri
 
     @staticmethod
     def get_online_nodes() -> int:
