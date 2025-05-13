@@ -68,6 +68,7 @@ class KexoBot:
         self._subreddit_cache = None | dict
         self._hostname = socket.gethostname()
         self._main_loop_counter = 0
+        self._offline_lavalink_servers: list[str] = []
 
         database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]
         self._bot_config = database["BotConfig"]
@@ -97,7 +98,6 @@ class KexoBot:
         bot.temp_user_data = {}
         bot.guild_data = {}
         bot.temp_guild_data = {}
-        bot.offline_lavalink_servers = []
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
         bot.guild_data_db = self._guild_data_db
@@ -257,11 +257,11 @@ class KexoBot:
             self._load_humor_api_tokens()
 
         if now.day % 2 == 0 and now.hour == 0:
-            bot.offline_lavalink_servers = []
+            self._offline_lavalink_servers = []
 
         self.lavalink_servers = (
             await self._lavalink_server_manager.get_lavalink_servers(
-                bot.offline_lavalink_servers
+                self._offline_lavalink_servers
             )
         )
         await self._content_monitor.power_outages()
@@ -296,10 +296,10 @@ class KexoBot:
         """
         if not self.lavalink_servers:
             # If somehow all nodes are offline, reset the list of offline nodes
-            bot.offline_lavalink_servers = []
+            self._offline_lavalink_servers = []
             self.lavalink_servers = (
                 await self._lavalink_server_manager.get_lavalink_servers(
-                    bot.offline_lavalink_servers
+                    self._offline_lavalink_servers
                 )
             )
             if not self.lavalink_servers:
@@ -405,7 +405,7 @@ class KexoBot:
                 self.lavalink_servers.remove(node)
                 break
 
-        bot.offline_lavalink_servers.append(urlparse(node_uri).hostname)
+        self._offline_lavalink_servers.append(urlparse(node_uri).hostname)
         return node_uri
 
     @staticmethod

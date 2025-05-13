@@ -616,7 +616,7 @@ async def make_http_request(
     url: str,
     data: Optional[Dict] = None,
     headers: Optional[Dict] = None,
-    retries: int = 1,
+    retries: int = 2,
     timeout: float = 3.0,
     get_json: bool = False,
     binary: bool = False,

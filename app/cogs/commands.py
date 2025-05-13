@@ -427,13 +427,14 @@ class CommandCog(commands.Cog):
         "duration",
         description="How long are you going to be hositng.",
         choices=[
-            "As long as I want.",
+            "As long as I want",
             "15 minutes",
-            "15-60 minutes",
+            "30 minutes",
             "1 hour",
-            "1+ hours",
-            "2+ hours",
-            "3+ hours",
+            "1–2 hours",
+            "2–4 hours",
+            "4+ hours",
+            "24/7",
         ],
     )
     @option(

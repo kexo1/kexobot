@@ -352,7 +352,7 @@ class MusicCommands(commands.Cog):
         try:
             await player.pause(False)
         except LavalinkLoadException:
-            await switch_node(self._bot.connect_node, player=player, play_after=False)
+            await switch_node(self._bot.connect_node, player=player)
         await send_response(ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10)
 
     @music.command(name="leave", description="Leaves voice channel.")
@@ -417,6 +417,84 @@ class MusicCommands(commands.Cog):
         await send_response(
             ctx, "AUTOPLAY_MODE_CHANGED", ephemeral=False, autoplay_mode=mode
         )
+
+    @music.command(name="play_troll", description="Play music bot into typed channel.")
+    @option("channel_id", description="ID of the channel to play music in.")
+    @option("search", description="Search query for the song.")
+    @discord.ext.commands.is_owner()
+    async def play_troll(
+        self, ctx: discord.ApplicationContext, channel_id: str, search: str
+    ) -> None:
+        """Play a troll music bot into the specified channel.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.ApplicationContext`
+            The context of the command.
+        channel_id: int
+            The ID of the channel to play music in.
+        """
+        channel = self._bot.get_channel(int(channel_id))
+        if not channel or not isinstance(channel, discord.VoiceChannel):
+            embed = discord.Embed(
+                title="",
+                description="Invalid channel ID or the channel is not a voice channel.",
+                color=discord.Color.red(),
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            return
+
+        if not channel.guild.voice_client:
+            await channel.connect(cls=wavelink.Player, timeout=2)
+
+        player: wavelink.Player = channel.guild.voice_client
+        player.should_respond = True
+        player.is_troll = True
+
+        tracks = await wavelink.Playable.search(search)
+        if not tracks:
+            await send_response(ctx, "NO_TRACKS_FOUND")
+            return
+
+        track = tracks[0]
+        embed = discord.Embed(
+            title="",
+            description=f"Joined the channel `{channel.name}`"
+            f" and started playing `{track.title}`",
+            color=discord.Color.blue(),
+        )
+        await ctx.respond(embed=embed, ephemeral=True)
+
+        if player.playing:
+            player.queue.put_at(0, track)
+        else:
+            await player.play(track)
+
+        disconnect_task = asyncio.create_task(
+            self._disconnect_after_timeout(player, track.length / 1000 + 2)
+        )
+        player.disconnect_task = disconnect_task
+
+    @staticmethod
+    async def _disconnect_after_timeout(
+        player: wavelink.Player, timeout: float
+    ) -> None:
+        """Disconnect the player after a timeout if no further activity.
+
+        Parameters:
+        -----------
+        player: :class:`wavelink.Player`
+            The player to disconnect.
+        timeout: float
+            The timeout in seconds.
+        """
+        try:
+            await asyncio.sleep(timeout)
+            if player and player.connected:
+                player.cleanup()
+                await player.disconnect()
+        except asyncio.CancelledError:
+            pass
 
     # ----------------------- Helper functions ------------------------ #
     async def _fetch_tracks(
@@ -598,9 +676,14 @@ class MusicCommands(commands.Cog):
     async def _prepare_wavelink(self, ctx: discord.ApplicationContext) -> None:
         player: wavelink.Player = ctx.voice_client
 
+        if hasattr(player, "disconnect_task") and player.disconnect_task:
+            player.disconnect_task.cancel()
+            player.disconnect_task = None
+
         player.text_channel = ctx.channel
         player.should_respond = False
         player.just_joined = True
+        player.is_troll = False
 
         guild_data, _ = await get_guild_data(self._bot, ctx.guild_id)
         await player.set_volume(guild_data["music"]["volume"])

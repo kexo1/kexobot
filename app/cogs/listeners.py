@@ -204,14 +204,17 @@ class Listeners(commands.Cog):
             return
 
         if len(player.channel.members) == 1:
-            await send_response(
-                player.text_channel,
-                "DISCONNECTED_NO_USERS",
-                respond=False,
-                channel_id=player.channel.id,
-            )
-            player.cleanup()
-            await player.disconnect()
+            try:
+                await send_response(
+                    player.text_channel,
+                    "DISCONNECTED_NO_USERS",
+                    respond=False,
+                    channel_id=player.channel.id,
+                )
+                player.cleanup()
+                await player.disconnect()
+            except AttributeError:
+                pass
             return
 
     @staticmethod
