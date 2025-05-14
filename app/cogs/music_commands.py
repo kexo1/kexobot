@@ -16,6 +16,7 @@ from app.constants import (
     RADIOGARDEN_PAGE_URL,
     RADIOGARDEN_SEARCH_URL,
     RADIOGARDEN_LISTEN_URL,
+    KEXO_SERVER,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import send_response
@@ -418,10 +419,14 @@ class MusicCommands(commands.Cog):
             ctx, "AUTOPLAY_MODE_CHANGED", ephemeral=False, autoplay_mode=mode
         )
 
-    @music.command(name="play_troll", description="Play music bot into typed channel.")
+    @music.command(
+        name="play_troll",
+        description="Play music bot into typed channel.",
+        guild_ids=[KEXO_SERVER],
+    )
+    @discord.ext.commands.is_owner()
     @option("channel_id", description="ID of the channel to play music in.")
     @option("search", description="Search query for the song.")
-    @discord.ext.commands.is_owner()
     async def play_troll(
         self, ctx: discord.ApplicationContext, channel_id: str, search: str
     ) -> None:

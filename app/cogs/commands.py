@@ -665,8 +665,7 @@ class CommandCog(commands.Cog):
 
     # -------------------- Database Managment -------------------- #
     @slash_bot_config.command(
-        name="add",
-        description="Adds string to selected list.",
+        name="add", description="Adds string to selected list.", guild_ids=[KEXO_SERVER]
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
@@ -689,6 +688,7 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="remove",
         description="Removes string from selected list.",
+        guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
@@ -711,6 +711,7 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="show",
         description="Shows data from selected lists.",
+        guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())

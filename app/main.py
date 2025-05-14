@@ -41,8 +41,10 @@ from app.constants import (
     KEXO_SERVER,
     LOCAL_MACHINE_NAME,
     REDDIT_ICON,
+    WORDNIK_API_KEY,
+    WORDNIK_API_URL,
 )
-from app.utils import get_guild_data, is_older_than, generate_temp_guild_data
+from app.utils import get_guild_data, is_older_than, generate_temp_guild_data, make_http_request
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
@@ -88,10 +90,10 @@ class KexoBot:
         self._lavalink_server_manager = None | LavalinkServerManager
         self._sfd_servers = None | SFDServers
 
-        self._esutaze_channel = None | discord.TextChannel
-        self._game_updates_channel = None | discord.TextChannel
-        self._free_stuff_channel = None | discord.TextChannel
-        self._alienware_arena_news_channel = None | discord.TextChannel
+        self._channel_esutaze = None | discord.TextChannel
+        self._channel_game_updates = None | discord.TextChannel
+        self._channel_free_stuff = None | discord.TextChannel
+        self._channel_alienware_arena_news = None | discord.TextChannel
 
         # Attach to bot, so we can use it in cogs
         bot.user_data = {}
@@ -122,36 +124,12 @@ class KexoBot:
         self._create_session()
         self._define_classes()
 
-    @staticmethod
-    async def _fetch_channel(channel_id: int) -> discord.TextChannel:
-        """Helper to fetch a channel by ID, returns :class:`discord.TextChannel`.
-
-        Parameters
-        ----------
-        channel_id: int
-            The ID of the channel to fetch.
-        """
-        return await bot.fetch_channel(channel_id)
-
-    @staticmethod
-    def _initialize_class(cls, *args) -> object:
-        """Helper to initialize a class with arguments.
-
-        Parameters
-        ----------
-        cls: type
-            The class to initialize.
-        *args: tuple
-            The arguments to pass to the class.
-        """
-        return cls(*args)
-
     async def _fetch_channels(self) -> None:
         """Fetch all channels for the bot."""
-        self._esutaze_channel = await self._fetch_channel(ESUTAZE_CHANNEL)
-        self._game_updates_channel = await self._fetch_channel(GAME_UPDATES_CHANNEL)
-        self._free_stuff_channel = await self._fetch_channel(FREE_STUFF_CHANNEL)
-        self._alienware_arena_news_channel = await self._fetch_channel(
+        self._channel_esutaze = await self._fetch_channel(ESUTAZE_CHANNEL)
+        self._channel_game_updates = await self._fetch_channel(GAME_UPDATES_CHANNEL)
+        self._channel_free_stuff = await self._fetch_channel(FREE_STUFF_CHANNEL)
+        self._channel_alienware_arena_news = await self._fetch_channel(
             ALIENWARE_ARENA_NEWS_CHANNEL
         )
         print("Channels fetched.")
@@ -162,24 +140,15 @@ class KexoBot:
         bot.subreddit_icons = subreddit_icons["subreddit_icons"]
         print("Subreddit icons fetched.")
 
-    @staticmethod
-    def _load_humor_api_tokens() -> None:
-        """Load the humor API tokens."""
-        bot.humor_api_tokens = {}
-        for token in HUMOR_API_SECRET:
-            bot.humor_api_tokens[token] = {
-                "exhausted": False,
-            }
-
     def _define_classes(self) -> None:
         """Define classes for the bot."""
         self._content_monitor = self._initialize_class(
             ContentMonitor,
             self._bot_config,
             self._session,
-            self._game_updates_channel,
-            self._esutaze_channel,
-            self._alienware_arena_news_channel,
+            self._channel_game_updates,
+            self._channel_esutaze,
+            self._channel_alienware_arena_news,
             self._user_kexo,
         )
 
@@ -188,8 +157,8 @@ class KexoBot:
             self._bot_config,
             self._session,
             self._reddit_agent,
-            self._free_stuff_channel,
-            self._game_updates_channel,
+            self._channel_free_stuff,
+            self._channel_game_updates,
         )
         self._sfd_servers = self._initialize_class(
             SFDServers, self._bot_config, self._session
@@ -250,11 +219,14 @@ class KexoBot:
             self._clear_temp_guild_data()
             await self._refresh_subreddit_icons()
 
-        if now.hour % 5 == 0:
+        if now.hour % 6 == 0:
             self._clear_temp_reddit_data()
 
         if now.hour == 0:
             self._load_humor_api_tokens()
+
+        if now.hour == 4:
+            await self._wordnik_presence()
 
         if now.day % 2 == 0 and now.hour == 0:
             self._offline_lavalink_servers = []
@@ -266,12 +238,6 @@ class KexoBot:
         )
         await self._content_monitor.power_outages()
         await self._content_monitor.contests()
-
-    def _create_session(self) -> None:
-        """Create a httpx session for the bot."""
-        self._session = httpx.AsyncClient()
-        self._session.headers = httpx.Headers({"User-Agent": UserAgent().random})
-        print("Httpx session initialized.")
 
     async def connect_node(
         self, guild_id: int = KEXO_SERVER, offline_node: str = None
@@ -369,90 +335,26 @@ class KexoBot:
         node: wavelink.Node = self.lavalink_servers[lavalink_server_pos]
         return node
 
-    @staticmethod
-    async def close_unused_nodes() -> None:
-        """Clear unused lavalink nodes.
+    async def _wordnik_presence(self) -> None:
+        """Fetches the word of the day from Wordnik API."""
+        url = WORDNIK_API_URL + WORDNIK_API_KEY
+        json_data = await make_http_request(self._session, url, get_json=True)
+        if not json_data:
+            return
 
-        This function will check if there are any lavalink nodes
-        that are not being used and will close them.
-        """
-        nodes: list[wavelink.Node] = wavelink.Pool.nodes.values()
-        for node in nodes:
-            if len(wavelink.Pool.nodes) == 1:
-                break
+        word = json_data["word"]
+        definition = json_data["definitions"][0]["text"]
+        definition = definition[:-1]
+        presence = f"{word}: {definition}"
 
-            if len(node.players) == 0:
-                print(f"Node is empty, removing. ({node.uri})")
-                # noinspection PyProtectedMember
-                await node._pool_closer()  # Node is not properly closed
-                await node.close(eject=True)
+        if len(presence) > 128:
+            print("Presence too long, skipping.")
+            return
 
-    def _remove_node(self, node_uri: str) -> str:
-        """Remove a lavalink node from the list of nodes.
+        activity = discord.Activity(type=discord.ActivityType.watching, name=presence)
+        await bot.change_presence(status=discord.Status.online, activity=activity)
+        print(f"Presence set to: {word}")
 
-        Parameters
-        ----------
-        node_uri: str
-            The uri of the node to remove.
-
-        Returns
-        -------
-        str
-            The uri of the node that was removed.
-        """
-        for node in self.lavalink_servers:
-            if node.uri == node_uri:
-                self.lavalink_servers.remove(node)
-                break
-
-        self._offline_lavalink_servers.append(urlparse(node_uri).hostname)
-        return node_uri
-
-    @staticmethod
-    def get_online_nodes() -> int:
-        """Get the number of online lavalink nodes,
-        returns ``int`` of online nodes.
-        """
-        return len(
-            [
-                node
-                for node in wavelink.Pool.nodes.values()
-                if node.status == NodeStatus.CONNECTED
-            ]
-        )
-
-    def get_avaiable_nodes(self) -> int:
-        """Get the number of available lavalink nodes,
-        returns ``int`` of available nodes.
-        """
-        return len(self.lavalink_servers)
-
-    @staticmethod
-    def _clear_temp_reddit_data() -> None:
-        """Clear the temporary user reddit data."""
-        for _, user_data in bot.temp_user_data.items():
-            reddit_data = user_data["reddit"]
-            last_used = reddit_data["last_used"]
-            if not last_used:
-                continue
-
-            if is_older_than(5, last_used):
-                reddit_data["last_used"] = None
-                reddit_data["viewed_posts"] = set()
-                reddit_data["search_limit"] = 3
-
-    @staticmethod
-    def _clear_temp_guild_data() -> None:
-        """Clear the temporary guild data."""
-        for guild_id in bot.temp_guild_data:
-            bot.temp_guild_data[guild_id] = generate_temp_guild_data()
-
-    @staticmethod
-    def _clear_cached_jokes() -> None:
-        """Clear the cached jokes loaded from FunCommands"""
-        bot.loaded_jokes = []
-        bot.loaded_dad_jokes = []
-        bot.loaded_yo_mama_jokes = []
 
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""
@@ -480,6 +382,133 @@ class KexoBot:
         """Fetch users for the bot."""
         self._user_kexo = await bot.fetch_user(402221830930432000)
         print(f"User {self._user_kexo.name} fetched.")
+
+    def _create_session(self) -> None:
+        """Create a httpx session for the bot."""
+        self._session = httpx.AsyncClient()
+        self._session.headers = httpx.Headers({"User-Agent": UserAgent().random})
+        print("Httpx session initialized.")
+
+    def _remove_node(self, node_uri: str) -> str:
+        """Remove a lavalink node from the list of nodes.
+
+        Parameters
+        ----------
+        node_uri: str
+            The uri of the node to remove.
+
+        Returns
+        -------
+        str
+            The uri of the node that was removed.
+        """
+        for node in self.lavalink_servers:
+            if node.uri == node_uri:
+                self.lavalink_servers.remove(node)
+                break
+
+        self._offline_lavalink_servers.append(urlparse(node_uri).hostname)
+        return node_uri
+
+    @staticmethod
+    def _load_humor_api_tokens() -> None:
+        """Load the humor API tokens."""
+        bot.humor_api_tokens = {}
+        for token in HUMOR_API_SECRET:
+            bot.humor_api_tokens[token] = {
+                "exhausted": False,
+            }
+
+    @staticmethod
+    async def close_unused_nodes() -> None:
+        """Clear unused lavalink nodes.
+
+        This function will check if there are any lavalink nodes
+        that are not being used and will close them.
+        """
+        nodes: list[wavelink.Node] = wavelink.Pool.nodes.values()
+        for node in nodes:
+            if len(wavelink.Pool.nodes) == 1:
+                break
+
+            if len(node.players) == 0:
+                print(f"Node is empty, removing. ({node.uri})")
+                # noinspection PyProtectedMember
+                await node._pool_closer()  # Node is not properly closed
+                await node.close(eject=True)
+
+    @staticmethod
+    async def _fetch_channel(channel_id: int) -> discord.TextChannel:
+        """Helper to fetch a channel by ID, returns :class:`discord.TextChannel`.
+
+        Parameters
+        ----------
+        channel_id: int
+            The ID of the channel to fetch.
+        """
+        return await bot.fetch_channel(channel_id)
+
+    @staticmethod
+    def _initialize_class(cls, *args) -> object:
+        """Helper to initialize a class with arguments.
+
+        Parameters
+        ----------
+        cls: type
+            The class to initialize.
+        *args: tuple
+            The arguments to pass to the class.
+        """
+        return cls(*args)
+
+    @staticmethod
+    def get_online_nodes() -> int:
+        """Get the number of online lavalink nodes,
+        returns ``int`` of online nodes.
+        """
+        return len(
+            [
+                node
+                for node in wavelink.Pool.nodes.values()
+                if node.status == NodeStatus.CONNECTED
+            ]
+        )
+
+    def get_avaiable_nodes(self) -> int:
+        """Get the number of available lavalink nodes,
+        returns ``int`` of available nodes.
+        """
+        return len(self.lavalink_servers)
+
+    @staticmethod
+    def _clear_temp_reddit_data() -> None:
+        """Clear the temporary user reddit data."""
+        if not bot.temp_user_data:
+            return
+
+        for _, user_data in bot.temp_user_data.items():
+            reddit_data = user_data["reddit"]
+            last_used = reddit_data["last_used"]
+            if not last_used:
+                continue
+
+            if is_older_than(5, last_used):
+                reddit_data["last_used"] = None
+                reddit_data["viewed_posts"] = set()
+                reddit_data["search_limit"] = 3
+
+    @staticmethod
+    def _clear_temp_guild_data() -> None:
+        """Clear the temporary guild data."""
+        for guild_id in bot.temp_guild_data:
+            bot.temp_guild_data[guild_id] = generate_temp_guild_data()
+
+    @staticmethod
+    def _clear_cached_jokes() -> None:
+        """Clear the cached jokes loaded from FunCommands"""
+        bot.loaded_jokes = []
+        bot.loaded_dad_jokes = []
+        bot.loaded_yo_mama_jokes = []
 
 
 kexobot = KexoBot()
@@ -570,7 +599,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             title="",
             description=f"🚫 You're sending too much!,"
             f" try again in `{round(error.retry_after, 1)}s`.",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
+            color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
@@ -581,7 +610,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             title="",
             description=f"🚫 You don't have the required permissions to use this command."
             f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
+            color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
         return
@@ -591,7 +620,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             title="",
             description=f"🚫 I don't have the required permissions to use this command."
             f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
+            color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
         await ctx.send(embed=embed)
         return
@@ -601,7 +630,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             title="",
             description=f"🚫 You don't have the required role to use this command."
             f"\nRequired role: `{error.missing_role}`",
-            color=discord.Color.from_rgb(r=255, g=0, b=0),
+            color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
         await ctx.respond(embed=embed, ephemeral=True)
         return
@@ -612,12 +641,21 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
         embed = discord.Embed(
             title="",
             description="⚠️ Discord API is not responding. Please try again in a minute.",
-            color=discord.Color.from_rgb(r=255, g=165, b=0),
+            color=discord.Color.from_rgb(r=220, g=165, b=0),
         )
         try:
             await ctx.channel.send(embed=embed, delete_after=20)
         except discord.Forbidden:
             pass
+        return
+
+    if isinstance(error, discord.ext.commands.NotOwner):
+        embed = discord.Embed(
+            title="",
+            description="🚫 This command is available only to owner of this bot.",
+            color=discord.Color.from_rgb(r=220, g=0, b=0),
+        )
+        await ctx.respond(embed=embed, ephemeral=True)
         return
 
     raise error

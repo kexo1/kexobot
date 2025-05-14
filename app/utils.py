@@ -6,6 +6,7 @@ from typing import Optional, Dict, Callable, Any
 
 import aiohttp
 import asyncpraw
+import asyncprawcore
 import asyncpraw.models
 import discord
 import httpx
@@ -432,7 +433,13 @@ async def generate_temp_user_data(bot: discord.Bot, user_id: int) -> dict:
     multireddit: asyncpraw.models.Multireddit = await bot.reddit_agent.multireddit(
         name=str(user_id), redditor="KexoBOT"
     )
-    await multireddit.load()
+    for attempt in range(3):
+        try:
+            await multireddit.load()
+            break
+        except asyncprawcore.exceptions.NotFound:
+            await asyncio.sleep(attempt + 1)
+
     for subreddit in multireddit.subreddits:
         try:
             # For whatever reason, subbreddits are already added to the multireddit

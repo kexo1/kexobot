@@ -413,3 +413,7 @@ RADIOGARDEN_PLACES_URL = "https://radio.garden/api/ara/content/places"
 RADIOGARDEN_PAGE_URL = "https://radio.garden/api/ara/content/page/"
 RADIOGARDEN_SEARCH_URL = "https://radio.garden/api/search?q="
 RADIOGARDEN_LISTEN_URL = "https://radio.garden/api/ara/content/listen/"
+
+# -------------------- Wordnik API -------------------- #
+WORDNIK_API_KEY = os.getenv("WORDNIK_API_KEY")
+WORDNIK_API_URL = "https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key="
