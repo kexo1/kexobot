@@ -44,7 +44,12 @@ from app.constants import (
     WORDNIK_API_KEY,
     WORDNIK_API_URL,
 )
-from app.utils import get_guild_data, is_older_than, generate_temp_guild_data, make_http_request
+from app.utils import (
+    get_guild_data,
+    is_older_than,
+    generate_temp_guild_data,
+    make_http_request,
+)
 
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
@@ -225,7 +230,7 @@ class KexoBot:
         if now.hour == 0:
             self._load_humor_api_tokens()
 
-        if now.hour == 4:
+        if now.hour == 2:
             await self._wordnik_presence()
 
         if now.day % 2 == 0 and now.hour == 0:
@@ -354,7 +359,6 @@ class KexoBot:
         activity = discord.Activity(type=discord.ActivityType.watching, name=presence)
         await bot.change_presence(status=discord.Status.online, activity=activity)
         print(f"Presence set to: {word}")
-
 
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""

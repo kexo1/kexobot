@@ -346,10 +346,14 @@ async def switch_node(
     """
     for i in range(5):
         try:
+            player_autoplay_mode = player.autoplay
+            player.autoplay = wavelink.AutoPlayMode.disabled
+
             node: wavelink.Node = await connect_node(player.guild.id, offline_node)
             await player.switch_node(node)
 
-            if not play_after and player.autoplay == wavelink.AutoPlayMode.enabled:
+            # When populated queue is on, the player can put random song and skip currently playing song
+            if not play_after and player_autoplay_mode == wavelink.AutoPlayMode.enabled:
                 try:
                     del player.queue[0]
                 except IndexError:
@@ -358,6 +362,7 @@ async def switch_node(
             if play_after:
                 await player.play(player.temp_current)
 
+            player.autoplay = player_autoplay_mode
             print(f"{i + 1}. Node switched. ({node.uri})")
             embed = discord.Embed(
                 title="",

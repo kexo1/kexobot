@@ -22,6 +22,11 @@ class LavalinkServerManager:
         self._session = session
         self._repeated_hostnames: list[str] = []
         self._offline_lavalink_servers: list[str] = []
+        self._unwanted_servers: list[str] = [
+            "lava-v4.ajieblogs.eu.org",
+            "lava.inzeworld.com",
+            "lavalink.jirayu.net",
+        ]
 
     async def get_lavalink_servers(
         self, offline_lavalink_servers: list[str]
@@ -38,17 +43,15 @@ class LavalinkServerManager:
         lavalink_servers = []
         # Lavainfo from github
         json_data: list = await make_http_request(
-            self._session, LAVAINFO_GITHUB_URL, retries=2, get_json=True
+            self._session, LAVAINFO_GITHUB_URL, get_json=True
         )
-        if json_data:
-            lavalink_servers.extend(await self._lavainfo_github_fetch(json_data))
+        lavalink_servers.extend(await self._lavainfo_github_fetch(json_data))
 
         # Lavalist
         json_data: list = await make_http_request(
-            self._session, LAVALIST_URL, retries=2, get_json=True
+            self._session, LAVALIST_URL, get_json=True
         )
-        if json_data:
-            lavalink_servers.extend(await self._lavalist_fetch(json_data))
+        lavalink_servers.extend(await self._lavalist_fetch(json_data))
 
         # Use as a last resort
         if not lavalink_servers:
@@ -67,6 +70,7 @@ class LavalinkServerManager:
             if (
                 server["host"] in self._offline_lavalink_servers
                 or server["host"] in self._repeated_hostnames
+                or server["host"] in self._unwanted_servers
             ):
                 continue
 
@@ -86,7 +90,10 @@ class LavalinkServerManager:
     async def _lavainfo_github_fetch(self, json_data: list) -> list[wavelink.Node]:
         lavalink_servers = []
         for server in json_data:
-            if server["host"] in self._offline_lavalink_servers:
+            if (
+                server["host"] in self._offline_lavalink_servers
+                or server["host"] in self._unwanted_servers
+            ):
                 continue
 
             if server["restVersion"] != "v4":
