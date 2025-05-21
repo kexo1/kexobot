@@ -12,7 +12,7 @@ from asyncprawcore.exceptions import (
     ResponseException,
     RequestException,
 )
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.constants import (
     REDDIT_CRACKWATCH_POSTS,
@@ -36,7 +36,7 @@ class RedditFetcher:
 
     Parameters
     ----------
-    bot_config: :class:`motor.motor_asyncio.AsyncIOMotorClient`
+    bot_config: :class:`motor.motor_asyncio.AsyncMongoClient`
         MongoDB client for accessing the database.
     session: :class:`httpx.AsyncClient`
         HTTP client for making requests.
@@ -50,7 +50,7 @@ class RedditFetcher:
 
     def __init__(
         self,
-        bot_config: AsyncIOMotorClient,
+        bot_config: AsyncMongoClient,
         session: httpx.AsyncClient,
         reddit_agent: asyncpraw.Reddit,
         free_stuff: discord.TextChannel,

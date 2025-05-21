@@ -12,7 +12,7 @@ import httpx
 import wavelink
 from discord.commands import slash_command, guild_only, option
 from discord.ext import commands
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.__init__ import __version__
 from app.classes.sfd_servers import SFDServers
@@ -61,8 +61,8 @@ class CommandCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self._bot = bot
         self._session: httpx.AsyncClient = self._bot.session
-        self._bot_config: AsyncIOMotorClient = self._bot.bot_config
-        self._user_data_db: AsyncIOMotorClient = self._bot.user_data_db
+        self._bot_config: AsyncMongoClient = self._bot.bot_config
+        self._user_data_db: AsyncMongoClient = self._bot.user_data_db
         self._user_data: dict = self._bot.user_data
         self._temp_user_data: dict = self._bot.temp_user_data
 

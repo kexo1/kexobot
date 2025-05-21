@@ -1,7 +1,7 @@
 import httpx
 import wavelink
 
-from app.constants import LAVALIST_URL, LAVAINFO_GITHUB_URL
+from app.constants import LAVALIST_URL, LAVAINFO_GITHUB_URL, UNWANTED_LAVALINK_SERVERS
 from app.utils import make_http_request
 
 
@@ -22,11 +22,6 @@ class LavalinkServerManager:
         self._session = session
         self._repeated_hostnames: list[str] = []
         self._offline_lavalink_servers: list[str] = []
-        self._unwanted_servers: list[str] = [
-            "lava-v4.ajieblogs.eu.org",
-            "lava.inzeworld.com",
-            "lavalink.jirayu.net",
-        ]
 
     async def get_lavalink_servers(
         self, offline_lavalink_servers: list[str]
@@ -70,7 +65,7 @@ class LavalinkServerManager:
             if (
                 server["host"] in self._offline_lavalink_servers
                 or server["host"] in self._repeated_hostnames
-                or server["host"] in self._unwanted_servers
+                or server["host"] in UNWANTED_LAVALINK_SERVERS
             ):
                 continue
 
@@ -92,7 +87,7 @@ class LavalinkServerManager:
         for server in json_data:
             if (
                 server["host"] in self._offline_lavalink_servers
-                or server["host"] in self._unwanted_servers
+                or server["host"] in UNWANTED_LAVALINK_SERVERS
             ):
                 continue
 

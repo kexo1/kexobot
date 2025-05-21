@@ -8,7 +8,7 @@ import httpx
 import unidecode
 from bs4 import BeautifulSoup, Tag
 from deep_translator import GoogleTranslator
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.constants import (
     DB_CACHE,
@@ -46,7 +46,7 @@ class ContentMonitor:
 
     Parameters
     ----------
-    bot_config: :class:`AsyncIOMotorClient`
+    bot_config: :class:`AsyncMongoClient`
         MongoDB client for database operations.
     session: :class:`httpx.AsyncClient`
         HTTP client for making requests.
@@ -62,7 +62,7 @@ class ContentMonitor:
 
     def __init__(
         self,
-        bot_config: AsyncIOMotorClient,
+        bot_config: AsyncMongoClient,
         session: httpx.AsyncClient,
         game_updates_channel: discord.TextChannel,
         esutaze_channel: discord.TextChannel,

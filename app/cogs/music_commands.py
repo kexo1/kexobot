@@ -569,23 +569,19 @@ class MusicCommands(commands.Cog):
                     return tracks
             except TimeoutError:
                 last_error = "NODE_UNRESPONSIVE"
-                await switch_node(
-                    self._bot.connect_node, player=player, play_after=False
-                )
-            except LavalinkLoadException as e:
-                print("LavalinkLoadException: ", e)
+            except LavalinkLoadException:
                 last_error = "LAVALINK_ERROR"
             except NodeException as e:
                 print("NodeException: ", e)
                 last_error = "NODE_UNRESPONSIVE"
-                await switch_node(
-                    self._bot.connect_node, player=player, play_after=False
-                )
             except AttributeError:
                 last_error = "NODE_UNRESPONSIVE"
+
+            if last_error:
                 await switch_node(
                     self._bot.connect_node, player=player, play_after=False
                 )
+
             # Fallback to default search
             source = "ytsearch"
             if is_spotify:
@@ -643,7 +639,7 @@ class MusicCommands(commands.Cog):
         except wavelink.exceptions.InvalidNodeException:
             await send_response(ctx, "NO_NODES")
             return False
-        except wavelink.exceptions.ChannelTimeoutException:
+        except (wavelink.exceptions.ChannelTimeoutException, TimeoutError):
             # For some reason there's like a tiny chance the fucking node suddenly stops
             # responding, even though it was working minutes before, seems like some nodes
             # actively disconnect players if they are not used for a while

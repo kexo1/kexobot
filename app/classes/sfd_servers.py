@@ -8,7 +8,7 @@ import httpx
 import matplotlib.pyplot as plt
 import mplcyberpunk
 from bs4 import BeautifulSoup
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app.constants import (
     SFD_SERVER_URL,
@@ -101,7 +101,7 @@ class SFDServers:
 
     Attributes:
     ----------
-    bot_config: AsyncIOMotorClient
+    bot_config: AsyncMongoClient
         The MongoDB client for database operations.
     session: httpx.AsyncClient
         The HTTP client for making requests.
@@ -109,7 +109,7 @@ class SFDServers:
         The directory where graphs will be saved.
     """
 
-    def __init__(self, bot_config: AsyncIOMotorClient, session: httpx.AsyncClient):
+    def __init__(self, bot_config: AsyncMongoClient, session: httpx.AsyncClient):
         self._session = session
         self._bot_config = bot_config
         self._graphs_dir = os.path.join(os.getcwd(), "graphs")

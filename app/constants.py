@@ -246,6 +246,11 @@ LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
 LAVAINFO_GITHUB_URL = (
     "https://raw.githubusercontent.com/appujet/lavalink-list/refs/heads/main/nodes.json"
 )
+UNWANTED_LAVALINK_SERVERS = [
+    "lava-v4.ajieblogs.eu.org",
+    "lava.inzeworld.com",
+    "lavalink.jirayu.net",
+]
 
 SOURCE_PATTERNS = [
     # YouTube Music (music.youtube.com URLs)

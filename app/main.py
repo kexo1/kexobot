@@ -15,7 +15,7 @@ import httpx
 import wavelink
 from discord.ext import tasks, commands
 from fake_useragent import UserAgent
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from pycord.multicog import Bot
 from wavelink.enums import NodeStatus
 
@@ -77,7 +77,7 @@ class KexoBot:
         self._main_loop_counter = 0
         self._offline_lavalink_servers: list[str] = []
 
-        database = AsyncIOMotorClient(MONGO_DB_URL)["KexoBOTDatabase"]
+        database = AsyncMongoClient(MONGO_DB_URL)["KexoBOTDatabase"]
         self._bot_config = database["BotConfig"]
         self._user_data_db = database["UserData"]
         self._guild_data_db = database["GuildData"]
@@ -230,7 +230,7 @@ class KexoBot:
         if now.hour == 0:
             self._load_humor_api_tokens()
 
-        if now.hour == 2:
+        if now.hour == 4:
             await self._wordnik_presence()
 
         if now.day % 2 == 0 and now.hour == 0:
