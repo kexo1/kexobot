@@ -283,7 +283,7 @@ class ContentMonitor:
     async def contests(self) -> None:
         """Checks for contests."""
         to_filter, esutaze_cache = await self._load_contests_cache()
-        esutaze_cache_upload = esutaze_cache.copy()
+        esutaze_cache_copy = esutaze_cache.copy()
         articles = await self._get_contest_articles()
 
         if not articles:
@@ -292,7 +292,7 @@ class ContentMonitor:
         for article in articles:
             url = article.find("link").text
 
-            if url in esutaze_cache:
+            if url in esutaze_cache_copy:
                 break
 
             title = article.find("title").text
@@ -300,18 +300,20 @@ class ContentMonitor:
             if is_filtered:
                 continue
 
-            del esutaze_cache_upload[0]
-            esutaze_cache_upload.append(url)
+            del esutaze_cache[0]
+            esutaze_cache.append(url)
 
             await self._send_contest_article(article)
 
-        await self._bot_config.update_one(
-            DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache_upload}}
-        )
+        if esutaze_cache != esutaze_cache_copy:
+            await self._bot_config.update_one(
+                DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache}}
+            )
 
     async def _send_alienware_arena_embed(
         self, json_data: dict, alienwarearena_cache: list, to_filter: list
     ) -> None:
+        alienwarearena_cache_copy = alienwarearena_cache.copy()
         for giveaway in json_data["data"][:ALIENWAREARENA_MAX_POSTS]:
             url = "https://eu.alienwarearena.com" + giveaway["url"]
 
@@ -333,24 +335,29 @@ class ContentMonitor:
             soup = BeautifulSoup(giveaway["description"], "html.parser")
             description = ""
             if soup:
-                paragraphs = soup.find_all('p')
+                paragraphs = soup.find_all("p")
                 description = paragraphs[1].get_text(strip=True)
 
             embed = discord.Embed(
-                title=title, description=description, colour=discord.Colour.dark_theme(), url=url
+                title=title,
+                description=description,
+                colour=discord.Colour.dark_theme(),
+                url=url,
             )
             embed.set_image(url=giveaway["image"])
             await self._game_updates_channel.send(embed=embed)
 
-        await self._bot_config.update_one(
-            DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
-        )
+        if alienwarearena_cache != alienwarearena_cache_copy:
+            await self._bot_config.update_one(
+                DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
+            )
 
     async def _send_alienware_arena_news_embed(
         self, response: httpx.Response, alienware_arena_news_cache: list
     ) -> None:
         soup = BeautifulSoup(response.text, "html.parser")
         news_widget = soup.find("div", class_="widget-table announcements-table")
+        alienware_arena_news_cache_copy = alienware_arena_news_cache.copy()
 
         for post in news_widget.find_all("div", class_="widget-table-row"):
             post_info = post.find("a", class_="link relay-announcement-wrap")
@@ -374,14 +381,16 @@ class ContentMonitor:
             )
             await self._alienware_arena_news_channel.send(embed=embed)
 
-        await self._bot_config.update_one(
-            DB_CACHE,
-            {"$set": {"alienwarearena_news_cache": alienware_arena_news_cache}},
-        )
+        if alienware_arena_news_cache != alienware_arena_news_cache_copy:
+            await self._bot_config.update_one(
+                DB_CACHE,
+                {"$set": {"alienwarearena_news_cache": alienware_arena_news_cache}},
+            )
 
     async def _send_fanatical_embed(
         self, json_data: dict, fanatical_cache: list
     ) -> None:
+        fanatical_cache_copy = fanatical_cache.copy()
         for giveaway in json_data["freeProducts"][:FANATICAL_MAX_POSTS]:
             if giveaway["min_spend"]["EUR"] != 0:
                 continue  # Skip if not free
@@ -410,9 +419,10 @@ class ContentMonitor:
             embed.set_image(url=img_url)
             await self._game_updates_channel.send(embed=embed)
 
-        await self._bot_config.update_one(
-            DB_CACHE, {"$set": {"fanatical_cache": fanatical_cache}}
-        )
+        if fanatical_cache != fanatical_cache_copy:
+            await self._bot_config.update_one(
+                DB_CACHE, {"$set": {"fanatical_cache": fanatical_cache}}
+            )
 
     async def _send_onlinefix_embed(self, url: str, game_title: str) -> None:
         onlinefix_article = await make_http_request(self._session, url)
@@ -490,13 +500,13 @@ class ContentMonitor:
     async def _process_power_outage_articles(
         self, articles: list, elektrinavypadky_cache: list
     ) -> None:
-        elektrinavypadky_cache_upload = elektrinavypadky_cache.copy()
+        elektrinavypadky_cache_copy = elektrinavypadky_cache.copy()
         above_limit = False
 
         for article in articles:
             description = article.find("content").text
             url = article.find("link")["href"]
-            if url in elektrinavypadky_cache:
+            if url in elektrinavypadky_cache_copy:
                 break
 
             title = article.find("title").text
@@ -508,8 +518,8 @@ class ContentMonitor:
             ):
                 continue
 
-            del elektrinavypadky_cache_upload[0]
-            elektrinavypadky_cache_upload.append(url)
+            del elektrinavypadky_cache[0]
+            elektrinavypadky_cache.append(url)
 
             iso_time = article.find("published").text
             timestamp = iso_to_timestamp(iso_time)
@@ -535,10 +545,12 @@ class ContentMonitor:
 
             if above_limit:
                 await self._user_kexo.send(description)
-        await self._bot_config.update_one(
-            DB_CACHE,
-            {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache_upload}},
-        )
+
+        if elektrinavypadky_cache != elektrinavypadky_cache_copy:
+            await self._bot_config.update_one(
+                DB_CACHE,
+                {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache}},
+            )
 
     async def _send_contest_article(self, article) -> None:
         title = article.find("title").text
