@@ -331,22 +331,13 @@ class ContentMonitor:
             alienwarearena_cache.append(url)
 
             soup = BeautifulSoup(giveaway["description"], "html.parser")
-
-            about_strong = soup.find(
-                "strong", string=lambda text: text and "About" in text
-            )
-            if about_strong:
-                result = []
-                current = about_strong.find_parent("p")
-                while current:
-                    result.append(current.get_text(strip=True))
-                    current = current.find_next_sibling("p")
-                description = "\n".join(result)
-            else:
-                description = "**[eu.alienwarearena.com]({url})**"
+            description = ""
+            if soup:
+                paragraphs = soup.find_all('p')
+                description = paragraphs[1].get_text(strip=True)
 
             embed = discord.Embed(
-                title=title, description=description, colour=discord.Colour.dark_theme()
+                title=title, description=description, colour=discord.Colour.dark_theme(), url=url
             )
             embed.set_image(url=giveaway["image"])
             await self._game_updates_channel.send(embed=embed)
@@ -365,7 +356,7 @@ class ContentMonitor:
             post_info = post.find("a", class_="link relay-announcement-wrap")
             url = post_info["href"]
             if url in alienware_arena_news_cache:
-                return
+                break
 
             del alienware_arena_news_cache[0]
             alienware_arena_news_cache.append(url)

@@ -170,7 +170,7 @@ class KexoBot:
             SFDServers, self._bot_config, self.session
         )
         self._lavalink_server_manager = self._initialize_class(
-            LavalinkServerManager, self.session
+            LavalinkServerManager, self.session, self._offline_lavalink_servers
         )
 
     async def main_loop(self) -> None:
