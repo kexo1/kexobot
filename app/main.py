@@ -59,7 +59,7 @@ bot = Bot()
 
 class KexoBot:
     """Main class for the _bot.
-    This class is responsible for initializing the _bot, creating the _session,
+    This class is responsible for initializing the _bot, creating the session,
     and connecting to the lavalink server.
     It also contains the main loop and the hourly loop.
     The main loop is responsible for running the different classes that
@@ -70,8 +70,9 @@ class KexoBot:
 
     def __init__(self):
         self.lavalink_servers: list[wavelink.Node] = []
+        self.session = None | httpx.AsyncClient
+
         self._user_kexo = None | discord.User
-        self._session = None | httpx.AsyncClient
         self._subreddit_cache = None | dict
         self._hostname = socket.gethostname()
         self._main_loop_counter = 0
@@ -150,7 +151,7 @@ class KexoBot:
         self._content_monitor = self._initialize_class(
             ContentMonitor,
             self._bot_config,
-            self._session,
+            self.session,
             self._channel_game_updates,
             self._channel_esutaze,
             self._channel_alienware_arena_news,
@@ -160,16 +161,16 @@ class KexoBot:
         self._reddit_fetcher = self._initialize_class(
             RedditFetcher,
             self._bot_config,
-            self._session,
+            self.session,
             self._reddit_agent,
             self._channel_free_stuff,
             self._channel_game_updates,
         )
         self._sfd_servers = self._initialize_class(
-            SFDServers, self._bot_config, self._session
+            SFDServers, self._bot_config, self.session
         )
         self._lavalink_server_manager = self._initialize_class(
-            LavalinkServerManager, self._session
+            LavalinkServerManager, self.session
         )
 
     async def main_loop(self) -> None:
@@ -231,15 +232,13 @@ class KexoBot:
             self._load_humor_api_tokens()
 
         if now.hour == 4:
-            await self._wordnik_presence()
+            await self.wordnik_presence()
 
         if now.day % 2 == 0 and now.hour == 0:
             self._offline_lavalink_servers = []
 
         self.lavalink_servers = (
-            await self._lavalink_server_manager.get_lavalink_servers(
-                self._offline_lavalink_servers
-            )
+            await self._lavalink_server_manager.get_lavalink_servers()
         )
         await self._content_monitor.power_outages()
         await self._content_monitor.contests()
@@ -340,11 +339,12 @@ class KexoBot:
         node: wavelink.Node = self.lavalink_servers[lavalink_server_pos]
         return node
 
-    async def _wordnik_presence(self) -> None:
+    async def wordnik_presence(self) -> None:
         """Fetches the word of the day from Wordnik API."""
         url = WORDNIK_API_URL + WORDNIK_API_KEY
-        json_data = await make_http_request(self._session, url, get_json=True)
+        json_data = await make_http_request(self.session, url, get_json=True)
         if not json_data:
+            print("Wordnik API returned no data.")
             return
 
         word = json_data["word"]
@@ -389,8 +389,8 @@ class KexoBot:
 
     def _create_session(self) -> None:
         """Create a httpx session for the bot."""
-        self._session = httpx.AsyncClient()
-        self._session.headers = httpx.Headers({"User-Agent": UserAgent().random})
+        self.session = httpx.AsyncClient()
+        self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
     def _remove_node(self, node_uri: str) -> str:
@@ -568,6 +568,30 @@ async def before_hourly_loop() -> None:
     await bot.wait_until_ready()
 
 
+async def bot_loader(main: KexoBot) -> None:
+    """This function asynchronously loads the bot and main functions.
+    It initializes the bot and starts the main loop and hourly loop.
+    It also connects to the lavalink server and sets the presence.
+
+    Parameters
+    ----------
+    main: KexoBot
+        The KexoBot instance to load.
+    """
+
+    await main.initialize()
+    main_loop_task.start()
+    hourly_loop_task.start()
+
+    while not main.lavalink_servers:
+        await asyncio.sleep(1)
+    await main.connect_node()
+
+    while not main.session:
+        await asyncio.sleep(1)
+    await main.wordnik_presence()
+
+
 @bot.event
 async def on_ready() -> None:
     """Event that runs when the bot is ready.
@@ -576,14 +600,7 @@ async def on_ready() -> None:
     It also starts the main loop and the hourly loop.
     """
     print(f"Logged in as {bot.user}")
-
-    await kexobot.initialize()
-    main_loop_task.start()
-    hourly_loop_task.start()
-
-    while not kexobot.lavalink_servers:
-        await asyncio.sleep(1)
-    await kexobot.connect_node()
+    await bot_loader(kexobot)
     print("Bot is ready.")
 
 

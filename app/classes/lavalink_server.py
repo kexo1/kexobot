@@ -16,37 +16,39 @@ class LavalinkServerManager:
     ----------
     session: :class:`httpx.AsyncClient`
         HTTP client for making requests.
+    offline_lavalink_servers: list[str]
+        List of offline lavalink servers.
     """
 
-    def __init__(self, session: httpx.AsyncClient) -> None:
+    def __init__(
+        self, session: httpx.AsyncClient, offline_lavalink_servers: list[str]
+    ) -> None:
         self._session = session
         self._repeated_hostnames: list[str] = []
-        self._offline_lavalink_servers: list[str] = []
+        self._offline_lavalink_servers = offline_lavalink_servers
 
-    async def get_lavalink_servers(
-        self, offline_lavalink_servers: list[str]
-    ) -> list[wavelink.Node]:
+    async def get_lavalink_servers(self) -> list[wavelink.Node]:
         """Method to get lavalink servers from lavalist and lavainfo GitHub.
 
-        Args:
-        ----------
-            offline_lavalink_servers (list[str]): List of offline lavalink servers.
-        Returns:
-            list[wavelink.Node]: List of lavalink nodes.
+        Returns
+        -------
+        list[wavelink.Node]
+            List of lavalink nodes.
         """
-        self._offline_lavalink_servers = offline_lavalink_servers
         lavalink_servers = []
         # Lavainfo from github
         json_data: list = await make_http_request(
             self._session, LAVAINFO_GITHUB_URL, get_json=True
         )
-        lavalink_servers.extend(await self._lavainfo_github_fetch(json_data))
+        if json_data:
+            lavalink_servers.extend(await self._lavainfo_github_fetch(json_data))
 
         # Lavalist
         json_data: list = await make_http_request(
             self._session, LAVALIST_URL, get_json=True
         )
-        lavalink_servers.extend(await self._lavalist_fetch(json_data))
+        if json_data:
+            lavalink_servers.extend(await self._lavalist_fetch(json_data))
 
         # Use as a last resort
         if not lavalink_servers:

@@ -43,6 +43,11 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStartEventPayload`
             The payload containing information about the track that started playing.
         """
+
+        if not hasattr(payload, "player"):
+            print("Player not found, skipping track start message.")
+            return
+
         if not payload.player.should_respond:
             await payload.player.text_channel.send(embed=self._playing_embed(payload))
 
