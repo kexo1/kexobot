@@ -317,7 +317,7 @@ class ContentMonitor:
         for giveaway in json_data["data"][:ALIENWAREARENA_MAX_POSTS]:
             url = "https://eu.alienwarearena.com" + giveaway["url"]
 
-            if url in alienwarearena_cache:
+            if url in alienwarearena_cache_copy:
                 break
 
             title = giveaway["title"]
@@ -362,7 +362,7 @@ class ContentMonitor:
         for post in news_widget.find_all("div", class_="widget-table-row"):
             post_info = post.find("a", class_="link relay-announcement-wrap")
             url = post_info["href"]
-            if url in alienware_arena_news_cache:
+            if url in alienware_arena_news_cache_copy:
                 break
 
             del alienware_arena_news_cache[0]
@@ -398,7 +398,7 @@ class ContentMonitor:
             product_info = giveaway["required_products"][0]
             url = "https://www.fanatical.com/en/game/" + product_info["slug"]
 
-            if url in fanatical_cache:
+            if url in fanatical_cache_copy:
                 break
 
             del fanatical_cache[0]
