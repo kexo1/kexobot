@@ -374,6 +374,7 @@ async def switch_node(
         except (
             wavelink.LavalinkException,
             wavelink.InvalidNodeException,
+            RuntimeError,
         ):
             pass
 

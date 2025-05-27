@@ -632,14 +632,14 @@ class MusicCommands(commands.Cog):
             await ctx.defer()
 
         try:
-            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=2)
+            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
         except wavelink.InvalidChannelStateException:
             await send_response(ctx, "NO_PERMISSIONS")
             return False
         except wavelink.exceptions.InvalidNodeException:
             await send_response(ctx, "NO_NODES")
             return False
-        except (wavelink.exceptions.ChannelTimeoutException, TimeoutError):
+        except wavelink.exceptions.ChannelTimeoutException:
             # For some reason there's like a tiny chance the fucking node suddenly stops
             # responding, even though it was working minutes before, seems like some nodes
             # actively disconnect players if they are not used for a while
@@ -648,7 +648,11 @@ class MusicCommands(commands.Cog):
                 ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
             )
             await self._bot.connect_node(offline_node=self._bot.node.uri)
-            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
+            try:
+                await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
+            except wavelink.exceptions.ChannelTimeoutException:
+                print("Already connected to the channel.")
+
             if not ctx.voice_client:
                 await send_response(
                     ctx, "CONNECTION_TIMEOUT", respond=False, ephemeral=False

@@ -175,7 +175,12 @@ class CommandCog(commands.Cog):
             The context of the command invocation.
         """
         node: wavelink.Node = self._bot.node
-        node_info: wavelink.InfoResponsePayload = await node.fetch_info()
+        try:
+            node_info: wavelink.InfoResponsePayload = await node.fetch_info()
+        except RuntimeError:
+            await send_response(ctx, "NO_NODES")
+            return
+
         embed = discord.Embed(
             title=urlparse(node.uri).netloc,
             color=discord.Color.blue(),

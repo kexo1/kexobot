@@ -250,6 +250,7 @@ UNWANTED_LAVALINK_SERVERS = [
     "lava-v4.ajieblogs.eu.org",
     "lava.inzeworld.com",
     "lavalink.jirayu.net",
+    "69.30.219.179",
 ]
 
 SOURCE_PATTERNS = [
