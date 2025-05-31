@@ -251,6 +251,9 @@ UNWANTED_LAVALINK_SERVERS = [
     "lava.inzeworld.com",
     "lavalink.jirayu.net",
     "69.30.219.179",
+    "lavahatry4.techbyte.host",
+    "ipv4.digitalocean-sg.anantix.network",
+    "lavalink.devxcode.in",
 ]
 
 SOURCE_PATTERNS = [

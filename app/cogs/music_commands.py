@@ -648,14 +648,10 @@ class MusicCommands(commands.Cog):
                 ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
             )
             await self._bot.connect_node(offline_node=self._bot.node.uri)
-            try:
-                await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
-            except wavelink.exceptions.ChannelTimeoutException:
-                print("Already connected to the channel.")
 
             if not ctx.voice_client:
                 await send_response(
-                    ctx, "CONNECTION_TIMEOUT", respond=False, ephemeral=False
+                    ctx, "CONNECTION_TIMEOUT", ephemeral=False
                 )
                 return False
         return True

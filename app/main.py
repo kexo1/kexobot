@@ -244,7 +244,7 @@ class KexoBot:
         await self._content_monitor.contests()
 
     async def connect_node(
-        self, guild_id: int = KEXO_SERVER, offline_node: str = None
+            self, guild_id: int = KEXO_SERVER, offline_node: str = None
     ) -> Optional[wavelink.Node]:
         """Connect to lavalink node.
 
@@ -268,9 +268,7 @@ class KexoBot:
             # If somehow all nodes are offline, reset the list of offline nodes
             self._offline_lavalink_servers = []
             self.lavalink_servers = (
-                await self._lavalink_server_manager.get_lavalink_servers(
-                    self._offline_lavalink_servers
-                )
+                await self._lavalink_server_manager.get_lavalink_servers()
             )
             if not self.lavalink_servers:
                 print("No lavalink servers found.")
@@ -282,7 +280,8 @@ class KexoBot:
         if offline_node:
             self._remove_node(offline_node)
 
-        for i in range(len(self.lavalink_servers)):
+        # Use a while loop to safely iterate while removing elements
+        while self.lavalink_servers:
             node: wavelink.Node = await self.get_node(guild_id)
             if not node:
                 return None
@@ -297,17 +296,18 @@ class KexoBot:
 
             except asyncio.TimeoutError:
                 print(f"Node timed out. ({node.uri})")
-                self._remove_node(self.lavalink_servers[i].uri)
+                self._remove_node(node.uri)
                 continue
             except (
-                wavelink.exceptions.LavalinkException,
-                wavelink.exceptions.NodeException,
-                aiohttp.client_exceptions.ServerDisconnectedError,
-                aiohttp.client_exceptions.ClientConnectorError,
-                AttributeError,
+                    wavelink.exceptions.LavalinkException,
+                    wavelink.exceptions.NodeException,
+                    aiohttp.client_exceptions.ServerDisconnectedError,
+                    aiohttp.client_exceptions.ClientConnectorError,
+                    ConnectionRefusedError,
+                    AttributeError,
             ):
                 print(f"Node failed to connect. ({node.uri})")
-                self._remove_node(self.lavalink_servers[i].uri)
+                self._remove_node(node.uri)
                 continue
 
             bot.node = node
