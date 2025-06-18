@@ -9,78 +9,7 @@ from pycord.multicog import subcommand
 from app.constants import YOUTUBE_ICON
 from app.decorators import is_playing, is_joined, is_queue_empty
 from app.response_handler import send_response
-from app.utils import find_track, fix_audio_title, has_pfp
-
-
-# noinspection PyUnusedLocal
-class QueuePaginator(discord.ui.View):
-    """A paginator for the queue command.
-
-    This class creates a view with two buttons, "Previous" and Next",
-    that allow the user to navigate through the pages of the queue."
-
-    Parameters
-    ----------
-    embeds : list
-        A list of embeds to be displayed in the paginator.
-    timeout : int
-        The time in seconds before the paginator times out. Default is 600 seconds.
-    """
-
-    def __init__(self, embeds: list, timeout: int = 600) -> None:
-        super().__init__(timeout=timeout)
-        self._embeds = embeds
-        self._current_page = 0
-
-    async def update_message(self, interaction: discord.Interaction) -> None:
-        """Updates the message with the current embed.
-
-        Parameters
-        ----------
-        interaction: :class:`discord.Interaction`
-            The interaction that triggered the button click.
-        """
-        await interaction.response.edit_message(
-            embed=self._embeds[self._current_page], view=self
-        )
-
-    @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple)
-    async def previous(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ) -> None:
-        """Handles the "Previous" button click event.
-
-        Parameters
-        ----------
-        button: :class:`discord.ui.Button`
-            The button that was clicked.
-        interaction: :class:`discord.Interaction`
-            The interaction that triggered the button click.
-        """
-        if self._current_page > 0:
-            self._current_page -= 1
-        else:
-            self._current_page = len(self._embeds) - 1
-        await self.update_message(interaction)
-
-    @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple)
-    async def next(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ) -> None:
-        """Handles the "Next" button click event.
-
-        Parameters
-        ----------
-        button: :class:`discord.ui.Button`
-            The button that was clicked.
-        interaction: :class:`discord.Interaction`
-            The interaction that triggered the button click.
-        """
-        if self._current_page < len(self._embeds) - 1:
-            self._current_page += 1
-        else:
-            self._current_page = 0
-        await self.update_message(interaction)
+from app.utils import find_track, fix_audio_title, has_pfp, QueuePaginator
 
 
 class Queue(commands.Cog):
@@ -295,7 +224,7 @@ class Queue(commands.Cog):
                 f"{round(divmod(track.length, 60000)[1] / 1000):02} | "
                 f"Requested by: {track.requester.name}`\n"
             )
-            if len(current_description) + len(song_line) > 4000:
+            if len(current_description) + len(song_line) > 4096:
                 embed = discord.Embed(
                     title=f"Queue for {ctx.guild.name}",
                     description=current_description,

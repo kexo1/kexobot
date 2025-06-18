@@ -11,6 +11,10 @@ import asyncpraw.models
 import asyncprawcore.exceptions
 import discord
 import dns.resolver
+
+dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+dns.resolver.default_resolver.nameservers = ["1.1.1.1"]
+
 import httpx
 import wavelink
 from discord.ext import tasks, commands
@@ -50,9 +54,6 @@ from app.utils import (
     generate_temp_guild_data,
     make_http_request,
 )
-
-dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
-dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
 
 bot = Bot()
 
@@ -234,9 +235,6 @@ class KexoBot:
         if now.hour == 4:
             await self.wordnik_presence()
 
-        if now.day % 2 == 0 and now.hour == 0:
-            self._offline_lavalink_servers = []
-
         self.lavalink_servers = (
             await self._lavalink_server_manager.get_lavalink_servers()
         )
@@ -244,7 +242,7 @@ class KexoBot:
         await self._content_monitor.contests()
 
     async def connect_node(
-            self, guild_id: int = KEXO_SERVER, offline_node: str = None
+        self, guild_id: int = KEXO_SERVER, offline_node: str = None
     ) -> Optional[wavelink.Node]:
         """Connect to lavalink node.
 
@@ -299,12 +297,12 @@ class KexoBot:
                 self._remove_node(node.uri)
                 continue
             except (
-                    wavelink.exceptions.LavalinkException,
-                    wavelink.exceptions.NodeException,
-                    aiohttp.client_exceptions.ServerDisconnectedError,
-                    aiohttp.client_exceptions.ClientConnectorError,
-                    ConnectionRefusedError,
-                    AttributeError,
+                wavelink.exceptions.LavalinkException,
+                wavelink.exceptions.NodeException,
+                aiohttp.client_exceptions.ServerDisconnectedError,
+                aiohttp.client_exceptions.ClientConnectorError,
+                ConnectionRefusedError,
+                AttributeError,
             ):
                 print(f"Node failed to connect. ({node.uri})")
                 self._remove_node(node.uri)

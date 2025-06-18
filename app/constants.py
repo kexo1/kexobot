@@ -59,8 +59,7 @@ ESUTAZE_ICON = "https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.
 # -------------------- MongoDB Configuration -------------------- #
 MONGO_DB_URL = (
     f"mongodb+srv://{os.getenv('MONGO_KEY')}"
-    f"@cluster0.exygx.mongodb.net/myFirstDatabase?retryWrites=true&w"
-    f"=majority"
+    f"@cluster0.exygx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 )
 
 DB_CACHE = {"_id": ObjectId("617958fae4043ee4a3f073f2")}
@@ -238,7 +237,6 @@ SHITPOST_SUBREDDITS_ALL = (
     "simpsonsshitposting",
     "shitposting",
     "clamworks",
-    "197",
 )
 
 # -------------------- Music Configuration -------------------- #

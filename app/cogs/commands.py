@@ -33,6 +33,7 @@ from app.utils import (
     check_node_status,
     get_user_data,
     switch_node,
+    QueuePaginator,
 )
 
 host_authors = []
@@ -324,15 +325,49 @@ class CommandCog(commands.Cog):
             await send_response(ctx, "SFD_SERVERS_NOT_FOUND")
             return
 
-        embed = discord.Embed(
-            title="Available Servers",
-            color=discord.Color.blue(),
-        )
-        embed.set_footer(text=f"Total players: {all_players}")
-        embed.add_field(name="Servers:", value="\n".join(servers_dict["server_name"]))
-        embed.add_field(name="Current Map:", value="\n".join(servers_dict["maps"]))
-        embed.add_field(name="Players:", value="\n".join(servers_dict["players"]))
-        await ctx.respond(embed=embed)
+        # Cleaning up the server names and maps
+        servers_dict["server_name"] = [s.strip() for s in servers_dict["server_name"]]
+        servers_dict["maps"] = [m.strip() for m in servers_dict["maps"]]
+
+        server_name_char, map_char, stopped_at = 0, 0, 0
+        pages = []
+
+        for i in range(len(servers_dict["server_name"])):
+            server_name_char += len(servers_dict["server_name"][i])
+            map_char += len(servers_dict["maps"][i])
+
+            embed = discord.Embed(
+                title="Available Servers",
+                color=discord.Color.blue(),
+            )
+            embed.set_footer(text=f"Total players: {all_players}")
+            additional_char = i - stopped_at
+            if (
+                server_name_char + additional_char > 1024
+                or map_char + additional_char > 1024
+            ):
+                embed.add_field(
+                    name="Servers:",
+                    value="\n".join(servers_dict["server_name"][stopped_at : i - 1]),
+                )
+                embed.add_field(
+                    name="Current Map:",
+                    value="\n".join(servers_dict["maps"][stopped_at : i - 1]),
+                )
+                embed.add_field(
+                    name="Players:",
+                    value="\n".join(servers_dict["players"][stopped_at : i - 1]),
+                )
+                stopped_at = i
+                server_name_char, map_char = 0, 0
+                pages.append(embed)
+
+        if not pages:
+            await ctx.respond(embed=embed)
+        else:
+            view = QueuePaginator(pages)
+
+            await ctx.respond(embed=pages[0], view=view)
 
     @slash_sfd.command(name="server_info", description="Find searched server.")
     @option("server", description="Server name.")

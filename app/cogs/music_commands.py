@@ -650,9 +650,7 @@ class MusicCommands(commands.Cog):
             await self._bot.connect_node(offline_node=self._bot.node.uri)
 
             if not ctx.voice_client:
-                await send_response(
-                    ctx, "CONNECTION_TIMEOUT", ephemeral=False
-                )
+                await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
                 return False
         return True
 
