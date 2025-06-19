@@ -246,9 +246,11 @@ class CommandCog(commands.Cog):
             embed.description = "No platforms supported"
 
         embed.set_footer(
-            text="unlikely - depends if node owner added API key for each platform"
-            if lavasrc_plugin
-            else ""
+            text=(
+                "unlikely - depends if node owner added API key for each platform"
+                if lavasrc_plugin
+                else ""
+            )
         )
         await ctx.respond(embed=embed)
 
@@ -345,7 +347,7 @@ class CommandCog(commands.Cog):
             if (
                 server_name_char + additional_char > 1024
                 or map_char + additional_char > 1024
-            ):
+            ) or (i == len(servers_dict["server_name"]) - 1 and not pages):
                 embed.add_field(
                     name="Servers:",
                     value="\n".join(servers_dict["server_name"][stopped_at : i - 1]),
@@ -362,11 +364,10 @@ class CommandCog(commands.Cog):
                 server_name_char, map_char = 0, 0
                 pages.append(embed)
 
-        if not pages:
+        if len(pages) == 1:
             await ctx.respond(embed=embed)
         else:
             view = QueuePaginator(pages)
-
             await ctx.respond(embed=pages[0], view=view)
 
     @slash_sfd.command(name="server_info", description="Find searched server.")

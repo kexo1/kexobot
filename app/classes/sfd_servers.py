@@ -227,7 +227,6 @@ class SFDServers:
         time_diff = now - last_update_week
         hours_diff = time_diff.total_seconds() / 3600
         update_count = min(4, max(1, int(hours_diff // 6)))
-        print(f"Updating weekly stats: {update_count} updates")
         players_week, servers_week = activity["players_week"], activity["servers_week"]
 
         recent_players = players_day[-60 * update_count :]
