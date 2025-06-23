@@ -1,7 +1,10 @@
+import copy
+
+import discord
 import httpx
 import wavelink
 
-from app.constants import LAVALIST_URL, LAVAINFO_GITHUB_URL, UNWANTED_LAVALINK_SERVERS
+from app.constants import LAVALIST_URL, LAVAINFO_GITHUB_URL, DB_CACHE
 from app.utils import make_http_request
 
 
@@ -20,100 +23,75 @@ class LavalinkServerManager:
         List of offline lavalink servers.
     """
 
-    def __init__(
-        self, session: httpx.AsyncClient, offline_lavalink_servers: list[str]
-    ) -> None:
+    def __init__(self, bot: discord.Bot, session: httpx.AsyncClient) -> None:
+        self._bot = bot
         self._session = session
-        self._repeated_hostnames: list[str] = []
-        self._offline_lavalink_servers = offline_lavalink_servers
+        self._cached_lavalink_servers = self._bot.cached_lavalink_servers
+        self._cached_lavalink_servers_copy = copy.deepcopy(
+            self._cached_lavalink_servers
+        )
 
-    async def get_lavalink_servers(self) -> list[wavelink.Node]:
-        """Method to get lavalink servers from lavalist and lavainfo GitHub.
+    async def fetch_lavalink_servers(self):
+        """Method to get new lavalink servers from lavalist and lavainfo GitHub.
 
         Returns
         -------
         list[wavelink.Node]
             List of lavalink nodes.
         """
-        lavalink_servers = []
         # Lavainfo from github
         json_data: list = await make_http_request(
             self._session, LAVAINFO_GITHUB_URL, get_json=True
         )
         if json_data:
-            lavalink_servers.extend(await self._lavainfo_github_fetch(json_data))
+            await self._lavainfo_github_fetch(json_data)
 
         # Lavalist
         json_data: list = await make_http_request(
             self._session, LAVALIST_URL, get_json=True
         )
         if json_data:
-            lavalink_servers.extend(await self._lavalist_fetch(json_data))
+            await self._lavalist_fetch(json_data)
 
-        # Use as a last resort
-        if not lavalink_servers:
-            lavalink_servers = [
-                self._return_node(
-                    "lavalink.kexoservers.online", "443", "kexobot", secure=True
-                )
-            ]
-
-        return lavalink_servers
+        if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
+            await self._bot.bot_config.update_one(
+                DB_CACHE, {"$set": {"lavalink_servers": self._cached_lavalink_servers}}
+            )
+            self._cached_lavalink_servers_copy = copy.deepcopy(
+                self._cached_lavalink_servers
+            )
 
     async def _lavalist_fetch(self, json_data: list) -> list[wavelink.Node]:
-        lavalink_servers = []
-
         for server in json_data:
-            if (
-                server["host"] in self._offline_lavalink_servers
-                or server["host"] in self._repeated_hostnames
-                or server["host"] in UNWANTED_LAVALINK_SERVERS
-            ):
-                continue
-
             if server.get("version") != "v4":
                 continue
 
-            node: wavelink.Node = self._return_node(
-                server["host"],
-                server["port"],
-                server["password"],
-                server["secure"],
-            )
-            lavalink_servers.append(node)
+            for cached_server in self._cached_lavalink_servers_copy:
+                if server["host"] in cached_server:
+                    continue
 
-        return lavalink_servers
+                self._cached_lavalink_servers[
+                    self._get_full_node_url(
+                        server["host"], server["port"], server.get("secure", False)
+                    )
+                ] = {"password": server["password"], "score": 0}
 
     async def _lavainfo_github_fetch(self, json_data: list) -> list[wavelink.Node]:
-        lavalink_servers = []
         for server in json_data:
-            if (
-                server["host"] in self._offline_lavalink_servers
-                or server["host"] in UNWANTED_LAVALINK_SERVERS
-            ):
-                continue
-
             if server["restVersion"] != "v4":
                 continue
 
-            node: wavelink.Node = self._return_node(
-                server["host"],
-                server["port"],
-                server["password"],
-                server["secure"],
-            )
-            lavalink_servers.append(node)
-            self._repeated_hostnames.append(server["host"])
+            for cached_server in self._cached_lavalink_servers_copy:
+                if server["host"] in cached_server:
+                    continue
 
-        return lavalink_servers
+                self._cached_lavalink_servers[
+                    self._get_full_node_url(
+                        server["host"], server["port"], server.get("secure", False)
+                    )
+                ] = {"password": server["password"], "score": 0}
 
     @staticmethod
-    def _return_node(
-        host: str, port: int, password: str, secure: bool = False
-    ) -> wavelink.Node:
-        return wavelink.Node(
-            uri=f"{'https://' if secure else 'http://'}{host}:{port}",
-            password=password,
-            retries=1,
-            inactive_player_timeout=600,
-        )
+    def _get_full_node_url(host: str, port: int, secure: bool = False) -> dict:
+        """Helper method to get the full node URI."""
+        return f"{'https://' if secure else 'http://'}{host}:{port}"

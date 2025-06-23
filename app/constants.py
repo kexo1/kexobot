@@ -28,6 +28,8 @@ ESUTAZE_CHANNEL = 1302271245919981638
 GAME_UPDATES_CHANNEL = 882185054174994462
 FREE_STUFF_CHANNEL = 1081883673902714953
 ALIENWARE_ARENA_NEWS_CHANNEL = 1368937624496115853
+# -------------------- User IDs -------------------- #
+USER_KEXO = 402221830930432000
 
 # -------------------- Icons -------------------- #
 YOUTUBE_ICON = "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
@@ -244,15 +246,6 @@ LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
 LAVAINFO_GITHUB_URL = (
     "https://raw.githubusercontent.com/appujet/lavalink-list/refs/heads/main/nodes.json"
 )
-UNWANTED_LAVALINK_SERVERS = [
-    "lava-v4.ajieblogs.eu.org",
-    "lava.inzeworld.com",
-    "lavalink.jirayu.net",
-    "69.30.219.179",
-    "lavahatry4.techbyte.host",
-    "ipv4.digitalocean-sg.anantix.network",
-    "lavalink.devxcode.in",
-]
 
 SOURCE_PATTERNS = [
     # YouTube Music (music.youtube.com URLs)

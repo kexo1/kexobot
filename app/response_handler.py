@@ -152,6 +152,11 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         " skipping shitpost.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
+    "NOT_OWNER": discord.Embed(
+        title="",
+        description=":x: Only bot owner can use this command.",
+        color=discord.Color.from_rgb(r=220, g=0, b=0),
+    ),
     "REDDIT_REQUEST_ERROR": discord.Embed(
         title="",
         description=":x: Reddit didn't respond, try again in a minute.\nWhat could cause "

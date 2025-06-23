@@ -319,21 +319,18 @@ def has_pfp(member: discord.Member) -> str:
     return DISCORD_ICON
 
 
-# I don't know if passing callable is the best way to do this, yet since connect_node is a
-# method of KexoBot, I don't see another way to do it
 async def switch_node(
-    connect_node: Callable[[], wavelink.Node],
+    bot: discord.Bot,
     player: wavelink.Player,
     play_after: bool = True,
-    offline_node: str = None,
 ) -> Optional[wavelink.Node]:
     """
     Attempt to switch to a new node for audio playback.
 
     Parameters:
     ----------
-    connect_node: Callable[[], wavelink.Node]
-        A callable that returns a new wavelink.Node instance.
+    bot: :class:`discord.Bot`
+        The discord bot instance.
     player: :class:`wavelink.Player`
         The wavelink Player instance to switch the node for.
     play_after: bool
@@ -344,15 +341,17 @@ async def switch_node(
     :class:`wavelink.Node` | None
         The new wavelink.Node instance if successful, None otherwise.
     """
+    bot.cached_lavalink_servers[player.node.uri]["score"] = 0
     for i in range(5):
         try:
             player_autoplay_mode = player.autoplay
             player.autoplay = wavelink.AutoPlayMode.disabled
 
-            node: wavelink.Node = await connect_node(player.guild.id, offline_node)
+            node: wavelink.Node = await bot.connect_node(player.guild.id)
             await player.switch_node(node)
 
-            # When populated queue is on, the player can put random song and skip currently playing song
+            # When populated queue is on, the player can put random song
+            # and skip currently playing song
             if not play_after and player_autoplay_mode == wavelink.AutoPlayMode.enabled:
                 try:
                     del player.queue[0]
@@ -376,7 +375,7 @@ async def switch_node(
             wavelink.InvalidNodeException,
             RuntimeError,
         ):
-            pass
+            bot.cached_lavalink_servers[node.uri]["score"] = 0
 
     embed = discord.Embed(
         title="",

@@ -1,22 +1,20 @@
 import asyncio
+import copy
 import socket
 from datetime import datetime
 from typing import Optional
-from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
+from itertools import islice
 
 import aiohttp
 import asyncpraw
 import asyncpraw.models
 import asyncprawcore.exceptions
 import discord
-import dns.resolver
-
-dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
-dns.resolver.default_resolver.nameservers = ["1.1.1.1"]
 
 import httpx
 import wavelink
+
 from discord.ext import tasks, commands
 from fake_useragent import UserAgent
 from pymongo import AsyncMongoClient
@@ -42,7 +40,6 @@ from app.constants import (
     FREE_STUFF_CHANNEL,
     ALIENWARE_ARENA_NEWS_CHANNEL,
     HUMOR_API_SECRET,
-    KEXO_SERVER,
     LOCAL_MACHINE_NAME,
     REDDIT_ICON,
     WORDNIK_API_KEY,
@@ -70,9 +67,7 @@ class KexoBot:
     """
 
     def __init__(self):
-        self.lavalink_servers: list[wavelink.Node] = []
         self.session = None | httpx.AsyncClient
-
         self._user_kexo = None | discord.User
         self._subreddit_cache = None | dict
         self._hostname = socket.gethostname()
@@ -107,6 +102,7 @@ class KexoBot:
         bot.temp_user_data = {}
         bot.guild_data = {}
         bot.temp_guild_data = {}
+        bot.cached_lavalink_servers = []
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
         bot.guild_data_db = self._guild_data_db
@@ -127,6 +123,7 @@ class KexoBot:
         await self._fetch_users()
         await self._fetch_channels()
         await self._fetch_subreddit_icons()
+        await self._fetch_cached_lavalink_servers()
         self._load_humor_api_tokens()
         self._create_session()
         self._define_classes()
@@ -140,6 +137,12 @@ class KexoBot:
             ALIENWARE_ARENA_NEWS_CHANNEL
         )
         print("Channels fetched.")
+
+    async def _fetch_cached_lavalink_servers(self) -> None:
+        """Fetch cached lavalink servers for the bot."""
+        cached_lavalink_servers = await self._bot_config.find_one(DB_CACHE)
+        bot.cached_lavalink_servers = cached_lavalink_servers["lavalink_servers"]
+        print("Cached lavalink servers fetched.")
 
     async def _fetch_subreddit_icons(self) -> None:
         """Fetch subreddit icons for the bot."""
@@ -171,7 +174,7 @@ class KexoBot:
             SFDServers, self._bot_config, self.session
         )
         self._lavalink_server_manager = self._initialize_class(
-            LavalinkServerManager, self.session, self._offline_lavalink_servers
+            LavalinkServerManager, bot, self.session
         )
 
     async def main_loop(self) -> None:
@@ -231,18 +234,17 @@ class KexoBot:
 
         if now.hour == 0:
             self._load_humor_api_tokens()
+            await self._upload_cached_lavalink_servers()
+            await self._lavalink_server_manager.fetch_lavalink_servers()
 
         if now.hour == 4:
             await self.wordnik_presence()
 
-        self.lavalink_servers = (
-            await self._lavalink_server_manager.get_lavalink_servers()
-        )
         await self._content_monitor.power_outages()
         await self._content_monitor.contests()
 
     async def connect_node(
-        self, guild_id: int = KEXO_SERVER, offline_node: str = None
+        self, guild_id: int | None = None
     ) -> Optional[wavelink.Node]:
         """Connect to lavalink node.
 
@@ -254,87 +256,67 @@ class KexoBot:
         ----------
         guild_id: int
             The guild ID to connect to.
-        offline_node: str
-            The node to remove from the list of nodes.
-
         Returns
         -------
         Optional[wavelink.Node]
             The lavalink that was connected to.
         """
-        if not self.lavalink_servers:
-            # If somehow all nodes are offline, reset the list of offline nodes
-            self._offline_lavalink_servers = []
-            self.lavalink_servers = (
-                await self._lavalink_server_manager.get_lavalink_servers()
-            )
-            if not self.lavalink_servers:
-                print("No lavalink servers found.")
-                return None
 
-        if len(self.lavalink_servers) == 1:
-            return self.lavalink_servers[0]
+        # If user requested to recconect node, we will try to
+        # connect to the next node based on the guild ID.
+        if guild_id:
+            for _ in range(len(bot.cached_lavalink_servers)):
+                uri, info = await self.get_guild_node(guild_id)
+                node = self._return_node(uri, info["password"])
+                is_connected = await self._check_node_status(node)
+                if is_connected:
+                    return node
 
-        if offline_node:
-            self._remove_node(offline_node)
+        cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
+        node = None
+        is_connected = False
 
-        # Use a while loop to safely iterate while removing elements
-        while self.lavalink_servers:
-            node: wavelink.Node = await self.get_node(guild_id)
-            if not node:
-                return None
+        # Try all nodes with score > 0 in descending order
+        quality_nodes = sorted(
+            [
+                (uri, info)
+                for uri, info in bot.cached_lavalink_servers.items()
+                if info["score"] > 0
+            ],
+            key=lambda x: x[1]["score"],
+            reverse=True,
+        )
+        for uri, info in quality_nodes:
+            node = self._return_node(uri, info["password"])
+            is_connected = await self._check_node_status(node)
+            if is_connected:
+                break
 
-            try:
-                await asyncio.wait_for(
-                    wavelink.Pool.connect(nodes=[node], client=bot), timeout=2
-                )
-                # Some fucking nodes secretly don't respond,
-                # I've played these games before!!!
-                await node.fetch_info()
+        # If not connected, try all nodes with score == 0
+        if not is_connected:
+            for uri, info in bot.cached_lavalink_servers.items():
+                if info["score"] == 0:
+                    node = self._return_node(uri, info["password"])
+                    is_connected = await self._check_node_status(node)
+                    if is_connected:
+                        break
 
-            except asyncio.TimeoutError:
-                print(f"Node timed out. ({node.uri})")
-                self._remove_node(node.uri)
-                continue
-            except (
-                wavelink.exceptions.LavalinkException,
-                wavelink.exceptions.NodeException,
-                aiohttp.client_exceptions.ServerDisconnectedError,
-                aiohttp.client_exceptions.ClientConnectorError,
-                ConnectionRefusedError,
-                AttributeError,
-            ):
-                print(f"Node failed to connect. ({node.uri})")
-                self._remove_node(node.uri)
-                continue
+        # If still not connected, try all nodes (maybe one came online)
+        if not is_connected:
+            for uri, info in bot.cached_lavalink_servers.items():
+                node = self._return_node(uri, info["password"])
+                is_connected = await self._check_node_status(node)
+                if is_connected:
+                    break
 
-            bot.node = node
-            return node
-        return None
+        if cached_lavalink_servers_copy != bot.cached_lavalink_servers:
+            await self._upload_cached_lavalink_servers()
 
-    async def get_node(self, guild_id: int) -> wavelink.Node:
-        """Get the next lavalink node, cycling is guild based.
+        if not is_connected:
+            print("No lavalink servers available.")
+            node = None
 
-        Parameters
-        ----------
-        guild_id: int
-            The guild ID to get the node for.
-
-        Returns
-        -------
-        wavelink.Node
-            The lavalink node to use.
-        """
-        _, temp_guild_data = await get_guild_data(bot, guild_id)
-        lavalink_server_pos = temp_guild_data["lavalink_server_pos"]
-
-        lavalink_server_pos += 1
-        if lavalink_server_pos >= len(self.lavalink_servers):
-            lavalink_server_pos = 0
-
-        temp_guild_data["lavalink_server_pos"] = lavalink_server_pos
-        bot.temp_guild_data[guild_id] = temp_guild_data
-        node: wavelink.Node = self.lavalink_servers[lavalink_server_pos]
+        bot.node = node
         return node
 
     async def wordnik_presence(self) -> None:
@@ -391,26 +373,81 @@ class KexoBot:
         self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
-    def _remove_node(self, node_uri: str) -> str:
-        """Remove a lavalink node from the list of nodes.
+    @staticmethod
+    async def get_guild_node(guild_id: int) -> dict:
+        """Get the next lavalink node, cycling is guild based.
 
         Parameters
         ----------
-        node_uri: str
-            The uri of the node to remove.
+        guild_id: int
+            The guild ID to get the node for.
 
         Returns
         -------
-        str
-            The uri of the node that was removed.
+        dict
+            The lavalink node to use.
         """
-        for node in self.lavalink_servers:
-            if node.uri == node_uri:
-                self.lavalink_servers.remove(node)
-                break
+        _, temp_guild_data = await get_guild_data(bot, guild_id)
+        lavalink_server_pos = temp_guild_data["lavalink_server_pos"]
 
-        self._offline_lavalink_servers.append(urlparse(node_uri).hostname)
-        return node_uri
+        lavalink_server_pos += 1
+        if lavalink_server_pos >= len(bot.cached_lavalink_servers):
+            lavalink_server_pos = 0
+
+        temp_guild_data["lavalink_server_pos"] = lavalink_server_pos
+        bot.temp_guild_data[guild_id] = temp_guild_data
+        return next(
+            islice(
+                bot.cached_lavalink_servers.items(),
+                lavalink_server_pos,
+                lavalink_server_pos + 1,
+            )
+        )
+
+    @staticmethod
+    async def _check_node_status(node: wavelink.Node) -> bool:
+        """Check the status of a lavalink node.
+        This function will try to connect to the lavalink node
+
+        Parameters
+        ----------
+        node: wavelink.Node
+            The lavalink node to check the status of.
+        Returns
+        -------
+        bool
+            True if the node is connected, False otherwise.
+        """
+        try:
+            await asyncio.wait_for(
+                wavelink.Pool.connect(nodes=[node], client=bot), timeout=2
+            )
+            # Some fucking nodes secretly don't respond,
+            # I've played these games before!!!
+            await node.fetch_info()
+            if bot.cached_lavalink_servers[node.uri]["score"] == -1:
+                bot.cached_lavalink_servers[node.uri]["score"] = 0
+            return True
+        except (
+            asyncio.TimeoutError,
+            wavelink.exceptions.LavalinkException,
+            wavelink.exceptions.NodeException,
+            aiohttp.client_exceptions.ServerDisconnectedError,
+            aiohttp.client_exceptions.ClientConnectorError,
+            ConnectionRefusedError,
+            AttributeError,
+        ):
+            print(f"Node failed to connect: ({node.uri})")
+            bot.cached_lavalink_servers[node.uri]["score"] = -1
+        return False
+
+    @staticmethod
+    async def _upload_cached_lavalink_servers() -> None:
+        """Upload cached lavalink servers to the database."""
+        await bot.bot_config.update_one(
+            DB_CACHE, {"$set": {"lavalink_servers": bot.cached_lavalink_servers}}
+        )
+        print("Cached lavalink servers uploaded.")
 
     @staticmethod
     def _load_humor_api_tokens() -> None:
@@ -476,11 +513,12 @@ class KexoBot:
             ]
         )
 
-    def get_avaiable_nodes(self) -> int:
+    @staticmethod
+    def get_avaiable_nodes() -> int:
         """Get the number of available lavalink nodes,
         returns ``int`` of available nodes.
         """
-        return len(self.lavalink_servers)
+        return len(bot.cached_lavalink_servers)
 
     @staticmethod
     def _clear_temp_reddit_data() -> None:
@@ -511,6 +549,15 @@ class KexoBot:
         bot.loaded_jokes = []
         bot.loaded_dad_jokes = []
         bot.loaded_yo_mama_jokes = []
+
+    @staticmethod
+    def _return_node(uri: str, password: str) -> wavelink.Node:
+        return wavelink.Node(
+            uri=uri,
+            password=password,
+            retries=1,
+            inactive_player_timeout=600,
+        )
 
 
 kexobot = KexoBot()
@@ -581,8 +628,6 @@ async def bot_loader(main: KexoBot) -> None:
     main_loop_task.start()
     hourly_loop_task.start()
 
-    while not main.lavalink_servers:
-        await asyncio.sleep(1)
     await main.connect_node()
 
     while not main.session:
@@ -682,14 +727,6 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
 
 @bot.event
 async def on_guild_join(guild: discord.Guild) -> None:
-    """Event that runs when the bot joins a new guild.
-    This event is responsible for creating the guild data in the database.
-
-    Parameters
-    ----------
-    guild: :class:`discord.Guild`
-        The guild that the bot joined.
-    """
     print(f"Joined new guild: {guild.name}")
 
 

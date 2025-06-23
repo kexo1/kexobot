@@ -24,6 +24,7 @@ from app.constants import (
     JOKE_EXCLUDED_WORDS,
     KEXO_SERVER,
     SISKA_GANG_SERVER,
+    USER_KEXO,
 )
 from app.response_handler import send_response
 from app.utils import (
@@ -239,12 +240,16 @@ class FunCommands(commands.Cog):
         else:
             await ctx.respond(member.mention + " " + joke)
 
-    @slash_command(name="spam", description="Spams words, max is 50.  (Admin)")
-    @discord.default_permissions(administrator=True)
-    @commands.cooldown(1, 50, commands.BucketType.user)
+    @slash_command(name="spam", description="Spams words, max is 50.  (Bot owner only)")
+    @option("word", description="Word to spam.")
     @option("integer", description="Max is 50.", min_value=1, max_value=50)
+    @option("channel_id", description="Channel to spam in.")
     async def spam(
-        self, ctx: discord.ApplicationContext, word: str, integer: int
+        self,
+        ctx: discord.ApplicationContext,
+        word: str,
+        integer: int,
+        channel_id: str = None,
     ) -> None:
         """This command spams a word a specified number of times.
 
@@ -256,7 +261,29 @@ class FunCommands(commands.Cog):
             The word to spam.
         integer: int
             The number of times to spam the word.
+        channel_id: str, optional
         """
+
+        if ctx.author.id != USER_KEXO:
+            await send_response(ctx, "NOT_OWNER")
+            return
+
+        try:
+            if channel_id and channel_id.isdigit():
+                channel = await self._bot.fetch_channel(channel_id)
+                if not channel or not isinstance(channel, discord.TextChannel):
+                    await ctx.respond("Invalid channel ID.")
+                    return
+
+                await ctx.respond(f"Spamming in `{word}` in <#{channel_id}>")
+                for _ in range(integer):
+                    await channel.send(word)
+                return
+
+        except discord.NotFound:
+            await ctx.respond("Invalid channel ID.")
+            return
+
         await ctx.respond(word)
         for _ in range(integer - 1):
             await ctx.send(word)

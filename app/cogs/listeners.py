@@ -135,9 +135,8 @@ class Listeners(commands.Cog):
             severity=payload.exception["severity"],
         )
         await switch_node(
-            connect_node=self._bot.connect_node,
+            bot=self._bot,
             player=payload.player,
-            offline_node=payload.player.node.uri,
         )
         payload.player.should_respond = False
 
@@ -155,10 +154,9 @@ class Listeners(commands.Cog):
         print(f"Track got stuck. ({payload.player.node.uri})")
         await send_response(payload.player.text_channel, "TRACK_STUCK", respond=False)
         await switch_node(
-            connect_node=self._bot.connect_node,
+            bot=self._bot,
             player=payload.player,
             play_after=False,
-            offline_node=payload.player.node.uri,
         )
         payload.player.should_respond = False
 

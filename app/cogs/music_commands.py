@@ -274,9 +274,9 @@ class MusicCommands(commands.Cog):
         try:
             await player.skip()
         except LavalinkLoadException:
-            await switch_node(self._bot.connect_node, player=player, play_after=False)
+            await switch_node(bot=self._bot, player=player, play_after=False)
 
-        player.should_respond = False
+        player.should_respond = player.queue.is_empty
         await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
 
     @music.command(name="skip-to", description="Skips to selected song in queue.")
@@ -335,7 +335,7 @@ class MusicCommands(commands.Cog):
         try:
             await player.pause(True)
         except LavalinkLoadException:
-            await switch_node(self._bot.connect_node, player=player, play_after=False)
+            await switch_node(bot=self._bot, player=player, play_after=False)
         await send_response(ctx, "TRACK_PAUSED", ephemeral=False, delete_after=10)
 
     @music.command(name="resume", description="Resumes paused song.")
@@ -353,7 +353,7 @@ class MusicCommands(commands.Cog):
         try:
             await player.pause(False)
         except LavalinkLoadException:
-            await switch_node(self._bot.connect_node, player=player)
+            await switch_node(bot=self._bot, player=player)
         await send_response(ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10)
 
     @music.command(name="leave", description="Leaves voice channel.")
@@ -578,9 +578,7 @@ class MusicCommands(commands.Cog):
                 last_error = "NODE_UNRESPONSIVE"
 
             if last_error:
-                await switch_node(
-                    self._bot.connect_node, player=player, play_after=False
-                )
+                await switch_node(bot=self._bot, player=player, play_after=False)
 
             # Fallback to default search
             source = "ytsearch"
@@ -668,8 +666,9 @@ class MusicCommands(commands.Cog):
             await send_response(
                 ctx, "NODE_REQUEST_ERROR", ephemeral=False, error=e.error
             )
-            await switch_node(self._bot.connect_node, player=player)
+            await switch_node(bot=self._bot, player=player)
 
+        self._bot.cached_lavalink_servers[player.node.uri]["score"] += 1
         return True
 
     async def _prepare_wavelink(self, ctx: discord.ApplicationContext) -> None:
