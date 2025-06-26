@@ -2,23 +2,21 @@ import asyncio
 import copy
 import socket
 from datetime import datetime
+from itertools import islice
 from typing import Optional
 from zoneinfo import ZoneInfo
-from itertools import islice
 
 import aiohttp
 import asyncpraw
 import asyncpraw.models
 import asyncprawcore.exceptions
 import discord
-
 import httpx
 import wavelink
-
 from discord.ext import tasks, commands
 from fake_useragent import UserAgent
-from pymongo import AsyncMongoClient
 from pycord.multicog import Bot
+from pymongo import AsyncMongoClient
 from wavelink.enums import NodeStatus
 
 from app.classes.content_monitor import ContentMonitor
@@ -307,6 +305,8 @@ class KexoBot:
                 node = self._return_node(uri, info["password"])
                 is_connected = await self._check_node_status(node)
                 if is_connected:
+                    if bot.cached_lavalink_servers[node.uri]["score"] == -1:
+                        bot.cached_lavalink_servers[node.uri]["score"] = 0
                     break
 
         if cached_lavalink_servers_copy != bot.cached_lavalink_servers:
@@ -425,8 +425,6 @@ class KexoBot:
             # Some fucking nodes secretly don't respond,
             # I've played these games before!!!
             await node.fetch_info()
-            if bot.cached_lavalink_servers[node.uri]["score"] == -1:
-                bot.cached_lavalink_servers[node.uri]["score"] = 0
             return True
         except (
             asyncio.TimeoutError,
@@ -447,7 +445,6 @@ class KexoBot:
         await bot.bot_config.update_one(
             DB_CACHE, {"$set": {"lavalink_servers": bot.cached_lavalink_servers}}
         )
-        print("Cached lavalink servers uploaded.")
 
     @staticmethod
     def _load_humor_api_tokens() -> None:

@@ -645,7 +645,7 @@ class MusicCommands(commands.Cog):
             await send_response(
                 ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
             )
-            await self._bot.connect_node(offline_node=self._bot.node.uri)
+            await self._bot.connect_node()
 
             if not ctx.voice_client:
                 await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
@@ -684,7 +684,12 @@ class MusicCommands(commands.Cog):
         player.is_troll = False
 
         guild_data, _ = await get_guild_data(self._bot, ctx.guild_id)
-        await player.set_volume(guild_data["music"]["volume"])
+        for _ in range(5):
+            try:
+                await player.set_volume(guild_data["music"]["volume"])
+                break
+            except wavelink.exceptions.LavalinkException:
+                await switch_node(bot=self._bot, player=player, play_after=False)
 
         if guild_data["music"]["autoplay_mode"] == 1:
             player.autoplay = wavelink.AutoPlayMode.partial

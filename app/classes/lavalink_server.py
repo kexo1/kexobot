@@ -44,14 +44,14 @@ class LavalinkServerManager:
             self._session, LAVAINFO_GITHUB_URL, get_json=True
         )
         if json_data:
-            await self._lavainfo_github_fetch(json_data)
+            self._parse_lavalink_servers(json_data, "lavainfo")
 
         # Lavalist
         json_data: list = await make_http_request(
             self._session, LAVALIST_URL, get_json=True
         )
         if json_data:
-            await self._lavalist_fetch(json_data)
+            self._parse_lavalink_servers(json_data, "lavalist")
 
         if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
             await self._bot.bot_config.update_one(
@@ -60,25 +60,15 @@ class LavalinkServerManager:
             self._cached_lavalink_servers_copy = copy.deepcopy(
                 self._cached_lavalink_servers
             )
+            print("Found new lavalink servers, updating cache.")
 
-    async def _lavalist_fetch(self, json_data: list) -> list[wavelink.Node]:
+    def _parse_lavalink_servers(
+        self, json_data: list, site: str
+    ) -> list[wavelink.Node]:
         for server in json_data:
-            if server.get("version") != "v4":
+            if site == "lavalist" and server.get("version") != "v4":
                 continue
-
-            for cached_server in self._cached_lavalink_servers_copy:
-                if server["host"] in cached_server:
-                    continue
-
-                self._cached_lavalink_servers[
-                    self._get_full_node_url(
-                        server["host"], server["port"], server.get("secure", False)
-                    )
-                ] = {"password": server["password"], "score": 0}
-
-    async def _lavainfo_github_fetch(self, json_data: list) -> list[wavelink.Node]:
-        for server in json_data:
-            if server["restVersion"] != "v4":
+            if site == "lavainfo" and server.get("restVersion") != "v4":
                 continue
 
             for cached_server in self._cached_lavalink_servers_copy:

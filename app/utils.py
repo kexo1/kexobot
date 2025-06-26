@@ -341,7 +341,7 @@ async def switch_node(
     :class:`wavelink.Node` | None
         The new wavelink.Node instance if successful, None otherwise.
     """
-    bot.cached_lavalink_servers[player.node.uri]["score"] = 0
+    bot.cached_lavalink_servers[player.node.uri]["score"] = -1
     for i in range(5):
         try:
             player_autoplay_mode = player.autoplay
