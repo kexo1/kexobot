@@ -357,8 +357,11 @@ class ContentMonitor:
     ) -> None:
         soup = BeautifulSoup(response.text, "html.parser")
         news_widget = soup.find("div", class_="widget-table announcements-table")
-        alienware_arena_news_cache_copy = alienware_arena_news_cache.copy()
+        if not news_widget:
+            print("Alienware Arena: News widget not found")
+            return
 
+        alienware_arena_news_cache_copy = alienware_arena_news_cache.copy()
         for post in news_widget.find_all("div", class_="widget-table-row"):
             post_info = post.find("a", class_="link relay-announcement-wrap")
             url = post_info["href"]

@@ -71,15 +71,12 @@ class LavalinkServerManager:
             if site == "lavainfo" and server.get("restVersion") != "v4":
                 continue
 
-            for cached_server in self._cached_lavalink_servers_copy:
-                if server["host"] in cached_server:
-                    continue
+            uri = self._get_full_node_url(server["host"], server["port"], server.get("secure", False))
+            if uri in self._cached_lavalink_servers_copy:
+                print(f"Skipping server {uri}, already cached.")
+                continue
 
-                self._cached_lavalink_servers[
-                    self._get_full_node_url(
-                        server["host"], server["port"], server.get("secure", False)
-                    )
-                ] = {"password": server["password"], "score": 0}
+            self._cached_lavalink_servers[uri] = {"password": server["password"], "score": 0}
 
     @staticmethod
     def _get_full_node_url(host: str, port: int, secure: bool = False) -> dict:
