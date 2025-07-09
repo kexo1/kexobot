@@ -179,7 +179,7 @@ class CommandCog(commands.Cog):
         try:
             node_info: wavelink.InfoResponsePayload = await node.fetch_info()
         except RuntimeError:
-            await send_response(ctx, "NO_NODES")
+            await send_response(ctx, "NO_NODE_INFO")
             return
 
         embed = discord.Embed(
@@ -214,7 +214,12 @@ class CommandCog(commands.Cog):
             The context of the command invocation.
         """
         node: wavelink.Node = self._bot.node
-        node_info: wavelink.InfoResponsePayload = await node.fetch_info()
+
+        try:
+            node_info: wavelink.InfoResponsePayload = await node.fetch_info()
+        except RuntimeError:
+            await send_response(ctx, "NO_NODE_INFO")
+            return
 
         plugins: wavelink.PluginResponsePayload = node_info.plugins
         youtube_plugin, lavasrc_plugin = False, False

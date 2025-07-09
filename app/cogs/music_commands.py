@@ -91,6 +91,7 @@ class MusicCommands(commands.Cog):
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
             if not joined:
+                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] = -1
                 return
             await self._prepare_wavelink(ctx)
 
@@ -641,6 +642,7 @@ class MusicCommands(commands.Cog):
             # For some reason there's like a tiny chance the fucking node suddenly stops
             # responding, even though it was working minutes before, seems like some nodes
             # actively disconnect players if they are not used for a while
+            self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] = -1
             print(f"Node join timeout. ({self._bot.node.uri})")
             await send_response(
                 ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
@@ -648,6 +650,7 @@ class MusicCommands(commands.Cog):
             await self._bot.connect_node()
 
             if not ctx.voice_client:
+                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] = -1
                 await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
                 return False
         return True

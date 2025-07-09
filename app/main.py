@@ -70,7 +70,8 @@ class KexoBot:
         self._subreddit_cache = None | dict
         self._hostname = socket.gethostname()
         self._main_loop_counter = 0
-        self._offline_lavalink_servers: list[str] = []
+        self.cached_lavalink_servers_copy = None | dict
+        self.subreddit_icons_copy = None | dict
 
         database = AsyncMongoClient(MONGO_DB_URL)["KexoBOTDatabase"]
         self._bot_config = database["BotConfig"]
@@ -140,12 +141,14 @@ class KexoBot:
         """Fetch cached lavalink servers for the bot."""
         cached_lavalink_servers = await self._bot_config.find_one(DB_CACHE)
         bot.cached_lavalink_servers = cached_lavalink_servers["lavalink_servers"]
+        self.cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
         print("Cached lavalink servers fetched.")
 
     async def _fetch_subreddit_icons(self) -> None:
         """Fetch subreddit icons for the bot."""
         subreddit_icons = await self._bot_config.find_one(DB_CACHE)
         bot.subreddit_icons = subreddit_icons["subreddit_icons"]
+        self.subreddit_icons_copy = copy.deepcopy(bot.subreddit_icons)
         print("Subreddit icons fetched.")
 
     def _define_classes(self) -> None:
@@ -233,7 +236,7 @@ class KexoBot:
         if now.hour == 0:
             self._load_humor_api_tokens()
             await self._upload_cached_lavalink_servers()
-            await self._lavalink_server_manager.fetch_lavalink_servers()
+            await self._lavalink_server_manager.fetch()
 
         if now.hour == 4:
             await self.wordnik_presence()
@@ -270,7 +273,6 @@ class KexoBot:
                 if is_connected:
                     return node
 
-        cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
         node = None
         is_connected = False
 
@@ -309,8 +311,7 @@ class KexoBot:
                         bot.cached_lavalink_servers[node.uri]["score"] = 0
                     break
 
-        if cached_lavalink_servers_copy != bot.cached_lavalink_servers:
-            await self._upload_cached_lavalink_servers()
+        await self._upload_cached_lavalink_servers()
 
         if not is_connected:
             print("No lavalink servers available.")
@@ -357,6 +358,9 @@ class KexoBot:
                 continue
             subreddit_icons[subreddit.display_name] = subreddit.icon_img
 
+        if self.subreddit_icons_copy == subreddit_icons:
+            return
+
         print("Subreddit icons refreshed.")
         await self._bot_config.update_one(
             DB_CACHE, {"$set": {"subreddit_icons": subreddit_icons}}
@@ -372,6 +376,16 @@ class KexoBot:
         self.session = httpx.AsyncClient()
         self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
+
+    async def _upload_cached_lavalink_servers(self) -> None:
+        """Upload cached lavalink servers to the database."""
+        if self.cached_lavalink_servers_copy == bot.cached_lavalink_servers:
+            return
+
+        await bot.bot_config.update_one(
+            DB_CACHE, {"$set": {"lavalink_servers": bot.cached_lavalink_servers}}
+        )
+        self.cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
 
     @staticmethod
     async def get_guild_node(guild_id: int) -> dict:
@@ -438,13 +452,6 @@ class KexoBot:
             print(f"Node failed to connect: ({node.uri})")
             bot.cached_lavalink_servers[node.uri]["score"] = -1
         return False
-
-    @staticmethod
-    async def _upload_cached_lavalink_servers() -> None:
-        """Upload cached lavalink servers to the database."""
-        await bot.bot_config.update_one(
-            DB_CACHE, {"$set": {"lavalink_servers": bot.cached_lavalink_servers}}
-        )
 
     @staticmethod
     def _load_humor_api_tokens() -> None:

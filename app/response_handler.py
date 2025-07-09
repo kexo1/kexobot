@@ -48,6 +48,11 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         "To fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
+    "NO_NODE_INFO": discord.Embed(
+        title="",
+        description=":x: Failed to get node info.",
+        color=discord.Color.from_rgb(r=220, g=0, b=0),
+    ),
     "NO_NODES_CONNECTED": discord.Embed(
         title="",
         description=":x: No nodes are connected.",
