@@ -148,7 +148,10 @@ ALIENWAREARENA_STRIP = ("Key", "Giveaway", "Steam Game")
 
 # -------------------- Fanatical Configuration -------------------- #
 FANATICAL_MAX_POSTS = 3
-FANATICAL_URL = "https://www.fanatical.com/api/all-promotions/en"
+FANATICAL_API_URL = "https://www.fanatical.com/api/all-promotions/en"
+FANATICAL_API_MEGAMENU_URL = (
+    "https://www.fanatical.com/api/algolia/megamenu?altRank=false"
+)
 FANATICAL_IMG_URL = "https://cdn-ext.fanatical.com/production/product/1280x720/"
 
 # -------------------- Power Outages Configuration -------------------- #

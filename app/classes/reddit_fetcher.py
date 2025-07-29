@@ -185,6 +185,7 @@ class RedditFetcher:
                 del freegamefindings_cache_upload[0]
                 freegamefindings_cache_upload.append(submission.url)
                 await self._process_submission(submission)
+
         except (AsyncPrawcoreException, RequestException, ResponseException) as e:
             print(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
 

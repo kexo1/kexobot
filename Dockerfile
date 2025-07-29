@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 # ---- Final Stage ----
 # This is the small, final image that will run the application
-FROM python:3.12.9-alpine
+FROM python:3.12.11-alpine
 
 # Create a non-root user for security
 RUN addgroup -g 1001 -S botuser && \

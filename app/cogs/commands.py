@@ -411,6 +411,7 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Game Mode:ㅤㅤ", value=server.game_mode)
         await ctx.respond(embed=embed)
 
+    """
     @slash_sfd.command(
         name="activity",
         description="Shows graph of SFD servers activity.",
@@ -428,6 +429,8 @@ class CommandCog(commands.Cog):
         choices=SFD_TIMEZONE_CHOICE,
     )
     @commands.cooldown(1, 60, commands.BucketType.user)
+    """
+
     async def get_sfd_graph(
         self,
         ctx: discord.ApplicationContext,

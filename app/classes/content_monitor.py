@@ -22,7 +22,8 @@ from app.constants import (
     GAME3RB_URL,
     GAME3RB_ICON,
     FANATICAL_MAX_POSTS,
-    FANATICAL_URL,
+    FANATICAL_API_URL,
+    FANATICAL_API_MEGAMENU_URL,
     FANATICAL_IMG_URL,
     ONLINEFIX_MAX_GAMES,
     ONLINEFIX_URL,
@@ -65,6 +66,7 @@ class ContentMonitor:
         bot_config: AsyncMongoClient,
         session: httpx.AsyncClient,
         game_updates_channel: discord.TextChannel,
+        free_stuff_channel: discord.TextChannel,
         esutaze_channel: discord.TextChannel,
         alienware_arena_news_channel: discord.TextChannel,
         user_kexo: discord.User = None,
@@ -72,6 +74,7 @@ class ContentMonitor:
         self._bot_config = bot_config
         self._session = session
         self._game_updates_channel = game_updates_channel
+        self._free_stuff_channel = free_stuff_channel
         self._esutaze_channel = esutaze_channel
         self._alienware_arena_news_channel = alienware_arena_news_channel
         self._user_kexo = user_kexo
@@ -256,7 +259,9 @@ class ContentMonitor:
     async def fanatical(self) -> None:
         """Checks for free games from Fanatical."""
         fanatical_cache = await self._load_fanatical_cache()
-        json_data = await make_http_request(self._session, FANATICAL_URL, get_json=True)
+        json_data = await make_http_request(
+            self._session, FANATICAL_API_URL, get_json=True
+        )
         if not json_data:
             return
         await self._send_fanatical_embed(json_data, fanatical_cache)
@@ -345,7 +350,7 @@ class ContentMonitor:
                 url=url,
             )
             embed.set_image(url=giveaway["image"])
-            await self._game_updates_channel.send(embed=embed)
+            await self._free_stuff_channel.send(embed=embed)
 
         if alienwarearena_cache != alienwarearena_cache_copy:
             await self._bot_config.update_one(
@@ -401,13 +406,34 @@ class ContentMonitor:
             product_info = giveaway["required_products"][0]
             url = "https://www.fanatical.com/en/game/" + product_info["slug"]
 
+            # Check if product is preorder
+            product_data: dict = await make_http_request(
+                self._session,
+                FANATICAL_API_MEGAMENU_URL,
+                headers={"referer": url},
+                get_json=True,
+            )
+
+            if not product_data:
+                print("Fanatical: Product data not found")
+                continue
+
+            title = product_info["name"]
+            is_preorder = False
+            for unreleased_game in product_data["comingSoon"]:
+                if title in unreleased_game["name"]:
+                    is_preorder = True
+                    break
+
+            if is_preorder:
+                continue
+
             if url in fanatical_cache_copy:
                 break
 
             del fanatical_cache[0]
             fanatical_cache.append(url)
 
-            title = product_info["name"]
             img_url = FANATICAL_IMG_URL + product_info["cover"]
             timestamp = (
                 f"<t:{int(iso_to_timestamp(giveaway['valid_until']).timestamp())}:F>"

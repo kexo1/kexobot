@@ -5,6 +5,9 @@ from typing import Union
 from zoneinfo import ZoneInfo
 
 import httpx
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mplcyberpunk
 from bs4 import BeautifulSoup
@@ -142,6 +145,7 @@ class SFDServers:
         plt.savefig(
             os.path.join(self._graphs_dir, f"sfd_activity_day_{timezone}.png"), dpi=300
         )
+        plt.clf()
         plt.close("all")
 
     async def generate_graph_week(self, timezone: str):
@@ -186,6 +190,7 @@ class SFDServers:
             dpi=300,
             bbox_inches="tight",
         )
+        plt.clf()
         plt.close("all")
 
     async def update_stats(self, now: datetime.datetime) -> None:

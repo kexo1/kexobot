@@ -71,7 +71,6 @@ class KexoBot:
         self._hostname = socket.gethostname()
         self._main_loop_counter = 0
         self.cached_lavalink_servers_copy = None | dict
-        self.subreddit_icons_copy = None | dict
 
         database = AsyncMongoClient(MONGO_DB_URL)["KexoBOTDatabase"]
         self._bot_config = database["BotConfig"]
@@ -148,7 +147,6 @@ class KexoBot:
         """Fetch subreddit icons for the bot."""
         subreddit_icons = await self._bot_config.find_one(DB_CACHE)
         bot.subreddit_icons = subreddit_icons["subreddit_icons"]
-        self.subreddit_icons_copy = copy.deepcopy(bot.subreddit_icons)
         print("Subreddit icons fetched.")
 
     def _define_classes(self) -> None:
@@ -158,6 +156,7 @@ class KexoBot:
             self._bot_config,
             self.session,
             self._channel_game_updates,
+            self._channel_free_stuff,
             self._channel_esutaze,
             self._channel_alienware_arena_news,
             self._user_kexo,
@@ -185,7 +184,7 @@ class KexoBot:
         It runs the classes in a round-robin fashion.
         """
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
-
+        await self._content_monitor.fanatical()
         if self._main_loop_counter == 0:
             self._main_loop_counter = 1
             await self._reddit_fetcher.freegamefindings()
@@ -358,7 +357,7 @@ class KexoBot:
                 continue
             subreddit_icons[subreddit.display_name] = subreddit.icon_img
 
-        if self.subreddit_icons_copy == subreddit_icons:
+        if bot.subreddit_icons == subreddit_icons:
             return
 
         print("Subreddit icons refreshed.")
@@ -446,6 +445,7 @@ class KexoBot:
             wavelink.exceptions.NodeException,
             aiohttp.client_exceptions.ServerDisconnectedError,
             aiohttp.client_exceptions.ClientConnectorError,
+            aiohttp.client_exceptions.ClientConnectionError,
             ConnectionRefusedError,
             AttributeError,
         ):
