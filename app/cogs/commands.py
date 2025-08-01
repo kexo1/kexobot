@@ -619,11 +619,10 @@ class CommandCog(commands.Cog):
                 return None
 
         view = HostView(author=author)
-        await ctx.respond(embed=embed, view=view)
-
-        interaction = await ctx.interaction.original_response()
-        view.message = await ctx.channel.fetch_message(interaction.id)
-        return None
+        response = await ctx.respond(embed=embed, view=view)
+        view.message = await ctx.channel.fetch_message(
+            (await response.original_response()).id
+        )
 
     # -------------------- Discord functions -------------------- #
     @slash_command(name="info", description="Shows bot info.")
@@ -917,19 +916,10 @@ class HostView(discord.ui.View):
         embed = await self._disable_embed()
         await self.message.edit(embed=embed, view=None)
         await self._author.send(
-            f"**You forgot to click button in {self.message.jump_url} you {
-                random.choice(
-                    (
-                        'dumbass',
-                        'retard',
-                        'nitwit',
-                        'prick',
-                        'cunt',
-                        'pillock',
-                        'twat',
-                    )
-                )
-            }.**"
+            f"You forgot to click button in {self.message.jump_url} you {
+                random.choice(('dumbass', 'retard', 'prick', 'cunt', 'shitling'))
+            }."
+            "\nhttps://tenor.com/view/zombie-screaming-gif-12431778992096703656"
         )
         del host_authors[host_authors.index(self._author.name)]
 

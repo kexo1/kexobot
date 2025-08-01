@@ -184,7 +184,7 @@ class KexoBot:
         It runs the classes in a round-robin fashion.
         """
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
-        await self._content_monitor.fanatical()
+
         if self._main_loop_counter == 0:
             self._main_loop_counter = 1
             await self._reddit_fetcher.freegamefindings()

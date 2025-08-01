@@ -153,6 +153,27 @@ FANATICAL_API_MEGAMENU_URL = (
     "https://www.fanatical.com/api/algolia/megamenu?altRank=false"
 )
 FANATICAL_IMG_URL = "https://cdn-ext.fanatical.com/production/product/1280x720/"
+FANATICAL_STRIP = (
+    "Super Deluxe Edition",
+    "Game of the Year Edition",
+    "Platinum Edition",
+    "Premium Edition",
+    "Collector's Edition",
+    "Game of the Year",
+    "Deluxe Edition",
+    "Gold Edition",
+    "Ultimate Edition",
+    "Complete Edition",
+    "Definitive Edition",
+    "Enhanced Edition",
+    "Standard Edition",
+    "Ultimate Edition",
+    "Complete Edition",
+    "Bundle Pack",
+    "Bundle Collection",
+    "Game Bundle",
+    "Bundle",
+)
 
 # -------------------- Power Outages Configuration -------------------- #
 POWER_OUTAGES_MAX_ARTICLES = 5
