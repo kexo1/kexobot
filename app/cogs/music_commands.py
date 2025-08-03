@@ -630,29 +630,46 @@ class MusicCommands(commands.Cog):
         if not ctx.response:
             await ctx.defer()
 
-        try:
-            await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
-        except wavelink.InvalidChannelStateException:
-            await send_response(ctx, "NO_PERMISSIONS")
+        # For some reason there's like a tiny chance the fucking node suddenly stops
+        # responding, even though it was working minutes before, seems like some nodes
+        # actively disconnect players if they are not used for a while
+        is_connected = await self._find_working_node(ctx)
+        if not is_connected:
             return False
-        except wavelink.exceptions.InvalidNodeException:
-            await send_response(ctx, "NO_NODES")
-            return False
-        except wavelink.exceptions.ChannelTimeoutException:
-            # For some reason there's like a tiny chance the fucking node suddenly stops
-            # responding, even though it was working minutes before, seems like some nodes
-            # actively disconnect players if they are not used for a while
-            self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] = -1
-            print(f"Node join timeout. ({self._bot.node.uri})")
-            await send_response(
-                ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
-            )
-            await self._bot.connect_node()
+        return True
 
-            if not ctx.voice_client:
+    async def _find_working_node(self, ctx: discord.ApplicationContext) -> bool:
+        """Retry joining the voice channel if the initial attempt fails.
+        This function will attempt to reconnect to the voice channel up to 5 times"""
+        for _ in range(5):
+            try:
+                await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
+                is_connected = True
+            except wavelink.exceptions.ChannelTimeoutException:
+                print(f"Node join timeout. ({self._bot.node.uri})")
                 self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] = -1
-                await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
-                return False
+                await self._bot.connect_node()
+                is_connected = False
+                if i == 0:
+                    await send_response(
+                        ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
+                    )
+            except wavelink.exceptions.InvalidNodeException:
+                await send_response(ctx, "NO_NODES")
+                is_connected = False
+                break
+            except wavelink.InvalidChannelStateException:
+                await send_response(ctx, "NO_PERMISSIONS")
+                is_connected = False
+                break
+
+            if not is_connected:
+                continue
+            break
+
+        if not is_connected:
+            await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
+            return False
         return True
 
     async def _play_track(

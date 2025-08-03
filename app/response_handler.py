@@ -182,7 +182,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "CANT_PING_ROLE": discord.Embed(
         title="",
         description=":x: I can't ping Exotic role, please check if role exists or"
-        " if I have permission to ping it.",
+        " if I have permission to ping it. If you are using ",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NOT_EMBED_AUTHOR": discord.Embed(

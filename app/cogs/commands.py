@@ -18,7 +18,6 @@ from app.__init__ import __version__
 from app.classes.sfd_servers import SFDServers
 from app.constants import (
     DB_LISTS,
-    XTC_SERVER,
     KEXO_SERVER,
     DB_CHOICES,
     SFD_TIMEZONE_CHOICE,
@@ -468,8 +467,7 @@ class CommandCog(commands.Cog):
     # -------------------- SFD Hosting -------------------- #
     @slash_sfd.command(
         name="host",
-        description="Creates hosting embed, you can also choose some optional info.",
-        guild_ids=[XTC_SERVER, KEXO_SERVER],
+        description="Creates hosting embed, you can also choose some optional info."
     )
     @option("server_name", description="Your server name.")
     @option(
@@ -487,6 +485,11 @@ class CommandCog(commands.Cog):
         ],
     )
     @option(
+        "ping_role",
+        description="Should this embed ping selected role or not, default is None",
+        required=False,
+    )
+    @option(
         "branch",
         description="If you're hosting on stable, beta, redux, default is stable.",
         choices=[
@@ -499,11 +502,6 @@ class CommandCog(commands.Cog):
     @option(
         "version",
         description="Which version are you hosting on.",
-        required=False,
-    )
-    @option(
-        "ping",
-        description="Should this embed ping @Exotic or not, default is True",
         required=False,
     )
     @option("password", description="Server password.", required=False)
@@ -521,13 +519,13 @@ class CommandCog(commands.Cog):
         ctx: discord.ApplicationContext,
         server_name: str,
         duration: str,
+        ping_role: discord.Role,
         branch: str,
         version: str,
         password: str,
         region: str,
         scripts: str,
         slots: int = 8,
-        ping: bool = True,
         image: str = None,
     ) -> None:
         """Method to create a hosting embed for SFD servers.
@@ -555,8 +553,8 @@ class CommandCog(commands.Cog):
             The scripts enabled on the server.
         slots: int
             The number of slots on the server (default is 8).
-        ping: bool
-            Whether to ping the @Exotic role or not (default is True).
+        ping_role: bool
+            Whether to ping role or not (default is None).
         image: str
             The URL of the image to be used in the embed.
         """
@@ -610,10 +608,9 @@ class CommandCog(commands.Cog):
                 await send_response(ctx, "INCORRECT_IMAGE_URL")
                 return None
 
-        if ping:
+        if ping_role:
             try:
-                role = discord.utils.get(ctx.guild.roles, name="Exotic")
-                await ctx.send(role.mention)
+                await ctx.send(ping_role.mention)
             except AttributeError:
                 await send_response(ctx, "CANT_PING_ROLE")
                 return None
@@ -623,6 +620,7 @@ class CommandCog(commands.Cog):
         view.message = await ctx.channel.fetch_message(
             (await response.original_response()).id
         )
+        return None
 
     # -------------------- Discord functions -------------------- #
     @slash_command(name="info", description="Shows bot info.")

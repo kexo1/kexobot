@@ -285,11 +285,12 @@ class KexoBot:
             key=lambda x: x[1]["score"],
             reverse=True,
         )
-        for uri, info in quality_nodes:
-            node = self._return_node(uri, info["password"])
-            is_connected = await self._check_node_status(node)
-            if is_connected:
-                break
+        if quality_nodes:
+            for uri, info in quality_nodes:
+                node = self._return_node(uri, info["password"])
+                is_connected = await self._check_node_status(node)
+                if is_connected:
+                    break
 
         # If not connected, try all nodes with score == 0
         if not is_connected:

@@ -63,14 +63,14 @@ class ContentMonitor:
     """
 
     def __init__(
-            self,
-            bot_config: AsyncMongoClient,
-            session: httpx.AsyncClient,
-            game_updates_channel: discord.TextChannel,
-            free_stuff_channel: discord.TextChannel,
-            esutaze_channel: discord.TextChannel,
-            alienware_arena_news_channel: discord.TextChannel,
-            user_kexo: discord.User = None,
+        self,
+        bot_config: AsyncMongoClient,
+        session: httpx.AsyncClient,
+        game_updates_channel: discord.TextChannel,
+        free_stuff_channel: discord.TextChannel,
+        esutaze_channel: discord.TextChannel,
+        alienware_arena_news_channel: discord.TextChannel,
+        user_kexo: discord.User = None,
     ) -> None:
         self._bot_config = bot_config
         self._session = session
@@ -211,7 +211,7 @@ class ContentMonitor:
                 description.append(f"[Direct link]({direct_url['href']})")
 
             if "Fix already included" in str(
-                    soup
+                soup
             ) or "Crack online already added" in str(soup):
                 description.append("_Fix already included_")
             else:
@@ -317,7 +317,7 @@ class ContentMonitor:
             )
 
     async def _send_alienware_arena_embed(
-            self, json_data: dict, alienwarearena_cache: list, to_filter: list
+        self, json_data: dict, alienwarearena_cache: list, to_filter: list
     ) -> None:
         alienwarearena_cache_copy = alienwarearena_cache.copy()
         for giveaway in json_data["data"][:ALIENWAREARENA_MAX_POSTS]:
@@ -358,7 +358,7 @@ class ContentMonitor:
             )
 
     async def _send_alienware_arena_news_embed(
-            self, response: httpx.Response, alienware_arena_news_cache: list
+        self, response: httpx.Response, alienware_arena_news_cache: list
     ) -> None:
         soup = BeautifulSoup(response.text, "html.parser")
         news_widget = soup.find("div", class_="widget-table announcements-table")
@@ -396,7 +396,7 @@ class ContentMonitor:
             )
 
     async def _send_fanatical_embed(
-            self, json_data: dict, fanatical_cache: list
+        self, json_data: dict, fanatical_cache: list
     ) -> None:
         fanatical_cache_copy = fanatical_cache.copy()
         for giveaway in json_data["freeProducts"][:FANATICAL_MAX_POSTS]:
@@ -495,7 +495,7 @@ class ContentMonitor:
         await self._game_updates_channel.send(embed=embed)
 
     async def _process_onlinefix_messages(
-            self, messages: list, onlinefix_cache: list, games: list
+        self, messages: list, onlinefix_cache: list, games: list
     ) -> None:
         limit = ONLINEFIX_MAX_GAMES
         to_upload = []
@@ -529,7 +529,7 @@ class ContentMonitor:
             )
 
     async def _process_power_outage_articles(
-            self, articles: list, elektrinavypadky_cache: list
+        self, articles: list, elektrinavypadky_cache: list
     ) -> None:
         elektrinavypadky_cache_copy = elektrinavypadky_cache.copy()
         above_limit = False
@@ -543,9 +543,9 @@ class ContentMonitor:
             title = article.find("title").text
 
             if not (
-                    "elektrin" in description
-                    or "elektrin" in title.lower()
-                    or "odstávka vody" in title.lower()
+                "elektri" in description.lower()
+                or "elektri" in title.lower()
+                or "odstávka vody" in title.lower()
             ):
                 continue
 

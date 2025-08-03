@@ -48,7 +48,9 @@ class Listeners(commands.Cog):
             print("Player not found, skipping track start message.")
             return
 
-        if not payload.player.should_respond:
+        if not payload.player.should_respond or not hasattr(
+            payload.player.current, "requester"
+        ):
             await payload.player.text_channel.send(embed=self._playing_embed(payload))
 
         if (
