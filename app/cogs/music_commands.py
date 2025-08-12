@@ -69,7 +69,10 @@ class MusicCommands(commands.Cog):
         type=bool,
     )
     async def play(
-        self, ctx: discord.ApplicationContext, search: str, play_next: bool = False
+        self,
+        ctx: discord.ApplicationContext,
+        search: str,
+        play_next: bool = False,
     ) -> None:
         """Plays a song from a given URL or name.
 
@@ -91,7 +94,9 @@ class MusicCommands(commands.Cog):
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
             if not joined:
-                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] = -1
+                self._bot.cached_lavalink_servers[self._bot.node.uri][
+                    "score"
+                ] = -1
                 return
             await self._prepare_wavelink(ctx)
 
@@ -129,7 +134,9 @@ class MusicCommands(commands.Cog):
             await ctx.respond(embed=self._playing_embed(track))
             player.should_respond = False
 
-    @radio.command(name="random", description="Gets random radio from RadioMap.")
+    @radio.command(
+        name="random", description="Gets random radio from RadioMap."
+    )
     @commands.cooldown(1, 4, commands.BucketType.user)
     @guild_only()
     @option(
@@ -168,9 +175,9 @@ class MusicCommands(commands.Cog):
 
         try:
             data = response.json()
-            station_id = data["data"]["content"][0]["items"][0]["page"]["url"].split(
-                "/"
-            )[-1]
+            station_id = data["data"]["content"][0]["items"][0]["page"][
+                "url"
+            ].split("/")[-1]
         except (KeyError, IndexError, ValueError):
             await send_response(ctx, "RADIOMAP_ERROR")
             return
@@ -197,7 +204,9 @@ class MusicCommands(commands.Cog):
 
         await self.play(ctx, station, play_next)
 
-    @radio.command(name="play", description="Search and play radio from RadioGarden")
+    @radio.command(
+        name="play", description="Search and play radio from RadioGarden"
+    )
     @commands.cooldown(1, 4, commands.BucketType.user)
     @guild_only()
     @option("station", description="Name of the radio station.")
@@ -245,18 +254,25 @@ class MusicCommands(commands.Cog):
         try:
             data = response.json()
             if not data["hits"]["hits"]:
-                await send_response(ctx, "RADIOMAP_NO_STATION_FOUND", search=station)
+                await send_response(
+                    ctx, "RADIOMAP_NO_STATION_FOUND", search=station
+                )
                 return
 
             for station_data in data["hits"]["hits"]:
                 station_source = station_data["_source"]
-                if country and station_source["page"]["country"]["title"] != country:
+                if (
+                    country
+                    and station_source["page"]["country"]["title"] != country
+                ):
                     continue
 
                 await self.play(ctx, station_source["stream"], play_next)
                 return
 
-            await send_response(ctx, "RADIOMAP_NO_STATION_FOUND", search=station)
+            await send_response(
+                ctx, "RADIOMAP_NO_STATION_FOUND", search=station
+            )
         except (KeyError, ValueError):
             await send_response(ctx, "RADIOMAP_ERROR")
 
@@ -280,7 +296,9 @@ class MusicCommands(commands.Cog):
         player.should_respond = player.queue.is_empty
         await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
 
-    @music.command(name="skip-to", description="Skips to selected song in queue.")
+    @music.command(
+        name="skip-to", description="Skips to selected song in queue."
+    )
     @guild_only()
     @option(
         "to_find",
@@ -313,10 +331,16 @@ class MusicCommands(commands.Cog):
         await player.stop()
 
         await send_response(
-            ctx, "TRACK_SKIPPED_TO", ephemeral=False, title=track.title, uri=track.uri
+            ctx,
+            "TRACK_SKIPPED_TO",
+            ephemeral=False,
+            title=track.title,
+            uri=track.uri,
         )
 
-    @music.command(name="pause", description="Pauses song that is currently playing.")
+    @music.command(
+        name="pause", description="Pauses song that is currently playing."
+    )
     @guild_only()
     @is_playing()
     async def pause(self, ctx: discord.ApplicationContext) -> None:
@@ -337,7 +361,9 @@ class MusicCommands(commands.Cog):
             await player.pause(True)
         except LavalinkLoadException:
             await switch_node(bot=self._bot, player=player, play_after=False)
-        await send_response(ctx, "TRACK_PAUSED", ephemeral=False, delete_after=10)
+        await send_response(
+            ctx, "TRACK_PAUSED", ephemeral=False, delete_after=10
+        )
 
     @music.command(name="resume", description="Resumes paused song.")
     @guild_only()
@@ -355,7 +381,9 @@ class MusicCommands(commands.Cog):
             await player.pause(False)
         except LavalinkLoadException:
             await switch_node(bot=self._bot, player=player)
-        await send_response(ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10)
+        await send_response(
+            ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10
+        )
 
     @music.command(name="leave", description="Leaves voice channel.")
     @guild_only()
@@ -381,7 +409,8 @@ class MusicCommands(commands.Cog):
         await player.disconnect()
 
     @music.command(
-        name="autoplay_mode", description="Change autoplay mode when playing music."
+        name="autoplay_mode",
+        description="Change autoplay mode when playing music.",
     )
     @option(
         "mode",
@@ -579,7 +608,9 @@ class MusicCommands(commands.Cog):
                 last_error = "NODE_UNRESPONSIVE"
 
             if last_error:
-                await switch_node(bot=self._bot, player=player, play_after=False)
+                await switch_node(
+                    bot=self._bot, player=player, play_after=False
+                )
 
             # Fallback to default search
             source = "ytsearch"
@@ -617,7 +648,10 @@ class MusicCommands(commands.Cog):
 
         await player.move_to(ctx.author.voice.channel)
         await send_response(
-            ctx, "MOVED", ephemeral=False, channel_id=ctx.author.voice.channel.id
+            ctx,
+            "MOVED",
+            ephemeral=False,
+            channel_id=ctx.author.voice.channel.id,
         )
         player.should_respond = False
         return True
@@ -638,21 +672,30 @@ class MusicCommands(commands.Cog):
             return False
         return True
 
-    async def _find_working_node(self, ctx: discord.ApplicationContext) -> bool:
+    async def _find_working_node(
+        self, ctx: discord.ApplicationContext
+    ) -> bool:
         """Retry joining the voice channel if the initial attempt fails.
         This function will attempt to reconnect to the voice channel up to 5 times"""
-        for _ in range(5):
+        for i in range(5):
             try:
-                await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
+                await ctx.author.voice.channel.connect(
+                    cls=wavelink.Player, timeout=3
+                )
                 is_connected = True
             except wavelink.exceptions.ChannelTimeoutException:
                 print(f"Node join timeout. ({self._bot.node.uri})")
-                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] = -1
+                self._bot.cached_lavalink_servers[self._bot.node.uri][
+                    "score"
+                ] = -1
                 await self._bot.connect_node()
                 is_connected = False
                 if i == 0:
                     await send_response(
-                        ctx, "NODE_UNRESPONSIVE", respond=False, ephemeral=False
+                        ctx,
+                        "NODE_UNRESPONSIVE",
+                        respond=False,
+                        ephemeral=False,
                     )
             except wavelink.exceptions.InvalidNodeException:
                 await send_response(ctx, "NO_NODES")
@@ -709,7 +752,9 @@ class MusicCommands(commands.Cog):
                 await player.set_volume(guild_data["music"]["volume"])
                 break
             except wavelink.exceptions.LavalinkException:
-                await switch_node(bot=self._bot, player=player, play_after=False)
+                await switch_node(
+                    bot=self._bot, player=player, play_after=False
+                )
 
         if guild_data["music"]["autoplay_mode"] == 1:
             player.autoplay = wavelink.AutoPlayMode.partial

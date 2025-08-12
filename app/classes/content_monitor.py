@@ -101,7 +101,9 @@ class ContentMonitor:
         )
         if not response:
             return
-        await self._send_alienware_arena_news_embed(response, alienwarearena_news_cache)
+        await self._send_alienware_arena_news_embed(
+            response, alienwarearena_news_cache
+        )
 
     async def game3rb(self) -> None:
         """Check for selected games from Game3rb."""
@@ -153,7 +155,8 @@ class ContentMonitor:
                     except ValueError:
                         if full_title not in game3rb_cache not in to_upload:
                             await self._bot_config.update_one(
-                                DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
+                                DB_CACHE,
+                                {"$set": {"game3rb_cache": to_upload}},
                             )
                             await self._user_kexo.send(
                                 f"Game3rb: Broken name - {full_title}"
@@ -178,7 +181,9 @@ class ContentMonitor:
                     "full_title": full_title,
                     "version": version,
                     "url": line.get("href"),
-                    "image": article.find("img", {"class": "entry-image"})["src"],
+                    "image": article.find("img", {"class": "entry-image"})[
+                        "src"
+                    ],
                     "timestamp": article.find("time")["datetime"],
                     "carts": carts,
                 }
@@ -221,7 +226,9 @@ class ContentMonitor:
                 else:
                     crack_url = soup.find("a", {"class": "crack"})
                     if crack_url:
-                        description.append(f"[Crack link]({crack_url['href']})")
+                        description.append(
+                            f"[Crack link]({crack_url['href']})"
+                        )
 
             game_update_url, game_update_name = [], []
             update_pattern = (
@@ -231,20 +238,26 @@ class ContentMonitor:
             for match in re.finditer(update_pattern, source.text, re.DOTALL):
                 update_name = re.sub(r"<.*?>", "", match.group(1)).strip()
                 game_update_name.append(unidecode.unidecode(update_name))
-                game_update_url.append(unidecode.unidecode(match.group(2).strip()))
+                game_update_url.append(
+                    unidecode.unidecode(match.group(2).strip())
+                )
 
             embed = discord.Embed(
                 title=game["title"] + game["version"],
                 url=game["url"],
                 timestamp=datetime.datetime.fromisoformat(game["timestamp"]),
             )
-            embed.add_field(name="Download links:", value="\n".join(description))
+            embed.add_field(
+                name="Download links:", value="\n".join(description)
+            )
             if game_update_name:
                 game_update = "\n".join(
                     f"{i + 1}. [{game_update_name[i]}]({game_update_url[i]})"
                     for i in range(len(game_update_url))
                 )
-                embed.add_field(name="Update links:", value=game_update, inline=False)
+                embed.add_field(
+                    name="Update links:", value=game_update, inline=False
+                )
             embed.set_footer(
                 text=", ".join(game["carts"]),
                 icon_url=GAME3RB_ICON,
@@ -274,17 +287,23 @@ class ContentMonitor:
         if not chat_log:
             return
         chat_messages = await self._get_onlinefix_messages(chat_log.text)
-        await self._process_onlinefix_messages(chat_messages, onlinefix_cache, games)
+        await self._process_onlinefix_messages(
+            chat_messages, onlinefix_cache, games
+        )
 
     async def power_outages(self) -> None:
         """Checks for power outages."""
         elektrinavypadky_cache = await self._load_power_outages_cache()
-        html_content = await make_http_request(self._session, POWER_OUTAGES_URL)
+        html_content = await make_http_request(
+            self._session, POWER_OUTAGES_URL
+        )
         if not html_content:
             return
 
         articles = self._get_power_outage_articles(html_content.text)
-        await self._process_power_outage_articles(articles, elektrinavypadky_cache)
+        await self._process_power_outage_articles(
+            articles, elektrinavypadky_cache
+        )
 
     async def contests(self) -> None:
         """Checks for contests."""
@@ -354,14 +373,17 @@ class ContentMonitor:
 
         if alienwarearena_cache != alienwarearena_cache_copy:
             await self._bot_config.update_one(
-                DB_CACHE, {"$set": {"alienwarearena_cache": alienwarearena_cache}}
+                DB_CACHE,
+                {"$set": {"alienwarearena_cache": alienwarearena_cache}},
             )
 
     async def _send_alienware_arena_news_embed(
         self, response: httpx.Response, alienware_arena_news_cache: list
     ) -> None:
         soup = BeautifulSoup(response.text, "html.parser")
-        news_widget = soup.find("div", class_="widget-table announcements-table")
+        news_widget = soup.find(
+            "div", class_="widget-table announcements-table"
+        )
         if not news_widget:
             print("Alienware Arena: News widget not found")
             return
@@ -378,7 +400,9 @@ class ContentMonitor:
 
             title = post_info.text
             post_date = post.find("span", class_="timeago").get("title")
-            post_date = datetime.datetime.strptime(post_date, "%Y-%m-%d %H:%M:%S")
+            post_date = datetime.datetime.strptime(
+                post_date, "%Y-%m-%d %H:%M:%S"
+            )
 
             embed = discord.Embed(
                 title=title,
@@ -392,7 +416,11 @@ class ContentMonitor:
         if alienware_arena_news_cache != alienware_arena_news_cache_copy:
             await self._bot_config.update_one(
                 DB_CACHE,
-                {"$set": {"alienwarearena_news_cache": alienware_arena_news_cache}},
+                {
+                    "$set": {
+                        "alienwarearena_news_cache": alienware_arena_news_cache
+                    }
+                },
             )
 
     async def _send_fanatical_embed(
@@ -437,9 +465,7 @@ class ContentMonitor:
                 continue
 
             img_url = FANATICAL_IMG_URL + product_info["cover"]
-            timestamp = (
-                f"<t:{int(iso_to_timestamp(giveaway['valid_until']).timestamp())}:F>"
-            )
+            timestamp = f"<t:{int(iso_to_timestamp(giveaway['valid_until']).timestamp())}:F>"
 
             embed = discord.Embed(
                 title=title,
@@ -472,7 +498,9 @@ class ContentMonitor:
         description_element = article_description.find(
             "div", class_="edited-block right"
         )
-        description: str = description_element.text if description_element else ""
+        description: str = (
+            description_element.text if description_element else ""
+        )
         description = GoogleTranslator(source="ru").translate(text=description)
         description = description.replace(". ", "\n")
 
@@ -565,7 +593,10 @@ class ContentMonitor:
                 above_limit = True
             else:
                 embed = discord.Embed(
-                    title=title, url=url, description=description, timestamp=timestamp
+                    title=title,
+                    url=url,
+                    description=description,
+                    timestamp=timestamp,
                 )
 
             embed.set_footer(
@@ -588,10 +619,14 @@ class ContentMonitor:
         url = article.find("link").text
         contest_description = article.find("description")
         contest_description = (
-            BeautifulSoup(contest_description.text, "html.parser").find("p").text
+            BeautifulSoup(contest_description.text, "html.parser")
+            .find("p")
+            .text
         )
         unix_time = article.find("pubDate").text
-        timestamp = datetime.datetime.strptime(unix_time, "%a, %d %b %Y %H:%M:%S %z")
+        timestamp = datetime.datetime.strptime(
+            unix_time, "%a, %d %b %Y %H:%M:%S %z"
+        )
 
         article_content = article.find("content:encoded").text
         soup = BeautifulSoup(article_content, "html.parser")
@@ -603,7 +638,9 @@ class ContentMonitor:
             return
 
         img_url = img_tag.get("src")
-        image_response = await make_http_request(self._session, img_url, binary=True)
+        image_response = await make_http_request(
+            self._session, img_url, binary=True
+        )
         image = BytesIO(image_response.content)
 
         embed = discord.Embed(

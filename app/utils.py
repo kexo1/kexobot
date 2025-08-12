@@ -169,7 +169,9 @@ async def check_node_status(
         )
     ]
     try:
-        await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=3)
+        await asyncio.wait_for(
+            wavelink.Pool.connect(nodes=node, client=bot), timeout=3
+        )
         await node[0].fetch_info()
     except (
         asyncio.TimeoutError,
@@ -352,7 +354,10 @@ async def switch_node(
 
             # When populated queue is on, the player can put random song
             # and skip currently playing song
-            if not play_after and player_autoplay_mode == wavelink.AutoPlayMode.enabled:
+            if (
+                not play_after
+                and player_autoplay_mode == wavelink.AutoPlayMode.enabled
+            ):
                 try:
                     del player.queue[0]
                 except IndexError:
@@ -435,8 +440,10 @@ async def generate_temp_user_data(bot: discord.Bot, user_id: int) -> dict:
     dict
         A dictionary containing temporary user data.
     """
-    multireddit: asyncpraw.models.Multireddit = await bot.reddit_agent.multireddit(
-        name=str(user_id), redditor="KexoBOT"
+    multireddit: asyncpraw.models.Multireddit = (
+        await bot.reddit_agent.multireddit(
+            name=str(user_id), redditor="KexoBOT"
+        )
     )
     for attempt in range(3):
         try:
@@ -547,7 +554,9 @@ def fix_data(
     return fixed_data
 
 
-async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tuple:
+async def get_user_data(
+    bot: discord.Bot, ctx: discord.ApplicationContext
+) -> tuple:
     """Get user data for the given user.
 
     Parameters
@@ -570,14 +579,18 @@ async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tu
 
     await ctx.defer()
 
-    user_data = await bot.user_data_db.find_one({"_id": user_id})  # Load from DB
+    user_data = await bot.user_data_db.find_one(
+        {"_id": user_id}
+    )  # Load from DB
     if user_data:
         fixed_data = fix_user_data(user_data)
         bot.user_data[user_id] = fixed_data
         temp_user_data = await generate_temp_user_data(bot, user_id)
     else:  # If not in DB, create new user data
         user_data = generate_user_data()
-        print("Creating new user data for user:", await bot.fetch_user(user_id))
+        print(
+            "Creating new user data for user:", await bot.fetch_user(user_id)
+        )
         await bot.user_data_db.insert_one({"_id": user_id, **user_data})
         bot.user_data[user_id] = user_data
 
@@ -606,7 +619,9 @@ async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple:
     if guild_data:
         return guild_data, bot.temp_guild_data[guild_id]
 
-    guild_data = await bot.guild_data_db.find_one({"_id": guild_id})  # Load from DB
+    guild_data = await bot.guild_data_db.find_one(
+        {"_id": guild_id}
+    )  # Load from DB
     if guild_data:
         fixed_data = fix_guild_data(guild_data)
         bot.guild_data[guild_id] = fixed_data
@@ -667,7 +682,9 @@ async def make_http_request(
                     url, data=data, headers=headers, timeout=timeout
                 )
             else:
-                response = await session.get(url, headers=headers, timeout=timeout)
+                response = await session.get(
+                    url, headers=headers, timeout=timeout
+                )
 
             # Don't raise for status for MP3 files or binary content
             if not (url.endswith(".mp3") or binary):

@@ -112,7 +112,9 @@ class SFDServers:
         The directory where graphs will be saved.
     """
 
-    def __init__(self, bot_config: AsyncMongoClient, session: httpx.AsyncClient):
+    def __init__(
+        self, bot_config: AsyncMongoClient, session: httpx.AsyncClient
+    ):
         self._session = session
         self._bot_config = bot_config
         self._graphs_dir = os.path.join(os.getcwd(), "graphs")
@@ -143,7 +145,8 @@ class SFDServers:
         time_positions = [i * 10 + 5 for i in range(24)]
         plt.xticks(time_positions, hours)
         plt.savefig(
-            os.path.join(self._graphs_dir, f"sfd_activity_day_{timezone}.png"), dpi=300
+            os.path.join(self._graphs_dir, f"sfd_activity_day_{timezone}.png"),
+            dpi=300,
         )
         plt.clf()
         plt.close("all")
@@ -186,7 +189,9 @@ class SFDServers:
         plt.xticks(time_positions, hours, rotation=45)
         plt.subplots_adjust(bottom=0.2)
         plt.savefig(
-            os.path.join(self._graphs_dir, f"sfd_activity_week_{timezone}.png"),
+            os.path.join(
+                self._graphs_dir, f"sfd_activity_week_{timezone}.png"
+            ),
             dpi=300,
             bbox_inches="tight",
         )
@@ -202,8 +207,14 @@ class SFDServers:
             The current datetime.
         """
         activity = await self._load_sfd_activity_data()
-        players_day, servers_day = activity["players_day"], activity["servers_day"]
-        current_players, current_servers = await self._get_players_and_servers()
+        players_day, servers_day = (
+            activity["players_day"],
+            activity["servers_day"],
+        )
+        (
+            current_players,
+            current_servers,
+        ) = await self._get_players_and_servers()
         if current_players is None or current_servers is None:
             return
 
@@ -232,7 +243,10 @@ class SFDServers:
         time_diff = now - last_update_week
         hours_diff = time_diff.total_seconds() / 3600
         update_count = min(4, max(1, int(hours_diff // 6)))
-        players_week, servers_week = activity["players_week"], activity["servers_week"]
+        players_week, servers_week = (
+            activity["players_week"],
+            activity["servers_week"],
+        )
 
         recent_players = players_day[-60 * update_count :]
         recent_servers = servers_day[-60 * update_count :]
@@ -259,7 +273,9 @@ class SFDServers:
 
         current_hour = now.hour
         rounded_hour = (current_hour // 6) * 6
-        next_update = now.replace(hour=rounded_hour, minute=0, second=0, microsecond=0)
+        next_update = now.replace(
+            hour=rounded_hour, minute=0, second=0, microsecond=0
+        )
         next_update = next_update.replace(tzinfo=ZoneInfo("Europe/Bratislava"))
 
         await self._bot_config.update_many(
@@ -294,7 +310,9 @@ class SFDServers:
             if server.bots == 0:
                 players = f"{server.players}/{server.max_players}"
             else:
-                players = f"{server.players}(+{server.bots})/{server.max_players}"
+                players = (
+                    f"{server.players}(+{server.bots})/{server.max_players}"
+                )
             servers_dict["players"].append(players)
             all_players += server.players
 
@@ -320,7 +338,10 @@ class SFDServers:
 
     async def _load_sfd_servers(self) -> str:
         response = await make_http_request(
-            self._session, SFD_SERVER_URL, data=SFD_REQUEST, headers=SFD_HEADERS
+            self._session,
+            SFD_SERVER_URL,
+            data=SFD_REQUEST,
+            headers=SFD_HEADERS,
         )
         if not response:
             return None
@@ -444,7 +465,9 @@ class SFDServers:
         plt.figure(figsize=(14, 7))
         plt.plot(x_positions, players, color="cyan", label="Players")
         plt.plot(x_positions, servers, color="magenta", label="Servers")
-        plt.legend(loc="upper center", fontsize=12, bbox_to_anchor=(0.5, 1.05), ncol=2)
+        plt.legend(
+            loc="upper center", fontsize=12, bbox_to_anchor=(0.5, 1.05), ncol=2
+        )
 
         mplcyberpunk.add_glow_effects()
         mplcyberpunk.add_gradient_fill(alpha_gradientglow=0.5)

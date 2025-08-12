@@ -55,7 +55,8 @@ class LavalinkServerManager:
 
         if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
             await self._bot.bot_config.update_one(
-                DB_CACHE, {"$set": {"lavalink_servers": self._cached_lavalink_servers}}
+                DB_CACHE,
+                {"$set": {"lavalink_servers": self._cached_lavalink_servers}},
             )
             self._cached_lavalink_servers_copy = copy.deepcopy(
                 self._cached_lavalink_servers

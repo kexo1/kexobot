@@ -53,7 +53,9 @@ class Queue(commands.Cog):
             await ctx.respond(embed=pages[0], view=view)
 
     @subcommand("music")
-    @slash_command(name="playing", description="What track is currently playing")
+    @slash_command(
+        name="playing", description="What track is currently playing"
+    )
     @guild_only()
     @is_playing()
     async def playing_command(self, ctx: discord.ApplicationContext) -> None:
@@ -88,7 +90,9 @@ class Queue(commands.Cog):
         player: wavelink.Player = ctx.voice_client
         track_pos = find_track(player, to_find)
         if track_pos is None:
-            await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
+            await send_response(
+                ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find
+            )
             return
 
         track = player.queue[track_pos - 1]
@@ -151,7 +155,10 @@ class Queue(commands.Cog):
 
         player.queue.mode = wavelink.QueueMode.loop_all
         await send_response(
-            ctx, "QUEUE_LOOP_ENABLED", ephemeral=False, count=player.queue.count
+            ctx,
+            "QUEUE_LOOP_ENABLED",
+            ephemeral=False,
+            count=player.queue.count,
         )
 
     @subcommand("music")
@@ -230,7 +237,9 @@ class Queue(commands.Cog):
                     description=current_description,
                     color=discord.Color.blue(),
                 )
-                embed.set_footer(text=f"\n{footer}{player.queue.count} songs in queue")
+                embed.set_footer(
+                    text=f"\n{footer}{player.queue.count} songs in queue"
+                )
                 pages.append(embed)
                 current_description = header + song_line
             else:
@@ -256,7 +265,9 @@ class Queue(commands.Cog):
         return "Now Playing", ""
 
     @staticmethod
-    async def _get_playing_embed(ctx: discord.ApplicationContext) -> discord.Embed:
+    async def _get_playing_embed(
+        ctx: discord.ApplicationContext,
+    ) -> discord.Embed:
         player: wavelink.Player = ctx.voice_client
 
         embed = discord.Embed(

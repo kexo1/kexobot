@@ -89,7 +89,9 @@ class FunCommands(commands.Cog):
         description="Topové fotečky z online hodín",
         guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER],
     )
-    async def top_strop_screenshot(self, ctx: discord.ApplicationContext) -> None:
+    async def top_strop_screenshot(
+        self, ctx: discord.ApplicationContext
+    ) -> None:
         """This command sends a random screenshot from a file.
 
         This command is restricted to specific guilds because it's private.
@@ -118,7 +120,9 @@ class FunCommands(commands.Cog):
         viewed_count = len(temp_guild_data["jokes"]["viewed_jokes"])
         loaded_count = len(self._loaded_jokes)
 
-        if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
+        if (
+            viewed_count == 0 and loaded_count == 0
+        ) or viewed_count == loaded_count:
             await ctx.defer()
             jokes = await self._get_jokes()
             if not jokes:
@@ -160,7 +164,9 @@ class FunCommands(commands.Cog):
         viewed_count = len(temp_guild_data["jokes"]["viewed_dad_jokes"])
         loaded_count = len(self._loaded_dad_jokes)
 
-        if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
+        if (
+            viewed_count == 0 and loaded_count == 0
+        ) or viewed_count == loaded_count:
             await ctx.defer()
             jokes = await self._get_dadjokes()
             if not jokes:
@@ -210,7 +216,9 @@ class FunCommands(commands.Cog):
         viewed_count = len(temp_guild_data["jokes"]["viewed_yo_mama_jokes"])
         loaded_count = len(self._loaded_yo_mama_jokes)
 
-        if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
+        if (
+            viewed_count == 0 and loaded_count == 0
+        ) or viewed_count == loaded_count:
             await ctx.defer()
             jokes = await self._get_yo_mama_jokes()
             if not jokes:
@@ -240,7 +248,9 @@ class FunCommands(commands.Cog):
         else:
             await ctx.respond(member.mention + " " + joke)
 
-    @slash_command(name="spam", description="Spams words, max is 50.  (Bot owner only)")
+    @slash_command(
+        name="spam", description="Spams words, max is 50.  (Bot owner only)"
+    )
     @option("word", description="Word to spam.")
     @option("integer", description="Max is 50.", min_value=1, max_value=50)
     @option("channel_id", description="Channel to spam in.")
@@ -290,7 +300,8 @@ class FunCommands(commands.Cog):
 
     @subcommand("reddit")
     @slash_command(
-        name="shitpost", description="Random post from various shitposting subreddits."
+        name="shitpost",
+        description="Random post from various shitposting subreddits.",
     )
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def shitpost(self, ctx: discord.ApplicationContext) -> None:
@@ -317,7 +328,9 @@ class FunCommands(commands.Cog):
         user_id = ctx.author.id
         user_data, temp_user_data = await self._load_user_data(ctx)
 
-        multireddit: asyncpraw.models.Multireddit = temp_user_data["multireddit"]
+        multireddit: asyncpraw.models.Multireddit = temp_user_data[
+            "multireddit"
+        ]
         limit = temp_user_data["search_limit"]
 
         try:
@@ -349,13 +362,21 @@ class FunCommands(commands.Cog):
                 self._update_temp_user_data(user_id, submission.permalink)
                 break
 
-        except (AsyncPrawcoreException, RequestException, ResponseException) as e:
+        except (
+            AsyncPrawcoreException,
+            RequestException,
+            ResponseException,
+        ) as e:
             print(e)
             print(vars(e))
             await send_response(ctx, "REDDIT_REQUEST_ERROR")
 
-    def _update_temp_user_data(self, user_id: int, submission_url: str) -> None:
-        self._temp_user_data[user_id]["reddit"]["viewed_posts"].add(submission_url)
+    def _update_temp_user_data(
+        self, user_id: int, submission_url: str
+    ) -> None:
+        self._temp_user_data[user_id]["reddit"]["viewed_posts"].add(
+            submission_url
+        )
         self._temp_user_data[user_id]["reddit"]["last_used"] = datetime.now()
         self._temp_user_data[user_id]["reddit"]["search_limit"] += 1
 
@@ -390,7 +411,11 @@ class FunCommands(commands.Cog):
         temp_user_data: dict,
     ) -> bool:
         # If post is locked, or is stickied, or it's a poll, skip it
-        if submission.locked or submission.stickied or hasattr(submission, "poll_data"):
+        if (
+            submission.locked
+            or submission.stickied
+            or hasattr(submission, "poll_data")
+        ):
             return False
 
         if submission.permalink in temp_user_data["viewed_posts"]:
@@ -489,7 +514,9 @@ class FunCommands(commands.Cog):
             if joke in self._loaded_jokes:
                 continue
 
-            is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.lower().split()]
+            is_filtered = [
+                k for k in JOKE_EXCLUDED_WORDS if k in joke.lower().split()
+            ]
             if is_filtered:
                 continue
 
@@ -507,7 +534,8 @@ class FunCommands(commands.Cog):
             for _ in range(len(self._bot.humor_api_tokens)):
                 response = await make_http_request(
                     self._session,
-                    HUMOR_API_URL + f"{joke_type}&api-key={token}&max-length=256",
+                    HUMOR_API_URL
+                    + f"{joke_type}&api-key={token}&max-length=256",
                     retries=3,
                 )
                 token = self._is_token_exhausted(response, token)
@@ -540,7 +568,9 @@ class FunCommands(commands.Cog):
             return token
         return None
 
-    def _is_token_exhausted(self, response: httpx.Response, token) -> Optional[str]:
+    def _is_token_exhausted(
+        self, response: httpx.Response, token
+    ) -> Optional[str]:
         if not response:
             self._bot.humor_api_tokens[token]["exhausted"] = True
             return None
@@ -554,13 +584,16 @@ class FunCommands(commands.Cog):
 
     @staticmethod
     async def _send_multiple_images(
-        ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission
+        ctx: discord.ApplicationContext,
+        submission: asyncpraw.reddit.Submission,
     ) -> None:
         for images in submission.gallery_data["items"]:
             await ctx.send(f"https://i.redd.it/{images['media_id']}.jpg")
 
     @staticmethod
-    async def _post_video(ctx: discord.ApplicationContext, submission_url: str) -> None:
+    async def _post_video(
+        ctx: discord.ApplicationContext, submission_url: str
+    ) -> None:
         video_url = submission_url.split("/")[4]
         await ctx.send(f"https://rxddit.com/{video_url}/", suppress=False)
 
