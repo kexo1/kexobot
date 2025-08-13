@@ -1,6 +1,0 @@
-[MASTER]
-disable=missing-module-docstring,missing-class-docstring,missing-function-docstring
-disable=invalid-name
-
-[MESSAGES CONTROL]
-disable=import-error
