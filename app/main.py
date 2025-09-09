@@ -603,7 +603,7 @@ def setup_cogs() -> None:
 
     create_cog_session()
     for cog in cogs_list:
-        bot.load_extension(f"cogs.{cog}")
+        bot.load_extension(f"app.cogs.{cog}")
     print("Cogs loaded.")
 
 

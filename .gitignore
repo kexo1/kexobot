@@ -2,8 +2,10 @@ text_files/
 video/
 graphs/
 .ruff_cache/
+.vscode/
 
 .pypirc
+.pylintrc
 desktop.ini
 fly.toml
 ruff.toml

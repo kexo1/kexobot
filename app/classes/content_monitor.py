@@ -316,9 +316,11 @@ class ContentMonitor:
 
         for article in articles:
             url = article.find("link").text
-
             if url in esutaze_cache_copy:
-                break
+                continue
+
+            if url in to_filter:
+                continue
 
             title = article.find("title").text
             is_filtered = [k for k in to_filter if k.lower() in title]
@@ -660,11 +662,11 @@ class ContentMonitor:
         )
 
     async def _get_contest_articles(self) -> list:
-        html_content = await make_http_request(self._session, ESUTAZE_URL)
-        if not html_content:
+        xml_content = await make_http_request(self._session, ESUTAZE_URL)
+        if not xml_content:
             return []
 
-        soup = BeautifulSoup(html_content.content, "xml")
+        soup = BeautifulSoup(xml_content.content, "xml")
         return soup.find_all("item")
 
     @staticmethod
