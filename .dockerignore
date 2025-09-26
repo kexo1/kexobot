@@ -9,6 +9,5 @@ __pycache__/
 .git
 .gitignore 
 
-secret.env
 TODO.md
 README.md

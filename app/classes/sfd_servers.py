@@ -3,11 +3,12 @@ import os
 from datetime import timedelta
 from typing import Union
 from zoneinfo import ZoneInfo
+import gc
 
 import httpx
 import matplotlib
 
-matplotlib.use("Agg")
+matplotlib.use("agg")
 import matplotlib.pyplot as plt
 import mplcyberpunk
 from bs4 import BeautifulSoup
@@ -149,7 +150,8 @@ class SFDServers:
             dpi=300,
         )
         plt.clf()
-        plt.close("all")
+        plt.close()
+        gc.collect()
 
     async def generate_graph_week(self, timezone: str):
         """Method to generate a weekly activity graph.
@@ -196,7 +198,8 @@ class SFDServers:
             bbox_inches="tight",
         )
         plt.clf()
-        plt.close("all")
+        plt.close()
+        gc.collect()
 
     async def update_stats(self, now: datetime.datetime) -> None:
         """Method to update the server statistics.
@@ -461,7 +464,6 @@ class SFDServers:
 
     @staticmethod
     def _generate_lines_and_effects(x_positions, players, servers):
-        plt.switch_backend("Agg")
         plt.figure(figsize=(14, 7))
         plt.plot(x_positions, players, color="cyan", label="Players")
         plt.plot(x_positions, servers, color="magenta", label="Servers")

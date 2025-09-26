@@ -3,7 +3,7 @@
 [![Python Badge]][Python]
 [![MongoDB Badge]][MongoDB]
 [![Docker Badge]][Docker]
-[![Fly.io Badge]][Fly.io]
+[![Oracle Badge]][Oracle]
 
 </div>
 <div align = left>
@@ -37,8 +37,8 @@ Discord python bot which is used for:
 [MongoDB Badge]: https://img.shields.io/badge/MongoDB-%234ea94b.svg?style=for-the-badge&logo=mongodb&logoColor=white
 [MongoDB]: https://www.mongodb.com/
 
-[Fly.io Badge]: https://img.shields.io/badge/Fly.io-purple?style=for-the-badge&logo=CLion
-[Fly.io]: https://fly.io/
+[Oracle Badge]: https://img.shields.io/badge/Oracle-F80000?style=for-the-badge&logo=oracle&logoColor=white
+[Oracle]: https://www.oracle.com/cloud/
 
 [Docker Badge]: https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white
 [Docker]: https://www.docker.com/
