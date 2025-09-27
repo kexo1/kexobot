@@ -4,7 +4,7 @@ import discord
 import httpx
 import wavelink
 
-from app.constants import LAVALIST_URL, LAVAINFO_GITHUB_URL, DB_CACHE
+from app.constants import LAVALIST_URL, LAVALINK_API_URL, DB_CACHE
 from app.utils import make_http_request
 
 
@@ -41,17 +41,17 @@ class LavalinkServerManager:
         """
         # Lavainfo from github
         json_data: list = await make_http_request(
-            self._session, LAVAINFO_GITHUB_URL, get_json=True
+            self._session, LAVALINK_API_URL, get_json=True
         )
         if json_data:
-            self._parse_lavalink_servers(json_data, "lavainfo")
+            self._parse_lavalink_servers(json_data["nodes"])
 
         # Lavalist
         json_data: list = await make_http_request(
             self._session, LAVALIST_URL, get_json=True
         )
         if json_data:
-            self._parse_lavalink_servers(json_data, "lavalist")
+            self._parse_lavalink_servers(json_data)
 
         if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
             await self._bot.bot_config.update_one(
@@ -63,13 +63,16 @@ class LavalinkServerManager:
             )
             print("Found new lavalink servers, updating cache.")
 
-    def _parse_lavalink_servers(
-        self, json_data: list, site: str
-    ) -> list[wavelink.Node]:
+    def _parse_lavalink_servers(self, json_data: list) -> list[wavelink.Node]:
         for server in json_data:
-            if site == "lavalist" and server.get("version") != "v4":
-                continue
-            if site == "lavainfo" and server.get("restVersion") != "v4":
+            if (
+                (
+                    server.get("restVersion")
+                    and server.get("restVersion") != "v4"
+                )
+                or (server.get("version") and server.get("version") != "v4")
+                or (not server.get("host"))
+            ):
                 continue
 
             uri = self._get_full_node_url(

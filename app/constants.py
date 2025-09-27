@@ -272,7 +272,7 @@ SHITPOST_SUBREDDITS_ALL = (
 
 # -------------------- Music Configuration -------------------- #
 LAVALIST_URL = "https://lavalink-list.ajieblogs.eu.org/All"
-LAVAINFO_GITHUB_URL = "https://raw.githubusercontent.com/appujet/lavalink-list/refs/heads/main/nodes.json"
+LAVALINK_API_URL = "https://lavalink-api.appujet.site/api/nodes"
 
 SOURCE_PATTERNS = [
     # YouTube Music (music.youtube.com URLs)
