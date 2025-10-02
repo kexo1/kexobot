@@ -66,10 +66,7 @@ class LavalinkServerManager:
     def _parse_lavalink_servers(self, json_data: list) -> list[wavelink.Node]:
         for server in json_data:
             if (
-                (
-                    server.get("restVersion")
-                    and server.get("restVersion") != "v4"
-                )
+                (server.get("restVersion") and server.get("restVersion") != "v4")
                 or (server.get("version") and server.get("version") != "v4")
                 or (not server.get("host"))
             ):

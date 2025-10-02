@@ -31,14 +31,16 @@ ALIENWARE_ARENA_NEWS_CHANNEL = 1368937624496115853
 USER_KEXO = 402221830930432000
 
 # -------------------- Icons -------------------- #
-YOUTUBE_ICON = (
-    "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
-)
+YOUTUBE_ICON = "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
 DISCORD_ICON = (
     "https://img.icons8.com/?size=100&id=M725CLW4L7wE&format=png&color=000000"
 )
-REDDIT_FREEGAME_ICON = "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png"
-REDDIT_CRACKWATCH_ICON = "https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
+REDDIT_FREEGAME_ICON = (
+    "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png"
+)
+REDDIT_CRACKWATCH_ICON = (
+    "https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
+)
 REDDIT_ICON = "https://www.pngkit.com/png/full/207-2074270_reddit-icon-png.png"
 GAME3RB_ICON = (
     "https://media.discordapp.net/attachments/796453724713123870"
@@ -49,15 +51,11 @@ ONLINEFIX_ICON = (
     "https://media.discordapp.net/attachments/"
     "796453724713123870/1035951759505506364/favicon-1.png"
 )
-ALIENWAREARENA_ICON = (
-    "https://www.pngarts.com/files/12/Alienware-PNG-Photo.png"
-)
+ALIENWAREARENA_ICON = "https://www.pngarts.com/files/12/Alienware-PNG-Photo.png"
 POWER_OUTAGES_ICON = (
     "https://www.hliniknadhronom.sk/portals_pictures/i_006868/i_6868718.png"
 )
-ESUTAZE_ICON = (
-    "https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg"
-)
+ESUTAZE_ICON = "https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg"
 
 # -------------------- MongoDB Configuration -------------------- #
 MONGO_DB_URL = (
@@ -143,9 +141,7 @@ ONLINEFIX_URL = "https://online-fix.me/chat.php"
 
 # -------------------- AlienwareArena Configuration -------------------- #
 ALIENWAREARENA_MAX_POSTS = 3
-ALIENWAREARENA_URL = (
-    "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
-)
+ALIENWAREARENA_URL = "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
 ALIENWAREARENA_NEWS_URL = "https://eu.alienwarearena.com/relay/my-feed"
 ALIENWAREARENA_STRIP = ("Key", "Giveaway", "Steam Game")
 
@@ -155,9 +151,7 @@ FANATICAL_API_URL = "https://www.fanatical.com/api/all-promotions/en"
 FANATICAL_API_MEGAMENU_URL = (
     "https://www.fanatical.com/api/algolia/megamenu?altRank=false"
 )
-FANATICAL_IMG_URL = (
-    "https://cdn-ext.fanatical.com/production/product/1280x720/"
-)
+FANATICAL_IMG_URL = "https://cdn-ext.fanatical.com/production/product/1280x720/"
 FANATICAL_STRIP = (
     "Super Deluxe Edition",
     "Game of the Year Edition",

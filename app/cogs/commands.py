@@ -73,12 +73,8 @@ class CommandCog(commands.Cog):
     slash_bot_config = discord.SlashCommandGroup(
         "bot_config", "Update Bot Configuration"
     )
-    slash_node = discord.SlashCommandGroup(
-        "node", "Commands for managing nodes"
-    )
-    slash_reddit = discord.SlashCommandGroup(
-        "reddit", "Commands for reddit posts"
-    )
+    slash_node = discord.SlashCommandGroup("node", "Commands for managing nodes")
+    slash_reddit = discord.SlashCommandGroup("reddit", "Commands for reddit posts")
     slash_sfd = discord.SlashCommandGroup(
         "sfd", "Show Superfighters Deluxe stats and servers"
     )
@@ -168,9 +164,7 @@ class CommandCog(commands.Cog):
                 uri=self._bot.node.uri,
             )
         else:
-            node: wavelink.Node = await self._bot.connect_node(
-                guild_id=ctx.guild_id
-            )
+            node: wavelink.Node = await self._bot.connect_node(guild_id=ctx.guild_id)
             self._bot.node = node
             await send_response(
                 ctx,
@@ -179,9 +173,7 @@ class CommandCog(commands.Cog):
                 uri=self._bot.node.uri,
             )
 
-    @slash_node.command(
-        name="info", description="Information about connected node"
-    )
+    @slash_node.command(name="info", description="Information about connected node")
     async def node_info(self, ctx: discord.ApplicationContext) -> None:
         """Method to fetch and display information about the connected Lavalink node.
 
@@ -202,15 +194,11 @@ class CommandCog(commands.Cog):
             color=discord.Color.blue(),
         )
         plugins: wavelink.PluginResponsePayload = node_info.plugins
-        unix_timestamp = int(
-            iso_to_timestamp(str(node_info.build_time)).timestamp()
-        )
+        unix_timestamp = int(iso_to_timestamp(str(node_info.build_time)).timestamp())
 
         embed.add_field(
             name="Plugins:",
-            value=", ".join(
-                f"{plugin.name}: {plugin.version}" for plugin in plugins
-            ),
+            value=", ".join(f"{plugin.name}: {plugin.version}" for plugin in plugins),
             inline=False,
         )
         embed.add_field(name="Lavaplayer version:", value=node_info.lavaplayer)
@@ -224,9 +212,7 @@ class CommandCog(commands.Cog):
         name="supported_platforms",
         description="Supported music platforms in the current node",
     )
-    async def node_supported_platforms(
-        self, ctx: discord.ApplicationContext
-    ) -> None:
+    async def node_supported_platforms(self, ctx: discord.ApplicationContext) -> None:
         """Method to fetch and display supported platforms of the connected Lavalink node.
 
         Parameters
@@ -266,9 +252,7 @@ class CommandCog(commands.Cog):
         elif youtube_plugin:
             embed.add_field(
                 name="_3 platforms supported_",
-                value="\n".join(
-                    f"{i + 1}. {SUPPORTED_PLATFORMS[i]}" for i in range(3)
-                ),
+                value="\n".join(f"{i + 1}. {SUPPORTED_PLATFORMS[i]}" for i in range(3)),
             )
         else:
             embed.description = "No platforms supported"
@@ -282,9 +266,7 @@ class CommandCog(commands.Cog):
         )
         await ctx.respond(embed=embed)
 
-    @slash_node.command(
-        name="players", description="Information about node players."
-    )
+    @slash_node.command(name="players", description="Information about node players.")
     async def node_players(self, ctx: discord.ApplicationContext) -> None:
         """Method to fetch and display information about players connected to the Lavalink node.
 
@@ -305,9 +287,7 @@ class CommandCog(commands.Cog):
 
         for node in nodes:
             try:
-                players: wavelink.PlayerResponsePayload = (
-                    await node.fetch_players()
-                )
+                players: wavelink.PlayerResponsePayload = await node.fetch_players()
             except (
                 wavelink.exceptions.LavalinkException,
                 wavelink.exceptions.NodeException,
@@ -325,13 +305,9 @@ class CommandCog(commands.Cog):
             )
 
             for player in players:
-                guild: discord.Guild = await self._bot.fetch_guild(
-                    player.guild_id
-                )
+                guild: discord.Guild = await self._bot.fetch_guild(player.guild_id)
                 server_name.append(guild.name)
-                playing.append(
-                    player.track.title if player.track else "Nothing"
-                )
+                playing.append(player.track.title if player.track else "Nothing")
                 node_uri.append(node.uri)
 
         if not server_name:
@@ -364,9 +340,7 @@ class CommandCog(commands.Cog):
             return
 
         # Cleaning up the server names and maps
-        servers_dict["server_name"] = [
-            s.strip() for s in servers_dict["server_name"]
-        ]
+        servers_dict["server_name"] = [s.strip() for s in servers_dict["server_name"]]
         servers_dict["maps"] = [m.strip() for m in servers_dict["maps"]]
 
         server_name_char, map_char, stopped_at = 0, 0, 0
@@ -388,9 +362,7 @@ class CommandCog(commands.Cog):
             ) or (i == len(servers_dict["server_name"]) - 1 and not pages):
                 embed.add_field(
                     name="Servers:",
-                    value="\n".join(
-                        servers_dict["server_name"][stopped_at : i - 1]
-                    ),
+                    value="\n".join(servers_dict["server_name"][stopped_at : i - 1]),
                 )
                 embed.add_field(
                     name="Current Map:",
@@ -398,9 +370,7 @@ class CommandCog(commands.Cog):
                 )
                 embed.add_field(
                     name="Players:",
-                    value="\n".join(
-                        servers_dict["players"][stopped_at : i - 1]
-                    ),
+                    value="\n".join(servers_dict["players"][stopped_at : i - 1]),
                 )
                 stopped_at = i
                 server_name_char, map_char = 0, 0
@@ -448,7 +418,6 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Game Mode:ㅤㅤ", value=server.game_mode)
         await ctx.respond(embed=embed)
 
-    """
     @slash_sfd.command(
         name="activity",
         description="Shows graph of SFD servers activity.",
@@ -466,8 +435,6 @@ class CommandCog(commands.Cog):
         choices=SFD_TIMEZONE_CHOICE,
     )
     @commands.cooldown(1, 60, commands.BucketType.user)
-    """
-
     async def get_sfd_graph(
         self,
         ctx: discord.ApplicationContext,
@@ -496,10 +463,7 @@ class CommandCog(commands.Cog):
 
         image_location = os.path.join(self._graphs_dir, filename)
 
-        if (
-            not os.path.exists(image_location)
-            or get_file_age(image_location) >= 3600
-        ):
+        if not os.path.exists(image_location) or get_file_age(image_location) >= 3600:
             await generator(timezone)
 
         file = discord.File(image_location, filename=filename)
@@ -547,9 +511,7 @@ class CommandCog(commands.Cog):
     )
     @option("password", description="Server password.", required=False)
     @option("region", description="Server region.", required=False)
-    @option(
-        "scripts", description="Which scripts are enabled.", required=False
-    )
+    @option("scripts", description="Which scripts are enabled.", required=False)
     @option(
         "slots",
         description="How many server slots, default is 8",
@@ -636,9 +598,7 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Uptime:ㅤㅤㅤㅤ", value=timestamp)
         embed.add_field(name="Version:ㅤㅤ", value=version)
         embed.add_field(name="Slots:ㅤㅤ", value=slots)
-        embed.add_field(
-            name="Region:ㅤㅤ", value=region if region else "Not specified"
-        )
+        embed.add_field(name="Region:ㅤㅤ", value=region if region else "Not specified")
 
         if password:
             embed.add_field(
@@ -687,18 +647,10 @@ class CommandCog(commands.Cog):
             name="Run time:ㅤㅤ",
             value=f"{str(datetime.timedelta(seconds=round(int(time.time()) - self._run_time)))}",
         )
-        embed.add_field(
-            name="Ping:ㅤㅤ", value=f"{round(self._bot.latency * 1000)} ms"
-        )
-        embed.add_field(
-            name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB"
-        )
-        embed.add_field(
-            name="Online nodes:ㅤ", value=self._bot.get_online_nodes()
-        )
-        embed.add_field(
-            name="Available nodes:ㅤ", value=self._bot.get_avaiable_nodes()
-        )
+        embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self._bot.latency * 1000)} ms")
+        embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
+        embed.add_field(name="Online nodes:ㅤ", value=self._bot.get_online_nodes())
+        embed.add_field(name="Available nodes:ㅤ", value=self._bot.get_avaiable_nodes())
         embed.add_field(name="Joined servers:ㅤ", value=len(self._bot.guilds))
         embed.add_field(name="Bot version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
@@ -709,9 +661,7 @@ class CommandCog(commands.Cog):
         embed.set_footer(text="Bot owner: _kexo")
         await ctx.respond(embed=embed)
 
-    @slash_command(
-        name="random_number", description="Choose number between intervals."
-    )
+    @slash_command(name="random_number", description="Choose number between intervals.")
     async def random_number(
         self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
     ) -> None:
@@ -750,14 +700,10 @@ class CommandCog(commands.Cog):
         words = words.split()
         await ctx.respond("I chose " + "`" + str(random.choice(words)) + "`")
 
-    @slash_command(
-        name="clear-messages", description="Clears messages, max 50 (Admin)"
-    )
+    @slash_command(name="clear-messages", description="Clears messages, max 50 (Admin)")
     @discord.default_permissions(administrator=True)
     @option("integer", description="Max is 50.", min_value=1, max_value=50)
-    async def clear(
-        self, ctx: discord.ApplicationContext, integer: int
-    ) -> None:
+    async def clear(self, ctx: discord.ApplicationContext, integer: int) -> None:
         """Method to clear messages in a channel.
         This method is only available to administrators.
 
@@ -780,13 +726,9 @@ class CommandCog(commands.Cog):
         guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
-    @option(
-        "collection", description="Choose database", choices=DB_CHOICES.keys()
-    )
+    @option("collection", description="Choose database", choices=DB_CHOICES.keys())
     @option("to_upload", description="String to upload.")
-    async def bot_config_add(
-        self, ctx, collection: str, to_upload: str
-    ) -> None:
+    async def bot_config_add(self, ctx, collection: str, to_upload: str) -> None:
         """Method to add a string to a selected database collection.
         This method is only available to the bot owner.
 
@@ -807,13 +749,9 @@ class CommandCog(commands.Cog):
         guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
-    @option(
-        "collection", description="Choose database", choices=DB_CHOICES.keys()
-    )
+    @option("collection", description="Choose database", choices=DB_CHOICES.keys())
     @option("to_remove", description="String to remove.")
-    async def bot_config_remove(
-        self, ctx, collection: str, to_remove: str
-    ) -> None:
+    async def bot_config_remove(self, ctx, collection: str, to_remove: str) -> None:
         """Method to remove a string from a selected database collection.
         This method is only available to the bot owner.
 
@@ -834,9 +772,7 @@ class CommandCog(commands.Cog):
         guild_ids=[KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
-    @option(
-        "collection", description="Choose database", choices=DB_CHOICES.keys()
-    )
+    @option("collection", description="Choose database", choices=DB_CHOICES.keys())
     async def bot_config_show(self, ctx, collection: str) -> None:
         """Method to show data from a selected database collection.
         This method is only available to the bot owner.
@@ -885,9 +821,7 @@ class CommandCog(commands.Cog):
         collection_name = collection
         collection: list = bot_config[DB_CHOICES[collection]]
 
-        embed = discord.Embed(
-            title=collection_name, color=discord.Color.blue()
-        )
+        embed = discord.Embed(title=collection_name, color=discord.Color.blue())
         embed.add_field(
             name=f"_{len(collection)} items_",
             value="\n".join(
@@ -896,9 +830,7 @@ class CommandCog(commands.Cog):
         )
         await ctx.respond(embed=embed)
 
-    async def _add_to_bot_config(
-        self, ctx, collection: str, to_upload: str
-    ) -> None:
+    async def _add_to_bot_config(self, ctx, collection: str, to_upload: str) -> None:
         bot_config: dict = await self._bot_config.find_one(DB_LISTS)
         collection_name = collection
         collection_db_name = DB_CHOICES[collection]
@@ -931,7 +863,7 @@ class CommandCog(commands.Cog):
             await send_response(ctx, "DB_NOT_IN_LIST", to_remove=to_remove)
             return
 
-        del collection[collection.index(to_remove)]
+        collection.pop(collection.index(to_remove), None)
         await self._bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
@@ -1001,13 +933,11 @@ class HostView(discord.ui.View):
         await self.message.edit(embed=embed, view=None)
         await self._author.send(
             f"You forgot to click button in {self.message.jump_url} you {
-                random.choice(
-                    ('dumbass', 'retard', 'prick', 'cunt', 'shitling')
-                )
+                random.choice(('dumbass', 'retard', 'prick', 'cunt', 'shitling'))
             }."
             "\nhttps://tenor.com/view/zombie-screaming-gif-12431778992096703656"
         )
-        del host_authors[host_authors.index(self._author.name)]
+        host_authors.pop(host_authors.index(self._author.name), None)
 
     async def _disable_embed(self) -> discord.Embed:
         self.stop()
@@ -1042,9 +972,7 @@ class SubredditSelectorView(discord.ui.View):
         The ID of the user who is editing the subreddits.
     """
 
-    def __init__(
-        self, current_subreddits: set, bot: discord.Bot, user_id: int
-    ) -> None:
+    def __init__(self, current_subreddits: set, bot: discord.Bot, user_id: int) -> None:
         super().__init__(timeout=600)
         self._current_subreddits = current_subreddits
         self.selected_subreddits = set()
@@ -1090,9 +1018,7 @@ class SubredditSelectorView(discord.ui.View):
         interaction: :class:`discord.Interaction`
             The interaction that triggered the button click.
         """
-        nsfw_status = not self._user_data[self._user_id]["reddit"][
-            "nsfw_posts"
-        ]
+        nsfw_status = not self._user_data[self._user_id]["reddit"]["nsfw_posts"]
 
         self._user_data[self._user_id]["reddit"]["nsfw_posts"] = nsfw_status
         await self._user_data_db.update_one(
@@ -1101,9 +1027,7 @@ class SubredditSelectorView(discord.ui.View):
 
         self._nsfw_button.label = "NSFW ON" if nsfw_status else "NSFW OFF"
         self._nsfw_button.style = (
-            discord.ButtonStyle.green
-            if not nsfw_status
-            else discord.ButtonStyle.red
+            discord.ButtonStyle.green if not nsfw_status else discord.ButtonStyle.red
         )
 
         await interaction.response.edit_message(view=self)
@@ -1140,18 +1064,16 @@ class SubredditSelectorView(discord.ui.View):
             color=discord.Color.green(),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
-        await interaction.response.edit_message(
-            embed=embed, view=None, delete_after=20
-        )
+        await interaction.response.edit_message(embed=embed, view=None, delete_after=20)
 
     async def on_timeout(self) -> None:
         self.disable_all_items()
         self.stop()
 
     async def _update_multireddit(self) -> None:
-        multireddit: asyncpraw.models.Multireddit = self._temp_user_data[
-            self._user_id
-        ]["reddit"]["multireddit"]
+        multireddit: asyncpraw.models.Multireddit = self._temp_user_data[self._user_id][
+            "reddit"
+        ]["multireddit"]
         await multireddit.load()
         added_subreddits = set()
 
@@ -1166,9 +1088,7 @@ class SubredditSelectorView(discord.ui.View):
                 continue
 
             try:
-                await multireddit.add(
-                    await self._bot.reddit_agent.subreddit(subreddit)
-                )
+                await multireddit.add(await self._bot.reddit_agent.subreddit(subreddit))
             except asyncpraw.exceptions.RedditAPIException:
                 print(f"Failed to add subreddit `{subreddit}`")
 

@@ -33,9 +33,7 @@ class Listeners(commands.Cog):
         self._bot = bot
 
     @commands.Cog.listener()  # noinspection PyUnusedLocal
-    async def on_wavelink_track_start(
-        self, payload: TrackStartEventPayload
-    ) -> None:
+    async def on_wavelink_track_start(self, payload: TrackStartEventPayload) -> None:
         """This event is triggered when a track starts playing.
 
         It sends a message to the text channel with the track information.
@@ -50,48 +48,39 @@ class Listeners(commands.Cog):
             print("Player not found, skipping track start message.")
             return
 
+        if payload.player.node_is_switching:
+            return
+
         if not payload.player.should_respond or not hasattr(
             payload.player.current, "requester"
         ):
-            await payload.player.text_channel.send(
-                embed=self._playing_embed(payload)
-            )
+            await payload.player.text_channel.send(embed=self._playing_embed(payload))
 
-        if (
-            payload.player.queue.history.count == 3
-            and payload.player.autoplay != wavelink.AutoPlayMode.enabled
-            and random.randint(0, 1) == 0
-        ):
-            await payload.player.text_channel.send(
-                "-# Not happy with the current node performance?\n"
-                f"-# You can switch between {self._bot.get_avaiable_nodes()}"
-                " nodes by using /node reconnect."
-            )
+        history_count = payload.player.queue.history.count
+        if payload.player.autoplay != wavelink.AutoPlayMode.enabled:
+            tips: dict[int, str] = {
+                3: (
+                    "-# Not happy with the current node performance?\n"
+                    f"-# You can switch between {self._bot.get_avaiable_nodes()} nodes "
+                    "by using /node reconnect."
+                ),
+                10: (
+                    "-# Use the /music autoplay_mode command and\n"
+                    "-# set the mode to populated to enable automatic queuing of "
+                    "similar tracks."
+                ),
+                15: (
+                    "-# Would you like to see which platforms are supported by this "
+                    "node? Use the /node supported_platforms."
+                ),
+            }
 
-        if (
-            payload.player.queue.history.count == 10
-            and payload.player.autoplay != wavelink.AutoPlayMode.enabled
-            and random.randint(0, 2) == 0
-        ):
-            await payload.player.text_channel.send(
-                "-# Use the /music autoplay_mode command and\n"
-                "-# set the mode to populated to enable automatic queuing of similar tracks."
-            )
-
-        if (
-            payload.player.queue.history.count == 15
-            and payload.player.autoplay != wavelink.AutoPlayMode.enabled
-            and random.randint(0, 2) == 0
-        ):
-            await payload.player.text_channel.send(
-                "-# Would you like to see which platforms are supported by this node?"
-                " Use the /node supported_platforms."
-            )
+            tip = tips.get(history_count)
+            if tip and random.randint(0, 2) == 0:
+                await payload.player.text_channel.send(tip)
 
     @commands.Cog.listener()
-    async def on_wavelink_node_ready(
-        self, payload: NodeReadyEventPayload
-    ) -> None:
+    async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
         """This event is triggered when a Wavelink node is ready.
 
         It checks if the bot is connected to the node and closes any unused nodes if necessary.
@@ -119,9 +108,7 @@ class Listeners(commands.Cog):
             The payload containing information about the node that is disconnected.
         """
         if self._bot.get_online_nodes() == 0 and self._is_bot_node_connected():
-            print(
-                f"Node got disconnected, connecting new node. ({payload.node.uri})"
-            )
+            print(f"Node got disconnected, connecting new node. ({payload.node.uri})")
             self._bot.cached_lavalink_servers[payload.node.uri]["score"] = 0
             await self._bot.connect_node()
 
@@ -138,6 +125,13 @@ class Listeners(commands.Cog):
         payload: :class:`TrackExceptionEventPayload`
             The payload containing information about the track exception.
         """
+        data = self._bot.track_exceptions.get(payload.player.guild.id)
+        if data:
+            track, track_failed_event = data
+            if track == payload.track:
+                track_failed_event.set()
+                return
+
         await send_response(
             payload.player.text_channel,
             "TRACK_EXCEPTION",
@@ -145,16 +139,11 @@ class Listeners(commands.Cog):
             message=payload.exception["message"],
             severity=payload.exception["severity"],
         )
-        await switch_node(
-            bot=self._bot,
-            player=payload.player,
-        )
+        await switch_node(bot=self._bot, player=payload.player)
         payload.player.should_respond = False
 
     @commands.Cog.listener()
-    async def on_wavelink_track_stuck(
-        self, payload: TrackStuckEventPayload
-    ) -> None:
+    async def on_wavelink_track_stuck(self, payload: TrackStuckEventPayload) -> None:
         """This event is triggered when a track gets stuck.
 
         It sends a message to the text channel and attempts to switch nodes.
@@ -164,21 +153,19 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStuckEventPayload`
             The payload containing information about the track that got stuck.
         """
-        print(f"Track got stuck. ({payload.player.node.uri})")
-        await send_response(
-            payload.player.text_channel, "TRACK_STUCK", respond=False
-        )
-        await switch_node(
-            bot=self._bot,
-            player=payload.player,
-            play_after=False,
-        )
+        data = self._bot.track_exceptions.get(payload.player.guild.id)
+        if data:
+            track, track_failed_event = data
+            if track == payload.track:
+                track_failed_event.set()
+                return
+
+        await send_response(payload.player.text_channel, "TRACK_STUCK", respond=False)
+        await switch_node(bot=self._bot, player=payload.player)
         payload.player.should_respond = False
 
     @commands.Cog.listener()
-    async def on_wavelink_inactive_player(
-        self, player: wavelink.Player
-    ) -> None:
+    async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:
         """This event is triggered when a player becomes inactive.
 
         It sends a message to the text channel and disconnects the player.

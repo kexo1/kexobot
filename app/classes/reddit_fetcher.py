@@ -68,13 +68,11 @@ class RedditFetcher:
             "crackwatch_cache", "crackwatch_exceptions"
         )
         crackwatch_cache_upload = crackwatch_cache.copy()
-        subreddit: asyncpraw.models.Subreddit = (
-            await self._reddit_agent.subreddit("CrackWatch")
+        subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
+            "CrackWatch"
         )
         try:
-            async for submission in subreddit.new(
-                limit=REDDIT_CRACKWATCH_POSTS
-            ):
+            async for submission in subreddit.new(limit=REDDIT_CRACKWATCH_POSTS):
                 if (
                     submission.locked
                     or submission.stickied
@@ -87,9 +85,7 @@ class RedditFetcher:
                     continue
 
                 is_filtered = [
-                    k
-                    for k in to_filter
-                    if k.lower() in submission.title.lower()
+                    k for k in to_filter if k.lower() in submission.title.lower()
                 ]
                 if is_filtered:
                     continue
@@ -104,9 +100,7 @@ class RedditFetcher:
 
                 description_list = []
 
-                submission_text = strip_text(
-                    submission_text, REDDIT_STRIP
-                ).split("\n")
+                submission_text = strip_text(submission_text, REDDIT_STRIP).split("\n")
                 for line in submission_text:
                     line = line.strip()
 
@@ -118,7 +112,7 @@ class RedditFetcher:
                         continue
                     description_list.append(f"• {line}\n")
 
-                del crackwatch_cache_upload[0]
+                crackwatch_cache_upload.pop(0)
                 crackwatch_cache_upload.append(submission.permalink)
 
                 description = "".join(description_list)[:4096]
@@ -141,9 +135,7 @@ class RedditFetcher:
                     text="I took it from - r/CrackWatch",
                     icon_url=REDDIT_CRACKWATCH_ICON,
                 )
-                embed.timestamp = datetime.fromtimestamp(
-                    submission.created_utc
-                )
+                embed.timestamp = datetime.fromtimestamp(submission.created_utc)
                 await self._game_updates.send(embed=embed)
 
             if crackwatch_cache != crackwatch_cache_upload:
@@ -164,14 +156,12 @@ class RedditFetcher:
             "freegamefindings_cache", "freegamefindings_exceptions"
         )
         freegamefindings_cache_upload = freegamefindings_cache.copy()
-        subreddit: asyncpraw.models.Subreddit = (
-            await self._reddit_agent.subreddit("FreeGameFindings")
+        subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
+            "FreeGameFindings"
         )
 
         try:
-            async for submission in subreddit.new(
-                limit=REDDIT_FREEGAME_MAX_POSTS
-            ):
+            async for submission in subreddit.new(limit=REDDIT_FREEGAME_MAX_POSTS):
                 # If post is locked, or is stickied, nsfw, or it's a poll, skip it
                 if (
                     submission.locked
@@ -184,10 +174,7 @@ class RedditFetcher:
                 if submission.url in freegamefindings_cache:
                     continue
 
-                if (
-                    "[PSA]" in submission.title
-                    and "Amazon" not in submission.title
-                ):
+                if "[PSA]" in submission.title and "Amazon" not in submission.title:
                     continue
 
                 if "(Game)" not in submission.title:
@@ -200,7 +187,7 @@ class RedditFetcher:
                 if is_filtered:
                     continue
 
-                del freegamefindings_cache_upload[0]
+                freegamefindings_cache_upload.pop(0)
                 freegamefindings_cache_upload.append(submission.url)
                 await self._process_submission(submission)
 
@@ -214,11 +201,7 @@ class RedditFetcher:
         if freegamefindings_cache_upload != freegamefindings_cache:
             await self._bot_config.update_one(
                 DB_CACHE,
-                {
-                    "$set": {
-                        "freegamefindings_cache": freegamefindings_cache_upload
-                    }
-                },
+                {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}},
             )
 
     async def _process_submission(
@@ -231,13 +214,9 @@ class RedditFetcher:
         elif "alienwarearena" in submission.url:
             await self._alienwarearena(submission.url)
         else:
-            title_stripped = re.sub(
-                r"\[.*?]|\(.*?\)", "", submission.title
-            ).strip()
+            title_stripped = re.sub(r"\[.*?]|\(.*?\)", "", submission.title).strip()
             feeegame_embeds["Default"]["title"] = title_stripped
-            await self._create_embed(
-                feeegame_embeds["Default"], submission.url
-            )
+            await self._create_embed(feeegame_embeds["Default"], submission.url)
 
     async def _alienwarearena(self, url) -> None:
         # There might be an occurence where giveaway is not showing in alienwarearena.com

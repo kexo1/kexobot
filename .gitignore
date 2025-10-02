@@ -6,6 +6,7 @@ graphs/
 
 .pypirc
 .pylintrc
+.flake8
 desktop.ini
 fly.toml
 ruff.toml

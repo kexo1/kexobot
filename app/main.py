@@ -100,6 +100,7 @@ class KexoBot:
         bot.temp_user_data = {}
         bot.guild_data = {}
         bot.temp_guild_data = {}
+        bot.track_exceptions = {}
         bot.cached_lavalink_servers = []
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
@@ -129,12 +130,8 @@ class KexoBot:
     async def _fetch_channels(self) -> None:
         """Fetch all channels for the bot."""
         self._channel_esutaze = await self._fetch_channel(ESUTAZE_CHANNEL)
-        self._channel_game_updates = await self._fetch_channel(
-            GAME_UPDATES_CHANNEL
-        )
-        self._channel_free_stuff = await self._fetch_channel(
-            FREE_STUFF_CHANNEL
-        )
+        self._channel_game_updates = await self._fetch_channel(GAME_UPDATES_CHANNEL)
+        self._channel_free_stuff = await self._fetch_channel(FREE_STUFF_CHANNEL)
         self._channel_alienware_arena_news = await self._fetch_channel(
             ALIENWARE_ARENA_NEWS_CHANNEL
         )
@@ -143,12 +140,8 @@ class KexoBot:
     async def _fetch_cached_lavalink_servers(self) -> None:
         """Fetch cached lavalink servers for the bot."""
         cached_lavalink_servers = await self._bot_config.find_one(DB_CACHE)
-        bot.cached_lavalink_servers = cached_lavalink_servers[
-            "lavalink_servers"
-        ]
-        self.cached_lavalink_servers_copy = copy.deepcopy(
-            bot.cached_lavalink_servers
-        )
+        bot.cached_lavalink_servers = cached_lavalink_servers["lavalink_servers"]
+        self.cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
         print("Cached lavalink servers fetched.")
 
     async def _fetch_subreddit_icons(self) -> None:
@@ -345,20 +338,16 @@ class KexoBot:
             print("Presence too long, skipping.")
             return
 
-        activity = discord.Activity(
-            type=discord.ActivityType.watching, name=presence
-        )
-        await bot.change_presence(
-            status=discord.Status.online, activity=activity
-        )
+        activity = discord.Activity(type=discord.ActivityType.watching, name=presence)
+        await bot.change_presence(status=discord.Status.online, activity=activity)
         print(f"Presence set to: {word}")
 
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""
         subreddit_icons = {}
         for subreddit_name in SHITPOST_SUBREDDITS_ALL:
-            subreddit: asyncpraw.models.Subreddit = (
-                await self._reddit_agent.subreddit(subreddit_name)
+            subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
+                subreddit_name
             )
             try:
                 await subreddit.load()
@@ -386,9 +375,7 @@ class KexoBot:
     def _create_session(self) -> None:
         """Create a httpx session for the bot."""
         self.session = httpx.AsyncClient()
-        self.session.headers = httpx.Headers(
-            {"User-Agent": UserAgent().random}
-        )
+        self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
         print("Httpx session initialized.")
 
     async def _upload_cached_lavalink_servers(self) -> None:
@@ -400,9 +387,7 @@ class KexoBot:
             DB_CACHE,
             {"$set": {"lavalink_servers": bot.cached_lavalink_servers}},
         )
-        self.cached_lavalink_servers_copy = copy.deepcopy(
-            bot.cached_lavalink_servers
-        )
+        self.cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
 
     @staticmethod
     async def get_guild_node(guild_id: int) -> dict:
@@ -669,9 +654,7 @@ async def on_ready() -> None:
 
 
 @bot.event
-async def on_application_command_error(
-    ctx: discord.ApplicationContext, error
-) -> None:
+async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
     """This event is called when an error occurs in an appliacation command.
 
     Parameters
@@ -722,9 +705,9 @@ async def on_application_command_error(
         await ctx.respond(embed=embed, ephemeral=True)
         return
 
-    if isinstance(
-        error, discord.errors.NotFound
-    ) and "Unknown interaction" in str(error):
+    if isinstance(error, discord.errors.NotFound) and "Unknown interaction" in str(
+        error
+    ):
         embed = discord.Embed(
             title="",
             description="⚠️ Discord API is not responding. Please try again in a minute.",

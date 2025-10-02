@@ -65,7 +65,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "NODE_UNRESPONSIVE": discord.Embed(
         title="",
-        description=":warning: Node is unresponsive, trying to connect to a new node.",
+        description=":warning: Node is unresponsive, trying to connect to a new node in a moment.",
         color=discord.Color.yellow(),
     ),
     "NO_PLAYERS_CONNECTED": discord.Embed(
@@ -75,8 +75,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "CONNECTION_TIMEOUT": discord.Embed(
         title="",
-        description=":x: Failed to connect to the voice channel,"
-        " might be due to being manually disconnected or node is unresponsive."
+        description=":x: Failed to connect to the voice channel."
         "\nTry using `/node reconnect`.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
@@ -100,15 +99,6 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
         description=":exploding_head: Can't shuffle 1 song in queue BRUH",
         color=discord.Color.blue(),
     ),
-    "YOUTUBE_ERROR": discord.Embed(
-        title="",
-        description=":x: Failed to load tracks, youtube plugin"
-        " might be disabled, or version is outdated."
-        " Try `/node reconnect`.\nIf issue persists,"
-        " it means YouTube updated their site and getting"
-        " tracks won't work until youtube plugin gets fixed.",
-        color=discord.Color.from_rgb(r=220, g=0, b=0),
-    ),
     "LAVALINK_ERROR": discord.Embed(
         title="",
         description=":x: Failed to load tracks, you probably inputted"
@@ -119,7 +109,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "NODE_REQUEST_ERROR": lambda **kwargs: discord.Embed(
         title="",
         description=":warning: An error occured when trying to send"
-        " request to the node, trying to connect to a new node."
+        " request to the node, trying to connect to a new node in a moment."
         f"\n\n**Message: {kwargs.get('error')}**",
         color=discord.Color.yellow(),
     ),
@@ -131,8 +121,13 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "TRACK_EXCEPTION": lambda **kwargs: discord.Embed(
         title="",
         description=":warning: An error occured when playing song, trying to connect to a new node."
-        f"\n\n**Message**: {kwargs.get('message')}"
+        f"\n**Message**: {kwargs.get('message')}"
         f"\n**Severity**: {kwargs.get('severity')}",
+        color=discord.Color.yellow(),
+    ),
+    "WAIT_UNTIL_NODE_SWITCHES": discord.Embed(
+        title="",
+        description=":hourglass_flowing_sand: Please wait until the bot finishes switching nodes.",
         color=discord.Color.yellow(),
     ),
     "TRACK_STUCK": discord.Embed(

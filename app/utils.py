@@ -169,9 +169,7 @@ async def check_node_status(
         )
     ]
     try:
-        await asyncio.wait_for(
-            wavelink.Pool.connect(nodes=node, client=bot), timeout=3
-        )
+        await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=3)
         await node[0].fetch_info()
     except (
         asyncio.TimeoutError,
@@ -344,50 +342,57 @@ async def switch_node(
         The new wavelink.Node instance if successful, None otherwise.
     """
     bot.cached_lavalink_servers[player.node.uri]["score"] = -1
-    for i in range(5):
+    for i in range(10):
+        player_autoplay_mode = player.autoplay
+        player.autoplay = wavelink.AutoPlayMode.disabled
+        player.node_is_switching = True
+        node: wavelink.Node = await bot.connect_node(player.guild.id)
+
         try:
-            player_autoplay_mode = player.autoplay
-            player.autoplay = wavelink.AutoPlayMode.disabled
-
-            node: wavelink.Node = await bot.connect_node(player.guild.id)
             await player.switch_node(node)
-
-            # When populated queue is on, the player can put random song
-            # and skip currently playing song
-            if (
-                not play_after
-                and player_autoplay_mode == wavelink.AutoPlayMode.enabled
-            ):
-                try:
-                    del player.queue[0]
-                except IndexError:
-                    pass
-
             if play_after:
                 await player.play(player.temp_current)
-
-            player.autoplay = player_autoplay_mode
-            print(f"{i + 1}. Node switched. ({node.uri})")
-            embed = discord.Embed(
-                title="",
-                description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
-                color=discord.Color.green(),
-            )
-            await player.text_channel.send(embed=embed)
-            return node
         except (
             wavelink.LavalinkException,
             wavelink.InvalidNodeException,
+            aiohttp.client_exceptions.ContentTypeError,
             RuntimeError,
         ):
-            bot.cached_lavalink_servers[node.uri]["score"] = 0
+            bot.cached_lavalink_servers[node.uri]["score"] = -1
+            continue
+
+        player.autoplay = player_autoplay_mode
+        if play_after:
+            track_failed_event = asyncio.Event()
+            bot.track_exceptions[player.guild.id] = (
+                player.temp_current,
+                track_failed_event,
+            )
+
+            try:
+                await asyncio.wait_for(track_failed_event.wait(), timeout=3)
+                bot.cached_lavalink_servers[node.uri]["score"] = -1
+                continue
+            except asyncio.TimeoutError:
+                bot.track_exceptions.pop(player.guild.id, None)
+
+        print(f"{i + 1}. Node switched. ({node.uri})")
+        embed = discord.Embed(
+            title="",
+            description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
+            color=discord.Color.green(),
+        )
+        await player.text_channel.send(embed=embed)
+        player.node_is_switching = False
+        return node
 
     embed = discord.Embed(
         title="",
-        description=":x: Failed to connect to a new node, try `/reconnect_node`",
+        description=":x: Failed to automatically connect to a new node, try `/reconnect_node`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     )
     await player.text_channel.send(embed=embed)
+    player.node_is_switching = False
     return None
 
 
@@ -440,10 +445,8 @@ async def generate_temp_user_data(bot: discord.Bot, user_id: int) -> dict:
     dict
         A dictionary containing temporary user data.
     """
-    multireddit: asyncpraw.models.Multireddit = (
-        await bot.reddit_agent.multireddit(
-            name=str(user_id), redditor="KexoBOT"
-        )
+    multireddit: asyncpraw.models.Multireddit = await bot.reddit_agent.multireddit(
+        name=str(user_id), redditor="KexoBOT"
     )
     for attempt in range(3):
         try:
@@ -554,9 +557,7 @@ def fix_data(
     return fixed_data
 
 
-async def get_user_data(
-    bot: discord.Bot, ctx: discord.ApplicationContext
-) -> tuple:
+async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tuple:
     """Get user data for the given user.
 
     Parameters
@@ -579,18 +580,14 @@ async def get_user_data(
 
     await ctx.defer()
 
-    user_data = await bot.user_data_db.find_one(
-        {"_id": user_id}
-    )  # Load from DB
+    user_data = await bot.user_data_db.find_one({"_id": user_id})  # Load from DB
     if user_data:
         fixed_data = fix_user_data(user_data)
         bot.user_data[user_id] = fixed_data
         temp_user_data = await generate_temp_user_data(bot, user_id)
     else:  # If not in DB, create new user data
         user_data = generate_user_data()
-        print(
-            "Creating new user data for user:", await bot.fetch_user(user_id)
-        )
+        print("Creating new user data for user:", await bot.fetch_user(user_id))
         await bot.user_data_db.insert_one({"_id": user_id, **user_data})
         bot.user_data[user_id] = user_data
 
@@ -619,9 +616,7 @@ async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple:
     if guild_data:
         return guild_data, bot.temp_guild_data[guild_id]
 
-    guild_data = await bot.guild_data_db.find_one(
-        {"_id": guild_id}
-    )  # Load from DB
+    guild_data = await bot.guild_data_db.find_one({"_id": guild_id})  # Load from DB
     if guild_data:
         fixed_data = fix_guild_data(guild_data)
         bot.guild_data[guild_id] = fixed_data
@@ -682,9 +677,7 @@ async def make_http_request(
                     url, data=data, headers=headers, timeout=timeout
                 )
             else:
-                response = await session.get(
-                    url, headers=headers, timeout=timeout
-                )
+                response = await session.get(url, headers=headers, timeout=timeout)
 
             # Don't raise for status for MP3 files or binary content
             if not (url.endswith(".mp3") or binary):

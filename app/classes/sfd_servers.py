@@ -113,9 +113,7 @@ class SFDServers:
         The directory where graphs will be saved.
     """
 
-    def __init__(
-        self, bot_config: AsyncMongoClient, session: httpx.AsyncClient
-    ):
+    def __init__(self, bot_config: AsyncMongoClient, session: httpx.AsyncClient):
         self._session = session
         self._bot_config = bot_config
         self._graphs_dir = os.path.join(os.getcwd(), "graphs")
@@ -191,9 +189,7 @@ class SFDServers:
         plt.xticks(time_positions, hours, rotation=45)
         plt.subplots_adjust(bottom=0.2)
         plt.savefig(
-            os.path.join(
-                self._graphs_dir, f"sfd_activity_week_{timezone}.png"
-            ),
+            os.path.join(self._graphs_dir, f"sfd_activity_week_{timezone}.png"),
             dpi=300,
             bbox_inches="tight",
         )
@@ -276,9 +272,7 @@ class SFDServers:
 
         current_hour = now.hour
         rounded_hour = (current_hour // 6) * 6
-        next_update = now.replace(
-            hour=rounded_hour, minute=0, second=0, microsecond=0
-        )
+        next_update = now.replace(hour=rounded_hour, minute=0, second=0, microsecond=0)
         next_update = next_update.replace(tzinfo=ZoneInfo("Europe/Bratislava"))
 
         await self._bot_config.update_many(
@@ -313,9 +307,7 @@ class SFDServers:
             if server.bots == 0:
                 players = f"{server.players}/{server.max_players}"
             else:
-                players = (
-                    f"{server.players}(+{server.bots})/{server.max_players}"
-                )
+                players = f"{server.players}(+{server.bots})/{server.max_players}"
             servers_dict["players"].append(players)
             all_players += server.players
 
@@ -467,9 +459,7 @@ class SFDServers:
         plt.figure(figsize=(14, 7))
         plt.plot(x_positions, players, color="cyan", label="Players")
         plt.plot(x_positions, servers, color="magenta", label="Servers")
-        plt.legend(
-            loc="upper center", fontsize=12, bbox_to_anchor=(0.5, 1.05), ncol=2
-        )
+        plt.legend(loc="upper center", fontsize=12, bbox_to_anchor=(0.5, 1.05), ncol=2)
 
         mplcyberpunk.add_glow_effects()
         mplcyberpunk.add_gradient_fill(alpha_gradientglow=0.5)

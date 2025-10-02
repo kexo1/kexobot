@@ -61,9 +61,7 @@ class Audio(commands.Cog):
         )
         self._bot.guild_data[ctx.guild_id] = guild_data
         await player.set_volume(volume)
-        await send_response(
-            ctx, "VOLUME_CHANGED", ephemeral=False, volume=volume
-        )
+        await send_response(ctx, "VOLUME_CHANGED", ephemeral=False, volume=volume)
 
     @subcommand("music")
     @slash_command(name="speed", description="Speeds up music.")
@@ -100,9 +98,7 @@ class Audio(commands.Cog):
         )
 
     @subcommand("music")
-    @slash_command(
-        name="clear-effects", description="Clears all effects on player."
-    )
+    @slash_command(name="clear-effects", description="Clears all effects on player.")
     @guild_only()
     @is_joined()
     async def clear_effects(self, ctx: discord.ApplicationContext) -> None:
