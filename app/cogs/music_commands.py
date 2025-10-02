@@ -89,7 +89,7 @@ class MusicCommands(commands.Cog):
         """
 
         # Defer the response right away to avoid interaction timeout
-        await ctx.defer(ephemeral=False)
+        await ctx.defer()
 
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
@@ -107,11 +107,12 @@ class MusicCommands(commands.Cog):
             return
 
         player: wavelink.Player = ctx.voice_client
-        player.temp_current = track  # To be used in case of switching nodes
 
         if player.node_is_switching:
             await send_response(ctx, "WAIT_UNTIL_NODE_SWITCHES")
             return
+
+        player.temp_current = track  # To be used in case of switching nodes
 
         if player.playing:
             if play_next:
@@ -280,9 +281,7 @@ class MusicCommands(commands.Cog):
         """
         player: wavelink.Player = ctx.voice_client
         await player.skip()
-        print(player.autoplay)
-
-        player.should_respond = player.queue.is_empty
+        player.should_respond = False
         await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
 
     @music.command(name="skip-to", description="Skips to selected song in queue.")
@@ -627,9 +626,6 @@ class MusicCommands(commands.Cog):
         if not ctx.author.voice or not ctx.author.voice.channel:
             await send_response(ctx, "NO_VOICE_CHANNEL")
             return False
-
-        if not ctx.response:
-            await ctx.defer()
 
         # For some reason there's like a tiny chance the fucking node suddenly stops
         # responding, even though it was working minutes before, seems like some nodes
