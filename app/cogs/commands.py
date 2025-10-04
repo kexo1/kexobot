@@ -491,8 +491,7 @@ class CommandCog(commands.Cog):
     )
     @option(
         "ping_role",
-        description="Should this embed ping selected role or not, default is None",
-        required=False,
+        description="Which role to ping when you start hosting.",
     )
     @option(
         "branch",
