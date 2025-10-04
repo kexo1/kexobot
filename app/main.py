@@ -449,6 +449,7 @@ class KexoBot:
             aiohttp.client_exceptions.ServerDisconnectedError,
             aiohttp.client_exceptions.ClientConnectorError,
             aiohttp.client_exceptions.ClientConnectionError,
+            aiohttp.client_exceptions.InvalidUrlClientError,
             ConnectionRefusedError,
             AttributeError,
         ):

@@ -356,6 +356,7 @@ async def switch_node(
             wavelink.LavalinkException,
             wavelink.InvalidNodeException,
             aiohttp.client_exceptions.ContentTypeError,
+            aiohttp.client_exceptions.InvalidUrlClientError,
             RuntimeError,
         ):
             bot.cached_lavalink_servers[node.uri]["score"] = -1
