@@ -284,7 +284,7 @@ class KexoBot:
             )
             node_uri, node_info = best_node
             node = self._return_node(node_uri, node_info["password"])
-            is_connected = await self._check_node_status(best_node)
+            is_connected = await self._check_node_status(node)
             if is_connected:
                 bot.cached_lavalink_servers[node.uri]["score"] += 1
                 break
