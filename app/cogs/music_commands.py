@@ -94,7 +94,7 @@ class MusicCommands(commands.Cog):
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
             if not joined:
-                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] = -1
+                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] -= 1
                 return
             await self._prepare_wavelink(ctx)
 
@@ -647,7 +647,7 @@ class MusicCommands(commands.Cog):
                 wavelink.exceptions.InvalidNodeException,
             ):
                 print(f"Node join timeout. ({self._bot.node.uri})")
-                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] = -1
+                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] -= 1
                 await self._bot.connect_node()
                 is_connected = False
 

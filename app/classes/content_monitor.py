@@ -406,7 +406,7 @@ class ContentMonitor:
         for giveaway in json_data["freeProducts"][:FANATICAL_MAX_POSTS]:
             if giveaway["min_spend"]["EUR"] != 0:
                 continue  # Skip if not free
-            
+
             if not giveaway["required_products"]:
                 continue
 

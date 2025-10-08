@@ -13,7 +13,7 @@ logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
 
 # -------------------- Environment Configuration -------------------- #
 LOCAL_MACHINE_NAME = "mato"
-if socket.gethostname() == LOCAL_MACHINE_NAME:
+if LOCAL_MACHINE_NAME in socket.gethostname():
     load_dotenv(os.getenv("SECRET_PATH"))
     DISCORD_TOKEN = os.getenv("DISCORD_TOKEN_DEV")
 else:

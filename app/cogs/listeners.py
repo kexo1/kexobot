@@ -109,7 +109,7 @@ class Listeners(commands.Cog):
         """
         if self._bot.get_online_nodes() == 0 and self._is_bot_node_connected():
             print(f"Node got disconnected, connecting new node. ({payload.node.uri})")
-            self._bot.cached_lavalink_servers[payload.node.uri]["score"] = 0
+            self._bot.cached_lavalink_servers[payload.node.uri]["score"] -= 1
             await self._bot.connect_node()
 
     @commands.Cog.listener()

@@ -276,41 +276,18 @@ class KexoBot:
         node = None
         is_connected = False
 
-        # Try all nodes with score > 0 in descending order
-        quality_nodes = sorted(
-            [
-                (uri, info)
-                for uri, info in bot.cached_lavalink_servers.items()
-                if info["score"] > 0
-            ],
-            key=lambda x: x[1]["score"],
-            reverse=True,
-        )
-        if quality_nodes:
-            for uri, info in quality_nodes:
-                node = self._return_node(uri, info["password"])
-                is_connected = await self._check_node_status(node)
-                if is_connected:
-                    break
-
-        # If not connected, try all nodes with score == 0
-        if not is_connected:
-            for uri, info in bot.cached_lavalink_servers.items():
-                if info["score"] == 0:
-                    node = self._return_node(uri, info["password"])
-                    is_connected = await self._check_node_status(node)
-                    if is_connected:
-                        break
-
-        # If still not connected, try all nodes (maybe one came online)
-        if not is_connected:
-            for uri, info in bot.cached_lavalink_servers.items():
-                node = self._return_node(uri, info["password"])
-                is_connected = await self._check_node_status(node)
-                if is_connected:
-                    if bot.cached_lavalink_servers[node.uri]["score"] == -1:
-                        bot.cached_lavalink_servers[node.uri]["score"] = 0
-                    break
+        # Try to connect to the best node based on score
+        for _ in range(len(bot.cached_lavalink_servers)):
+            best_node = max(
+                bot.cached_lavalink_servers.items(),
+                key=lambda x: x[1]["score"],
+            )
+            node_uri, node_info = best_node
+            best_node = self._return_node(node_uri, node_info["password"])
+            is_connected = await self._check_node_status(best_node)
+            if is_connected:
+                bot.cached_lavalink_servers[best_node.uri]["score"] += 1
+                break
 
         await self._upload_cached_lavalink_servers()
 
@@ -454,7 +431,7 @@ class KexoBot:
             AttributeError,
         ):
             print(f"Node failed to connect: ({node.uri})")
-            bot.cached_lavalink_servers[node.uri]["score"] = -1
+            bot.cached_lavalink_servers[node.uri]["score"] -= 1
         return False
 
     @staticmethod

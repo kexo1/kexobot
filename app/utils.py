@@ -359,7 +359,7 @@ async def switch_node(
             aiohttp.client_exceptions.InvalidUrlClientError,
             RuntimeError,
         ):
-            bot.cached_lavalink_servers[node.uri]["score"] = -1
+            bot.cached_lavalink_servers[node.uri]["score"] -= 1
             continue
 
         player.autoplay = player_autoplay_mode
@@ -372,7 +372,7 @@ async def switch_node(
 
             try:
                 await asyncio.wait_for(track_failed_event.wait(), timeout=3)
-                bot.cached_lavalink_servers[node.uri]["score"] = -1
+                bot.cached_lavalink_servers[node.uri]["score"] -= 1
                 continue
             except asyncio.TimeoutError:
                 bot.track_exceptions.pop(player.guild.id, None)
