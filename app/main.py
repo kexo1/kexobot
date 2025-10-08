@@ -283,10 +283,10 @@ class KexoBot:
                 key=lambda x: x[1]["score"],
             )
             node_uri, node_info = best_node
-            best_node = self._return_node(node_uri, node_info["password"])
+            node = self._return_node(node_uri, node_info["password"])
             is_connected = await self._check_node_status(best_node)
             if is_connected:
-                bot.cached_lavalink_servers[best_node.uri]["score"] += 1
+                bot.cached_lavalink_servers[node.uri]["score"] += 1
                 break
 
         await self._upload_cached_lavalink_servers()
