@@ -7,6 +7,7 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 import aiohttp
+import logging
 import asyncpraw
 import asyncpraw.models
 import asyncprawcore.exceptions
@@ -135,20 +136,20 @@ class KexoBot:
         self._channel_alienware_arena_news = await self._fetch_channel(
             ALIENWARE_ARENA_NEWS_CHANNEL
         )
-        print("Channels fetched.")
+        logging.info("[Starter] Channels fetched.")
 
     async def _fetch_cached_lavalink_servers(self) -> None:
         """Fetch cached lavalink servers for the bot."""
         cached_lavalink_servers = await self._bot_config.find_one(DB_CACHE)
         bot.cached_lavalink_servers = cached_lavalink_servers["lavalink_servers"]
         self.cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
-        print("Cached lavalink servers fetched.")
+        logging.info("[Starter] Cached lavalink servers fetched.")
 
     async def _fetch_subreddit_icons(self) -> None:
         """Fetch subreddit icons for the bot."""
         subreddit_icons = await self._bot_config.find_one(DB_CACHE)
         bot.subreddit_icons = subreddit_icons["subreddit_icons"]
-        print("Subreddit icons fetched.")
+        logging.info("[Starter] Subreddit icons fetched.")
 
     def _define_classes(self) -> None:
         """Define classes for the bot."""
@@ -292,7 +293,7 @@ class KexoBot:
         await self._upload_cached_lavalink_servers()
 
         if not is_connected:
-            print("No lavalink servers available.")
+            logging.error("[Lavalink] No lavalink servers available.")
             node = None
 
         bot.node = node
@@ -303,7 +304,7 @@ class KexoBot:
         url = WORDNIK_API_URL + WORDNIK_API_KEY
         json_data = await make_http_request(self.session, url, get_json=True)
         if not json_data:
-            print("Wordnik API returned no data.")
+            logging.warning("[API] Wordnik API returned no data.")
             return
 
         word = json_data["word"]
@@ -312,12 +313,12 @@ class KexoBot:
         presence = f"{word}: {definition}"
 
         if len(presence) > 128:
-            print("Presence too long, skipping.")
+            logging.info(f"[API] Presence too long ({presence}), skipping.")
             return
 
         activity = discord.Activity(type=discord.ActivityType.watching, name=presence)
         await bot.change_presence(status=discord.Status.online, activity=activity)
-        print(f"Presence set to: {word}")
+        logging.info(f"[API] Presence set to: {word}")
 
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""
@@ -339,7 +340,7 @@ class KexoBot:
         if bot.subreddit_icons == subreddit_icons:
             return
 
-        print("Subreddit icons refreshed.")
+        logging.info("[Reddit] Subreddit icons refreshed.")
         await self._bot_config.update_one(
             DB_CACHE, {"$set": {"subreddit_icons": subreddit_icons}}
         )
@@ -347,13 +348,13 @@ class KexoBot:
     async def _fetch_users(self) -> None:
         """Fetch users for the bot."""
         self._user_kexo = await bot.fetch_user(402221830930432000)
-        print(f"User {self._user_kexo.name} fetched.")
+        logging.info(f"[Starter] User {self._user_kexo.name} fetched.")
 
     def _create_session(self) -> None:
         """Create a httpx session for the bot."""
         self.session = httpx.AsyncClient()
         self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
-        print("Httpx session initialized.")
+        logging.info("[Starter] Httpx session initialized.")
 
     async def _upload_cached_lavalink_servers(self) -> None:
         """Upload cached lavalink servers to the database."""
@@ -430,7 +431,7 @@ class KexoBot:
             ConnectionRefusedError,
             AttributeError,
         ):
-            print(f"Node failed to connect: ({node.uri})")
+            logging.info(f"[Lavalink] Node failed to connect: ({node.uri})")
             bot.cached_lavalink_servers[node.uri]["score"] -= 1
         return False
 
@@ -456,7 +457,7 @@ class KexoBot:
                 break
 
             if len(node.players) == 0:
-                print(f"Node is empty, removing. ({node.uri})")
+                logging.info(f"[Lavalink] Node is empty, removing. ({node.uri})")
                 await node._pool_closer()  # Node is not properly closed
                 await node.close(eject=True)
 
@@ -567,7 +568,7 @@ def setup_cogs() -> None:
     create_cog_session()
     for cog in cogs_list:
         bot.load_extension(f"app.cogs.{cog}")
-    print("Cogs loaded.")
+    logging.info("[Starter] Cogs loaded.")
 
 
 setup_cogs()
@@ -626,9 +627,9 @@ async def on_ready() -> None:
     connecting to the lavalink server.
     It also starts the main loop and the hourly loop.
     """
-    print(f"Logged in as {bot.user}")
+    logging.info(f"[Starter] Logged in as {bot.user}")
     await bot_loader(kexobot)
-    print("Bot is ready.")
+    logging.info("[Starter] Bot is ready.")
 
 
 @bot.event
@@ -711,7 +712,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
 
 @bot.event
 async def on_guild_join(guild: discord.Guild) -> None:
-    print(f"Joined new guild: {guild.name}")
+    logging.info(f"Joined new guild: {guild.name}")
 
 
 bot.run(DISCORD_TOKEN)

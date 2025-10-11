@@ -6,6 +6,7 @@ import time
 from urllib.parse import urlparse
 
 import aiohttp
+import logging
 import asyncpraw.models
 import discord
 import httpx
@@ -401,8 +402,6 @@ class CommandCog(commands.Cog):
         if not server:
             await send_response(ctx, "SFD_SERVER_NOT_FOUND")
             return
-
-        print(server)
 
         embed = discord.Embed(
             title=server.server_name,
@@ -1089,7 +1088,7 @@ class SubredditSelectorView(discord.ui.View):
             try:
                 await multireddit.add(await self._bot.reddit_agent.subreddit(subreddit))
             except asyncpraw.exceptions.RedditAPIException:
-                print(f"Failed to add subreddit `{subreddit}`")
+                logging.warning(f"[Reddit] Failed to add subreddit `{subreddit}`")
 
 
 class SubredditSelect(discord.ui.Select):

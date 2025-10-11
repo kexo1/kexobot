@@ -2,6 +2,7 @@ import copy
 
 import discord
 import httpx
+import logging
 import wavelink
 
 from app.constants import LAVALIST_URL, LAVALINK_API_URL, DB_CACHE
@@ -61,7 +62,7 @@ class LavalinkServerManager:
             self._cached_lavalink_servers_copy = copy.deepcopy(
                 self._cached_lavalink_servers
             )
-            print("Found new lavalink servers, updating cache.")
+            logging.info("[Lavalink] Found new lavalink servers, updating cache.")
 
     def _parse_lavalink_servers(self, json_data: list) -> list[wavelink.Node]:
         for server in json_data:

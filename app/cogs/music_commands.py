@@ -5,6 +5,7 @@ from typing import Union, Optional, List
 
 import discord
 import wavelink
+import logging
 from discord import option
 from discord.commands import guild_only
 from discord.ext import commands
@@ -646,7 +647,7 @@ class MusicCommands(commands.Cog):
                 wavelink.exceptions.ChannelTimeoutException,
                 wavelink.exceptions.InvalidNodeException,
             ):
-                print(f"Node join timeout. ({self._bot.node.uri})")
+                logging.warning(f"[Lavalink] Node join timeout. ({self._bot.node.uri})")
                 self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] -= 1
                 await self._bot.connect_node()
                 is_connected = False

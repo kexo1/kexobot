@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, Dict, Callable, Any
 
 import aiohttp
+import logging
 import asyncpraw
 import asyncpraw.models
 import asyncprawcore
@@ -134,10 +135,10 @@ async def download_video(
         return discord.File(video_path)
 
     except httpx.ReadTimeout:
-        print("Request timed out while downloading the video.")
+        logging.error("[Httpx] Request timed out while downloading the video.")
         return None
     except httpx.ConnectError:
-        print("Failed to connect to the server.")
+        logging.error("[Httpx] Failed to connect to the server.")
         return None
 
 
@@ -377,7 +378,7 @@ async def switch_node(
             except asyncio.TimeoutError:
                 bot.track_exceptions.pop(player.guild.id, None)
 
-        print(f"{i + 1}. Node switched. ({node.uri})")
+        logging.info(f"[Lavalink] {i + 1}. Node switched ({node.uri})")
         embed = discord.Embed(
             title="",
             description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
@@ -588,7 +589,7 @@ async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tu
         temp_user_data = await generate_temp_user_data(bot, user_id)
     else:  # If not in DB, create new user data
         user_data = generate_user_data()
-        print("Creating new user data for user:", await bot.fetch_user(user_id))
+        logging.info(f"[MongoDB] Creating new user data for user: {await bot.fetch_user(user_id)}")
         await bot.user_data_db.insert_one({"_id": user_id, **user_data})
         bot.user_data[user_id] = user_data
 
@@ -625,7 +626,7 @@ async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple:
     else:  # If not in DB, create new guild data
         guild_data = generate_guild_data()
         guild_name = await bot.fetch_guild(guild_id)
-        print("Creating new guild data for server:", guild_name)
+        logging.info(f"[MongoDB] Creating new guild data for server: {guild_name}")
         await bot.guild_data_db.insert_one({"_id": guild_id, **guild_data})
         bot.guild_data[guild_id] = guild_data
         temp_guild_data = generate_temp_guild_data()
@@ -694,11 +695,11 @@ async def make_http_request(
             httpx.HTTPError,
         ) as e:
             if attempt == retries - 1:
-                print(f"Request failed ({type(e).__name__}): ", url)
+                logging.error(f"[Httpx] Request failed ({type(e).__name__}): {url}")
                 return None
             await asyncio.sleep(1 * (attempt + 1))
         except json.decoder.JSONDecodeError:
-            print("Failed to decode JSON: ", url)
+            logging.error("[Httpx] Failed to decode JSON: ", url)
     return None
 
 

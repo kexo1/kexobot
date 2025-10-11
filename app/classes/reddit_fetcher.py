@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import asyncpraw
 import asyncpraw.models
 import discord
+import logging
 import httpx
 from asyncprawcore.exceptions import (
     AsyncPrawcoreException,
@@ -148,7 +149,7 @@ class RedditFetcher:
             RequestException,
             ResponseException,
         ) as e:
-            print(f"Error when accessing crackwatch:\n{e}")
+            logging.error(f"[CrackWatch] - Error when accessing crackwatch:\n{e}")
 
     async def freegamefindings(self) -> None:
         """Method to fetch free games from r/FreeGameFindings subreddit."""
@@ -196,7 +197,7 @@ class RedditFetcher:
             RequestException,
             ResponseException,
         ) as e:
-            print(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
+            logging.error(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
 
         if freegamefindings_cache_upload != freegamefindings_cache:
             await self._bot_config.update_one(

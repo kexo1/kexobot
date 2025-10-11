@@ -7,9 +7,27 @@ from bson.objectid import ObjectId
 from dotenv import load_dotenv
 
 # -------------------- Logging Configuration -------------------- #
-logging.basicConfig(level=logging.CRITICAL)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter(
+    "%(asctime)s - %(levelname)s - %(message)s", datefmt="%d/%m/%y %H:%M:%S"
+)
+console_handler.setFormatter(formatter)
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+if logger.hasHandlers():
+    logger.handlers.clear()
+
+logger.addHandler(console_handler)
+
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
+logging.getLogger("discord.client").setLevel(logging.WARNING)
+logging.getLogger("discord.gateway").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # -------------------- Environment Configuration -------------------- #
 LOCAL_MACHINE_NAME = "mato"

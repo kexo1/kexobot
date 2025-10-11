@@ -11,8 +11,8 @@
 # KexoBOT
 
 Discord python bot which is used for:
-* **Automation** - Manages MongoDB, SFD Hosting messages, scrapes and sends info from various websites
-* **Music** - With wavelink library, bot can play both spotify and YouTube music using Lavalink server
+* **Automation** - Manages Mongo database, Fetches Superfighters Deluxe servers status, scrapes and sends info from various websites
+* **Music** - With wavelink library, bot can play both Spotify and YouTube music for free using public Lavalink servers
 * **Fun** - Bot has many fun commands you can use to troll friends or get some memes from Reddit
 
 > **Note:** This project won't have documentation, because it's for my personal use. If you want to use it, you can copy the code and modify it to your needs. If you have any questions, feel free to ask me on Discord.

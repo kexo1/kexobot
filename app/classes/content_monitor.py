@@ -6,6 +6,7 @@ from typing import List, Tuple
 import discord
 import httpx
 import unidecode
+import logging
 from bs4 import BeautifulSoup, Tag
 from deep_translator import GoogleTranslator
 from pymongo import AsyncMongoClient
@@ -200,7 +201,7 @@ class ContentMonitor:
                 game["url"],
             )
             if not source:
-                print("Broken link - ", game["url"])
+                logging.warning(f"[Game3rb] Broken link - {game['url']}")
                 continue
             soup = BeautifulSoup(source.text, "html.parser")
 
@@ -367,7 +368,7 @@ class ContentMonitor:
         soup = BeautifulSoup(response.text, "html.parser")
         news_widget = soup.find("div", class_="widget-table announcements-table")
         if not news_widget:
-            print("Alienware Arena: News widget not found")
+            logging.warning("[Alienware Arena] News widget not found")
             return
 
         alienware_arena_news_cache_copy = alienware_arena_news_cache.copy()
@@ -422,7 +423,7 @@ class ContentMonitor:
             )
 
             if not product_data:
-                print("Fanatical: Product data not found")
+                logging.warning(f"[Fanatical] Product data not found - {url}")
                 continue
 
             title = product_info["name"]
@@ -473,7 +474,7 @@ class ContentMonitor:
         img_url = meta_tag.get("content")
         article_description = soup.find("article")
         if not isinstance(article_description, Tag):
-            print("OnlineFix: Article tag not found")
+            logging.warning("[Online-Fix] Article tag not found")
             return
 
         description_element = article_description.find(
@@ -609,7 +610,7 @@ class ContentMonitor:
 
         img_tag = soup.find("img")
         if not isinstance(img_tag, Tag):
-            print("Esutaze: Image tag not found")
+            logging.warning("[Esutaze] Image tag not found")
             return
 
         img_url = img_tag.get("src")
@@ -645,7 +646,7 @@ class ContentMonitor:
         soup = BeautifulSoup(chat_log, "html.parser")
         chat_element = soup.find("ul", id="lc_chat")
         if not isinstance(chat_element, Tag):
-            print("OnlineFix: Chat element not found")
+            logging.warning("[Online-Fix] Chat element not found")
             return []
         return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
 

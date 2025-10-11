@@ -2,6 +2,7 @@ import random
 
 import discord
 import wavelink
+import logging
 from discord.ext import commands
 from wavelink import (
     NodeDisconnectedEventPayload,
@@ -45,7 +46,7 @@ class Listeners(commands.Cog):
         """
 
         if not hasattr(payload, "player"):
-            print("Player not found, skipping track start message.")
+            logging.warning("Player not found, skipping track start message.")
             return
 
         if payload.player.node_is_switching:
@@ -90,7 +91,7 @@ class Listeners(commands.Cog):
         payload: :class:`NodeReadyEventPayload`
             The payload containing information about the node that is ready.
         """
-        print(f"Node ({payload.node.uri}) is ready!")
+        logging.info(f"[Lavalink] Node ({payload.node.uri}) is ready!")
         if self._bot.get_online_nodes() > 1 and self._is_bot_node_connected():
             await self._bot.close_unused_nodes()
 
@@ -108,7 +109,7 @@ class Listeners(commands.Cog):
             The payload containing information about the node that is disconnected.
         """
         if self._bot.get_online_nodes() == 0 and self._is_bot_node_connected():
-            print(f"Node got disconnected, connecting new node. ({payload.node.uri})")
+            logging.warning(f"[Lavalink] Node got disconnected, connecting new node. ({payload.node.uri})")
             self._bot.cached_lavalink_servers[payload.node.uri]["score"] -= 1
             await self._bot.connect_node()
 

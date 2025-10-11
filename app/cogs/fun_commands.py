@@ -354,9 +354,7 @@ class FunCommands(commands.Cog):
             AsyncPrawcoreException,
             RequestException,
             ResponseException,
-        ) as e:
-            print(e)
-            print(vars(e))
+        ):
             await send_response(ctx, "REDDIT_REQUEST_ERROR")
 
     def _update_temp_user_data(self, user_id: int, submission_url: str) -> None:
