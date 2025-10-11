@@ -589,7 +589,9 @@ async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tu
         temp_user_data = await generate_temp_user_data(bot, user_id)
     else:  # If not in DB, create new user data
         user_data = generate_user_data()
-        logging.info(f"[MongoDB] Creating new user data for user: {await bot.fetch_user(user_id)}")
+        logging.info(
+            f"[MongoDB] Creating new user data for user: {await bot.fetch_user(user_id)}"
+        )
         await bot.user_data_db.insert_one({"_id": user_id, **user_data})
         bot.user_data[user_id] = user_data
 

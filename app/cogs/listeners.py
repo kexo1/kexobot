@@ -109,7 +109,9 @@ class Listeners(commands.Cog):
             The payload containing information about the node that is disconnected.
         """
         if self._bot.get_online_nodes() == 0 and self._is_bot_node_connected():
-            logging.warning(f"[Lavalink] Node got disconnected, connecting new node. ({payload.node.uri})")
+            logging.warning(
+                f"[Lavalink] Node got disconnected, connecting new node. ({payload.node.uri})"
+            )
             self._bot.cached_lavalink_servers[payload.node.uri]["score"] -= 1
             await self._bot.connect_node()
 
