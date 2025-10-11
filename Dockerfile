@@ -42,6 +42,9 @@ COPY . .
 RUN chown -R botuser:botuser /kexobot
 USER botuser
 
+# Create a writable directory for Matplotlib config
+RUN mkdir -p /tmp/matplotlib && chown -R botuser:botuser /tmp/matplotlib
+
 # Set environment variables for runtime
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONDONTWRITEBYTECODE=1 \

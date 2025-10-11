@@ -17,6 +17,7 @@ mplcyberpunk
 tzdata
 psutil
 dotenv
+PyNaCl
 
 # Wavelink depencies
 yarl>=1.9.2
