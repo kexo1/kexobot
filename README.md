@@ -3,7 +3,6 @@
 [![Python Badge]][Python]
 [![MongoDB Badge]][MongoDB]
 [![Docker Badge]][Docker]
-[![Oracle Badge]][Oracle]
 
 </div>
 <div align = left>
@@ -11,7 +10,7 @@
 # KexoBOT
 
 Discord python bot which is used for:
-* **Automation** - Manages Mongo database, Fetches Superfighters Deluxe servers status, scrapes and sends info from various websites
+* **Automation** - Manages Mongo database, fetches Superfighters Deluxe servers status, scrapes and sends info from various websites
 * **Music** - With wavelink library, bot can play both Spotify and YouTube music for free using public Lavalink servers
 * **Fun** - Bot has many fun commands you can use to troll friends or get some memes from Reddit
 
@@ -36,9 +35,6 @@ Discord python bot which is used for:
 
 [MongoDB Badge]: https://img.shields.io/badge/MongoDB-%234ea94b.svg?style=for-the-badge&logo=mongodb&logoColor=white
 [MongoDB]: https://www.mongodb.com/
-
-[Oracle Badge]: https://img.shields.io/badge/Oracle-F80000?style=for-the-badge&logo=oracle&logoColor=white
-[Oracle]: https://www.oracle.com/cloud/
 
 [Docker Badge]: https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white
 [Docker]: https://www.docker.com/
