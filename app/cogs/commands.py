@@ -230,41 +230,49 @@ class CommandCog(commands.Cog):
             return
 
         plugins: wavelink.PluginResponsePayload = node_info.plugins
-        youtube_plugin, lavasrc_plugin = False, False
+        youtube_plugin, lavasrc_plugin, lavasearch_plugin = False, False, False
         for plugin in plugins:
             if "lavasrc" in plugin.name:
                 lavasrc_plugin = True
             if "youtube" in plugin.name or "yt-" in plugin.name:
                 youtube_plugin = True
+            if "lavasearch-plugin" in plugin.name:
+                lavasearch_plugin = True
 
         embed = discord.Embed(
             title=urlparse(node.uri).netloc,
             color=discord.Color.blue(),
         )
-        if youtube_plugin and lavasrc_plugin:
+
+        if lavasrc_plugin:
+            supported_platforms_count = len(SUPPORTED_PLATFORMS)
+        elif youtube_plugin:
+            supported_platforms_count = 3
+        else:
+            embed.description = "No platforms supported"
+            supported_platforms_count = 0
+
+        if not lavasearch_plugin:
+            no_search_warning = "(no search plugin, only direct links)"
+        else:
+            no_search_warning = ""
+
+        if supported_platforms_count != 0:
             embed.add_field(
-                name=f"_{len(SUPPORTED_PLATFORMS)} platforms supported_",
+                name=f"_{supported_platforms_count} platforms supported {no_search_warning}_",
                 value="\n".join(
                     f"{i + 1}. {SUPPORTED_PLATFORMS[i]}"
-                    for i in range(len(SUPPORTED_PLATFORMS))
+                    for i in range(supported_platforms_count)
                 ),
             )
 
-        elif youtube_plugin:
-            embed.add_field(
-                name="_3 platforms supported_",
-                value="\n".join(f"{i + 1}. {SUPPORTED_PLATFORMS[i]}" for i in range(3)),
+        if lavasrc_plugin:
+            embed.set_footer(
+                text=(
+                    "unlikely - depends if node owner added API key for each platform"
+                )
             )
-        else:
-            embed.description = "No platforms supported"
 
-        embed.set_footer(
-            text=(
-                "unlikely - depends if node owner added API key for each platform"
-                if lavasrc_plugin
-                else ""
-            )
-        )
         await ctx.respond(embed=embed)
 
     @slash_node.command(name="players", description="Information about node players.")
