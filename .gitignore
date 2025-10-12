@@ -3,6 +3,10 @@ video/
 graphs/
 .ruff_cache/
 .vscode/
+.stfolder/
+selenium/
+screenshots/
+logs/
 
 .pypirc
 .pylintrc
@@ -11,6 +15,8 @@ desktop.ini
 fly.toml
 ruff.toml
 secret.env
+agent_cache.json
+.stignore
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

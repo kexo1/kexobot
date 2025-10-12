@@ -18,6 +18,7 @@ tzdata
 psutil
 dotenv
 PyNaCl
+cloudscraper
 
 # Wavelink depencies
 yarl>=1.9.2

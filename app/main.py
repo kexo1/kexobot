@@ -14,6 +14,7 @@ import asyncprawcore.exceptions
 import discord
 import httpx
 import wavelink
+import cloudscraper
 from discord.ext import tasks, commands
 from fake_useragent import UserAgent
 from pycord.multicog import Bot
@@ -67,6 +68,7 @@ class KexoBot:
 
     def __init__(self):
         self.session = None | httpx.AsyncClient
+        self.cloudscraper_session = None | cloudscraper.CloudScraper
         self._user_kexo = None | discord.User
         self._subreddit_cache = None | dict
         self._hostname = socket.gethostname()
@@ -125,7 +127,7 @@ class KexoBot:
         await self._fetch_subreddit_icons()
         await self._fetch_cached_lavalink_servers()
         self._load_humor_api_tokens()
-        self._create_session()
+        self._create_http_sessions()
         self._define_classes()
 
     async def _fetch_channels(self) -> None:
@@ -157,6 +159,7 @@ class KexoBot:
             ContentMonitor,
             self._bot_config,
             self.session,
+            self.cloudscraper_session,
             self._channel_game_updates,
             self._channel_free_stuff,
             self._channel_esutaze,
@@ -350,11 +353,12 @@ class KexoBot:
         self._user_kexo = await bot.fetch_user(402221830930432000)
         logging.info(f"[Starter] User {self._user_kexo.name} fetched.")
 
-    def _create_session(self) -> None:
+    def _create_http_sessions(self) -> None:
         """Create a httpx session for the bot."""
         self.session = httpx.AsyncClient()
         self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
-        logging.info("[Starter] Httpx session initialized.")
+        self.cloudscraper_session = cloudscraper.create_scraper()
+        logging.info("[Starter] Httpx and cloudscraper session initialized.")
 
     async def _upload_cached_lavalink_servers(self) -> None:
         """Upload cached lavalink servers to the database."""
@@ -548,8 +552,8 @@ class KexoBot:
 kexobot = KexoBot()
 
 
-def create_cog_session() -> None:
-    """Create a httpx session for the cogs."""
+def initialize_cog_http_session() -> None:
+    """Create a httpx and cloudscraper session for the cogs."""
     bot.session = httpx.AsyncClient()
     bot.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
 
@@ -565,7 +569,7 @@ def setup_cogs() -> None:
         "fun_commands",
     ]
 
-    create_cog_session()
+    initialize_cog_http_session()
     for cog in cogs_list:
         bot.load_extension(f"app.cogs.{cog}")
     logging.info("[Starter] Cogs loaded.")

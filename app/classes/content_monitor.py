@@ -5,6 +5,7 @@ from typing import List, Tuple
 
 import discord
 import httpx
+import cloudscraper
 import unidecode
 import logging
 from bs4 import BeautifulSoup, Tag
@@ -67,6 +68,7 @@ class ContentMonitor:
         self,
         bot_config: AsyncMongoClient,
         session: httpx.AsyncClient,
+        cloudscraper_session: cloudscraper.CloudScraper,
         game_updates_channel: discord.TextChannel,
         free_stuff_channel: discord.TextChannel,
         esutaze_channel: discord.TextChannel,
@@ -75,6 +77,7 @@ class ContentMonitor:
     ) -> None:
         self._bot_config = bot_config
         self._session = session
+        self._cloudscraper_session = cloudscraper_session
         self._game_updates_channel = game_updates_channel
         self._free_stuff_channel = free_stuff_channel
         self._esutaze_channel = esutaze_channel
@@ -272,7 +275,7 @@ class ContentMonitor:
     async def online_fix(self) -> None:
         """Checks for selected games from Online-Fix."""
         onlinefix_cache, games = await self._load_onlinefix_cache()
-        chat_log = await make_http_request(self._session, ONLINEFIX_URL)
+        chat_log = self._cloudscraper_session.get(ONLINEFIX_URL)
         if not chat_log:
             return
         chat_messages = await self._get_onlinefix_messages(chat_log.text)
