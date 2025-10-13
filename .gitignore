@@ -8,11 +8,8 @@ selenium/
 screenshots/
 logs/
 
-.pypirc
 .pylintrc
-.flake8
 desktop.ini
-fly.toml
 ruff.toml
 secret.env
 agent_cache.json

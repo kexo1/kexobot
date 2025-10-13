@@ -1,27 +1,27 @@
 import datetime
+import gc
 import os
 from datetime import timedelta
 from typing import Union
 from zoneinfo import ZoneInfo
-import gc
 
 import httpx
 import matplotlib
-
-matplotlib.use("agg")
-import matplotlib.pyplot as plt
-import mplcyberpunk
 from bs4 import BeautifulSoup
 from pymongo import AsyncMongoClient
 
 from app.constants import (
-    SFD_SERVER_URL,
-    SFD_REQUEST,
-    SFD_HEADERS,
     DB_SFD_ACTIVITY,
+    SFD_HEADERS,
+    SFD_REQUEST,
+    SFD_SERVER_URL,
     TIMEZONES,
 )
 from app.utils import average, is_older_than, make_http_request
+
+matplotlib.use("agg")
+import matplotlib.pyplot as plt
+import mplcyberpunk
 
 plt.style.use("cyberpunk")
 

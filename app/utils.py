@@ -697,11 +697,11 @@ async def make_http_request(
             httpx.HTTPError,
         ) as e:
             if attempt == retries - 1:
-                logging.error(f"[Httpx] Request failed ({type(e).__name__}): {url}")
+                logging.warning(f"[Httpx] Request failed ({type(e).__name__}): {url}")
                 return None
             await asyncio.sleep(1 * (attempt + 1))
         except json.decoder.JSONDecodeError:
-            logging.error("[Httpx] Failed to decode JSON: ", url)
+            logging.warning("[Httpx] Failed to decode JSON: ", url)
     return None
 
 
