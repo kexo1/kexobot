@@ -347,7 +347,7 @@ async def switch_node(
         player_autoplay_mode = player.autoplay
         player.autoplay = wavelink.AutoPlayMode.disabled
         player.node_is_switching = True
-        node: wavelink.Node = await bot.connect_node(player.guild.id, switch_node=True)
+        node: wavelink.Node = await bot.connect_node(switch_node=True)
 
         try:
             await player.switch_node(node)
