@@ -25,6 +25,7 @@ logger.addHandler(console_handler)
 
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
+logging.getLogger("wavelink.node").setLevel(logging.ERROR)
 logging.getLogger("discord.client").setLevel(logging.WARNING)
 logging.getLogger("discord.gateway").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)

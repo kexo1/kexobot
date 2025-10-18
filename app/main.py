@@ -282,18 +282,18 @@ class KexoBot:
 
         if switch_node and bot.node:
             bot.cached_lavalink_servers[bot.node.uri]["score"] -= 1
+            
         is_connected = False
+        node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
         
         if switch_node:
-            node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
             for uri in list(node_candidates.keys()):
                 if uri == bot.node.uri:
                     del node_candidates[uri]
-        else:
-            node_candidates = bot.cached_lavalink_servers
+            
 
         # Try to connect to the best node based on score
-        for _ in range(len(node_candidates)):
+        while node_candidates:
             best_node = max(
                 node_candidates.items(),
                 key=lambda x: x[1]["score"],
@@ -304,6 +304,8 @@ class KexoBot:
             if is_connected:
                 bot.cached_lavalink_servers[node.uri]["score"] += 1
                 break
+            
+            del node_candidates[node_uri]
 
         await self._upload_cached_lavalink_servers()
 
