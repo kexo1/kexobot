@@ -99,12 +99,15 @@ class KexoBot:
         self._channel_alienware_arena_news = None | discord.TextChannel
 
         # Attach to bot, so we can use it in cogs
+        bot.node = None | wavelink.Node
+        
         bot.user_data = {}
         bot.temp_user_data = {}
         bot.guild_data = {}
         bot.temp_guild_data = {}
         bot.track_exceptions = {}
         bot.cached_lavalink_servers = []
+        
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
         bot.guild_data_db = self._guild_data_db
@@ -249,7 +252,7 @@ class KexoBot:
         await self._content_monitor.contests()
 
     async def connect_node(
-        self, guild_id: int | None = None
+        self, guild_id: int | None = None, switch_node: bool = False
     ) -> Optional[wavelink.Node]:
         """Connect to lavalink node.
 
@@ -277,13 +280,22 @@ class KexoBot:
                 if is_connected:
                     return node
 
-        node = None
+        if switch_node and bot.node:
+            bot.cached_lavalink_servers[bot.node.uri]["score"] -= 1
         is_connected = False
+        
+        if switch_node:
+            node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
+            for uri in list(node_candidates.keys()):
+                if uri == bot.node.uri:
+                    del node_candidates[uri]
+        else:
+            node_candidates = bot.cached_lavalink_servers
 
         # Try to connect to the best node based on score
-        for _ in range(len(bot.cached_lavalink_servers)):
+        for _ in range(len(node_candidates)):
             best_node = max(
-                bot.cached_lavalink_servers.items(),
+                node_candidates.items(),
                 key=lambda x: x[1]["score"],
             )
             node_uri, node_info = best_node
@@ -316,7 +328,7 @@ class KexoBot:
         presence = f"{word}: {definition}"
 
         if len(presence) > 128:
-            logging.info(f"[API] Presence too long ({presence}), skipping.")
+            logging.info(f"[API] Presence too long ({word}), skipping.")
             return
 
         activity = discord.Activity(type=discord.ActivityType.watching, name=presence)
