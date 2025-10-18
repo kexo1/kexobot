@@ -89,8 +89,9 @@ class MusicCommands(commands.Cog):
             If True, the song will be played next in the queue.
         """
 
-        # Defer the response right away to avoid interaction timeout
-        await ctx.defer()
+        # Check if response was already sent, for radio command
+        if not ctx.interaction.response.is_done():
+            await ctx.defer()
 
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
@@ -258,8 +259,8 @@ class MusicCommands(commands.Cog):
                 return
 
             for station_data in data["hits"]["hits"]:
-                station_source = station_data["_source"]
-                if country and station_source["page"]["country"]["title"] != country:
+                station_source = station_data["_source"]["page"]
+                if country and station_source["country"]["title"] != country:
                     continue
 
                 await self.play(ctx, station_source["stream"], play_next)
