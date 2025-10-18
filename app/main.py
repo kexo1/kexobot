@@ -100,14 +100,14 @@ class KexoBot:
 
         # Attach to bot, so we can use it in cogs
         bot.node = None | wavelink.Node
-        
+
         bot.user_data = {}
         bot.temp_user_data = {}
         bot.guild_data = {}
         bot.temp_guild_data = {}
         bot.track_exceptions = {}
         bot.cached_lavalink_servers = []
-        
+
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
         bot.guild_data_db = self._guild_data_db
@@ -280,17 +280,13 @@ class KexoBot:
                 if is_connected:
                     return node
 
-        if switch_node and bot.node:
-            bot.cached_lavalink_servers[bot.node.uri]["score"] -= 1
-            
         is_connected = False
         node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
-        
+
         if switch_node:
             for uri in list(node_candidates.keys()):
                 if uri == bot.node.uri:
                     del node_candidates[uri]
-            
 
         # Try to connect to the best node based on score
         while node_candidates:
@@ -304,7 +300,7 @@ class KexoBot:
             if is_connected:
                 bot.cached_lavalink_servers[node.uri]["score"] += 1
                 break
-            
+
             del node_candidates[node_uri]
 
         await self._upload_cached_lavalink_servers()
