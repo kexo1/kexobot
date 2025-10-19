@@ -51,6 +51,7 @@ class MusicCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self._bot = bot
         self._session = self._bot.session
+        self._node_is_switching: dict[int, bool] = {}
         self._radiomap_cache: List[str] = []
 
     music = discord.SlashCommandGroup("music", "All music commands")
@@ -110,7 +111,7 @@ class MusicCommands(commands.Cog):
 
         player: wavelink.Player = ctx.voice_client
 
-        if player.node_is_switching:
+        if player.node_is_switching or self._node_is_switching.get(ctx.guild_id, False):
             await send_response(ctx, "WAIT_UNTIL_NODE_SWITCHES")
             return
 
@@ -456,7 +457,7 @@ class MusicCommands(commands.Cog):
             return
 
         if not channel.guild.voice_client:
-            await channel.connect(cls=wavelink.Player, timeout=2)
+            await channel.connect(cls=wavelink.Player, timeout=3)
 
         player: wavelink.Player = channel.guild.voice_client
         player.should_respond = True
@@ -640,6 +641,7 @@ class MusicCommands(commands.Cog):
     async def _find_working_node(self, ctx: discord.ApplicationContext) -> bool:
         """Retry joining the voice channel if the initial attempt fails.
         This function will attempt to reconnect to the voice channel up to 10 times"""
+        self._node_is_switching[ctx.guild_id] = False
         for i in range(10):
             try:
                 await ctx.author.voice.channel.connect(cls=wavelink.Player)
@@ -649,6 +651,7 @@ class MusicCommands(commands.Cog):
                 wavelink.exceptions.InvalidNodeException,
             ):
                 logging.warning(f"[Lavalink] Node join timeout. ({self._bot.node.uri})")
+                self._node_is_switching[ctx.guild_id] = True
                 self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] -= 1
                 await self._bot.connect_node()
                 is_connected = False
@@ -669,6 +672,7 @@ class MusicCommands(commands.Cog):
                 continue
             break
 
+        del self._node_is_switching[ctx.guild_id]
         if not is_connected:
             await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
             return False
