@@ -111,6 +111,7 @@ class MusicCommands(commands.Cog):
 
         player: wavelink.Player = ctx.voice_client
 
+        # Check if node is switching during play command and joining
         if player.node_is_switching or self._node_is_switching.get(ctx.guild_id, False):
             await send_response(ctx, "WAIT_UNTIL_NODE_SWITCHES")
             return
@@ -574,7 +575,7 @@ class MusicCommands(commands.Cog):
                 )
                 if tracks:
                     return tracks
-            except (TimeoutError, LavalinkLoadException, AttributeError):
+            except (TimeoutError, AttributeError):
                 last_error = "NODE_UNRESPONSIVE"
             except LavalinkLoadException:
                 last_error = "LAVALINK_ERROR"
@@ -642,6 +643,7 @@ class MusicCommands(commands.Cog):
         """Retry joining the voice channel if the initial attempt fails.
         This function will attempt to reconnect to the voice channel up to 10 times"""
         self._node_is_switching[ctx.guild_id] = False
+        is_connected = False
         for i in range(10):
             try:
                 await ctx.author.voice.channel.connect(cls=wavelink.Player)
@@ -672,7 +674,7 @@ class MusicCommands(commands.Cog):
                 continue
             break
 
-        del self._node_is_switching[ctx.guild_id]
+        self._node_is_switching.pop(ctx.guild_id, None)
         if not is_connected:
             await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
             return False

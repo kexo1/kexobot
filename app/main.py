@@ -252,7 +252,7 @@ class KexoBot:
         await self._content_monitor.contests()
 
     async def connect_node(
-        self, guild_id: int | None = None, switch_node: bool = False
+        self, guild_id: int | None = None, switch_node: bool = True
     ) -> Optional[wavelink.Node]:
         """Connect to lavalink node.
 
@@ -284,9 +284,7 @@ class KexoBot:
         node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
 
         if switch_node:
-            for uri in list(node_candidates.keys()):
-                if uri == bot.node.uri:
-                    del node_candidates[uri]
+            del node_candidates[bot.node.uri]
 
         # Try to connect to the best node based on score
         while node_candidates:
@@ -306,7 +304,7 @@ class KexoBot:
         await self._upload_cached_lavalink_servers()
 
         if not is_connected:
-            logging.error("[Lavalink] No lavalink servers available.")
+            logging.critical("[Lavalink] No lavalink servers available.")
             node = None
 
         bot.node = node
@@ -627,7 +625,7 @@ async def bot_loader(main: KexoBot) -> None:
     main_loop_task.start()
     hourly_loop_task.start()
 
-    await main.connect_node()
+    await main.connect_node(switch_node=False)
 
     while not main.session:
         await asyncio.sleep(1)
