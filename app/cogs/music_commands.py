@@ -647,7 +647,6 @@ class MusicCommands(commands.Cog):
         for i in range(10):
             try:
                 await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
-                await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
                 is_connected = True
             except (
                 wavelink.exceptions.ChannelTimeoutException,
