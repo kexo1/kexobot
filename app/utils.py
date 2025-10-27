@@ -324,6 +324,7 @@ async def switch_node(
     bot: discord.Bot,
     player: wavelink.Player,
     play_after: bool = True,
+    send_message: bool = True,
 ) -> Optional[wavelink.Node]:
     """
     Attempt to switch to a new node for audio playback.
@@ -379,12 +380,15 @@ async def switch_node(
                 bot.track_exceptions.pop(player.guild.id, None)
 
         logging.info(f"[Lavalink] {i + 1}. Node switched ({node.uri})")
-        embed = discord.Embed(
-            title="",
-            description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
-            color=discord.Color.green(),
-        )
-        await player.text_channel.send(embed=embed)
+        if send_message:
+            embed = discord.Embed(
+                title="",
+                description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
+                color=discord.Color.green(),
+            )
+
+            await player.text_channel.send(embed=embed)
+
         player.node_is_switching = False
         return node
 

@@ -646,7 +646,7 @@ class MusicCommands(commands.Cog):
         is_connected = False
         for i in range(10):
             try:
-                await ctx.author.voice.channel.connect(cls=wavelink.Player)
+                await ctx.author.voice.channel.connect(cls=wavelink.Player, timeout=3)
                 is_connected = True
             except (
                 wavelink.exceptions.ChannelTimeoutException,
@@ -655,15 +655,6 @@ class MusicCommands(commands.Cog):
                 logging.warning(f"[Lavalink] Node join timeout. ({self._bot.node.uri})")
                 self._node_is_switching[ctx.guild_id] = True
                 self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] -= 1
-                await self._bot.connect_node()
-                is_connected = False
-
-            except wavelink.InvalidChannelStateException:
-                await send_response(ctx, "NO_PERMISSIONS")
-                is_connected = False
-                break
-
-            if not is_connected:
                 if i == 0:
                     await send_response(
                         ctx,
@@ -671,7 +662,14 @@ class MusicCommands(commands.Cog):
                         respond=False,
                         ephemeral=False,
                     )
+                await self._bot.connect_node()
+                is_connected = False
                 continue
+
+            except wavelink.InvalidChannelStateException:
+                await send_response(ctx, "NO_PERMISSIONS")
+                is_connected = False
+
             break
 
         self._node_is_switching.pop(ctx.guild_id, None)

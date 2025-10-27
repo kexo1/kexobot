@@ -155,7 +155,7 @@ class CommandCog(commands.Cog):
 
         if player:
             node: wavelink.Node = await switch_node(
-                self._bot, player=player, play_after=False
+                self._bot, player=player, play_after=False, send_message=False
             )
             self._bot.node = node
             await send_response(
