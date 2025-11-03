@@ -651,6 +651,7 @@ class MusicCommands(commands.Cog):
             except (
                 wavelink.exceptions.ChannelTimeoutException,
                 wavelink.exceptions.InvalidNodeException,
+                KeyError,
             ):
                 logging.warning(f"[Lavalink] Node join timeout. ({self._bot.node.uri})")
                 self._node_is_switching[ctx.guild_id] = True
@@ -664,6 +665,7 @@ class MusicCommands(commands.Cog):
                     )
                 await self._bot.connect_node()
                 is_connected = False
+                continue
 
             except wavelink.InvalidChannelStateException:
                 await send_response(ctx, "NO_PERMISSIONS")
