@@ -651,6 +651,7 @@ class MusicCommands(commands.Cog):
             except (
                 wavelink.exceptions.ChannelTimeoutException,
                 wavelink.exceptions.InvalidNodeException,
+                KeyError,
             ):
                 logging.warning(f"[Lavalink] Node join timeout. ({self._bot.node.uri})")
                 self._node_is_switching[ctx.guild_id] = True

@@ -1,4 +1,4 @@
-py-cord
+py-cord==2.7.0rc2
 pycord-multicog
 asyncpraw
 asyncprawcore
