@@ -11,7 +11,7 @@ from app.utils import make_http_request
 
 class LavalinkServerManager:
     """Class to manage lavalink servers. Checks from various sources and returns
-     a list of lavalink servers.
+    a list of lavalink servers.
 
     It also checks if the server is online or offline and if it is a low quality node.
     The class is used to get lavalink servers from lavalist and lavainfo GitHub.

@@ -869,7 +869,7 @@ class CommandCog(commands.Cog):
             await send_response(ctx, "DB_NOT_IN_LIST", to_remove=to_remove)
             return
 
-        collection.pop(collection.index(to_remove), None)
+        collection.pop(collection.index(to_remove))
         await self._bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
@@ -943,7 +943,7 @@ class HostView(discord.ui.View):
             }."
             "\nhttps://tenor.com/view/zombie-screaming-gif-12431778992096703656"
         )
-        host_authors.pop(host_authors.index(self._author.name), None)
+        host_authors.pop(host_authors.index(self._author.name))
 
     async def _disable_embed(self) -> discord.Embed:
         self.stop()
