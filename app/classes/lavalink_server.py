@@ -31,6 +31,7 @@ class LavalinkServerManager:
         self._cached_lavalink_servers_copy = copy.deepcopy(
             self._cached_lavalink_servers
         )
+        self._fresh_nodes: list[wavelink.Node] = []
 
     async def fetch(self):
         """Method to get new lavalink servers from lavalist and lavainfo GitHub.
@@ -54,6 +55,8 @@ class LavalinkServerManager:
         if json_data:
             self._parse_lavalink_servers(json_data)
 
+        self._clear_removed_nodes()
+
         if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
             await self._bot.bot_config.update_one(
                 DB_CACHE,
@@ -62,7 +65,9 @@ class LavalinkServerManager:
             self._cached_lavalink_servers_copy = copy.deepcopy(
                 self._cached_lavalink_servers
             )
-            logging.info("[Lavalink] Found new lavalink servers, updating cache.")
+            logging.info(
+                "[Lavalink] Lavalink servers list got updated, updating cache."
+            )
 
     def _parse_lavalink_servers(self, json_data: list) -> list[wavelink.Node]:
         for server in json_data:
@@ -76,6 +81,8 @@ class LavalinkServerManager:
             uri = self._get_full_node_url(
                 server["host"], server["port"], server.get("secure", False)
             )
+            self._fresh_nodes.append(uri)
+
             if uri in self._cached_lavalink_servers_copy:
                 continue
 
@@ -83,6 +90,19 @@ class LavalinkServerManager:
                 "password": server["password"],
                 "score": 0,
             }
+
+    def _clear_removed_nodes(self) -> None:
+        """Method to clear old nodes from the cached lavalink servers."""
+        for uri in list(self._cached_lavalink_servers.keys()):
+            is_fresh = False
+            for fresh_uri in self._fresh_nodes:
+                if uri == fresh_uri:
+                    is_fresh = True
+                    break
+
+            if not is_fresh:
+                logging.info(f"[Lavalink] Removing lavalink server: {uri}")
+                del self._cached_lavalink_servers[uri]
 
     @staticmethod
     def _get_full_node_url(host: str, port: int, secure: bool = False) -> dict:
