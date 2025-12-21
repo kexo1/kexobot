@@ -706,7 +706,7 @@ async def make_http_request(
                 return None
             await asyncio.sleep(1 * (attempt + 1))
         except json.decoder.JSONDecodeError:
-            logging.warning("[Httpx] Failed to decode JSON: ", url)
+            logging.warning("[Httpx] Failed to decode JSON: %s", url)
     return None
 
 
