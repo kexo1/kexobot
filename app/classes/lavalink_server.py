@@ -101,7 +101,6 @@ class LavalinkServerManager:
                     break
 
             if not is_fresh:
-                logging.info(f"[Lavalink] Removing lavalink server: {uri}")
                 del self._cached_lavalink_servers[uri]
 
     @staticmethod
