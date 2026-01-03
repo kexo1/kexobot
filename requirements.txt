@@ -21,7 +21,7 @@ PyNaCl
 cloudscraper
 
 # Wavelink depencies
-yarl>=1.9.2
+yarl
 async_timeout
 typing_extensions
 aiohttp

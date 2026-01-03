@@ -20,7 +20,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy and install Python requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir --no-deps git+https://github.com/PythonistaGuild/Wavelink.git
+    pip install --no-cache-dir --no-deps git+https://github.com/haruyq/Wavelink.git
 
 # ---- Final Stage ----
 # This is the small, final image that will run the application
