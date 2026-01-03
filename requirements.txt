@@ -24,4 +24,4 @@ cloudscraper
 yarl
 async_timeout
 typing_extensions
-aiohttp
+aiohttp>=3.7.4,<4

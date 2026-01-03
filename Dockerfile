@@ -1,6 +1,6 @@
 # ---- Builder Stage ----
 # This stage installs dependencies, including from git
-FROM python:3.12.12-alpine AS builder
+FROM python:3.13.11-alpine AS builder
 
 # Install build-time dependencies
 RUN apk add --no-cache \
@@ -20,11 +20,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy and install Python requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir --no-deps git+https://github.com/haruyq/Wavelink.git
+    pip install --no-cache-dir --no-deps git+https://github.com/PythonistaGuild/Wavelink.git
 
-# ---- Final Stage ----
-# This is the small, final image that will run the application
-FROM python:3.12.12-alpine
+FROM python:3.13.11-alpine
 
 # Create a non-root user for security
 RUN addgroup -g 1001 -S botuser && \
