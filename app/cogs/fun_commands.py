@@ -295,8 +295,8 @@ class FunCommands(commands.Cog):
     )
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def shitpost(self, ctx: discord.ApplicationContext) -> None:
-        """This command cals a method which fetches
-         a random post from various shitposting subreddits.
+        """This command calls a method which fetches
+        a random post from various shitposting subreddits.
 
         Parameters
         ----------

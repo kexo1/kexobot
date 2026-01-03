@@ -186,7 +186,7 @@ class CommandCog(commands.Cog):
         node: wavelink.Node = self._bot.node
         try:
             node_info: wavelink.InfoResponsePayload = await node.fetch_info()
-        except RuntimeError:
+        except Exception:
             await send_response(ctx, "NO_NODE_INFO")
             return
 
@@ -225,7 +225,7 @@ class CommandCog(commands.Cog):
 
         try:
             node_info: wavelink.InfoResponsePayload = await node.fetch_info()
-        except RuntimeError:
+        except Exception:
             await send_response(ctx, "NO_NODE_INFO")
             return
 
@@ -297,12 +297,7 @@ class CommandCog(commands.Cog):
         for node in nodes:
             try:
                 players: wavelink.PlayerResponsePayload = await node.fetch_players()
-            except (
-                wavelink.exceptions.LavalinkException,
-                wavelink.exceptions.NodeException,
-                aiohttp.client_exceptions.ServerDisconnectedError,
-                aiohttp.client_exceptions.ClientConnectorError,
-            ):
+            except Exception:
                 continue
 
             if not players:

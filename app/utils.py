@@ -354,14 +354,7 @@ async def switch_node(
             await player.switch_node(node)
             if play_after:
                 await player.play(player.temp_current)
-        except (
-            wavelink.LavalinkException,
-            wavelink.InvalidNodeException,
-            aiohttp.client_exceptions.ContentTypeError,
-            aiohttp.client_exceptions.InvalidUrlClientError,
-            aiohttp.client_exceptions.ServerDisconnectedError,
-            RuntimeError,
-        ):
+        except Exception:
             bot.cached_lavalink_servers[node.uri]["score"] -= 1
             continue
 

@@ -6,7 +6,6 @@ from itertools import islice
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-import aiohttp
 import logging
 import asyncpraw
 import asyncpraw.models
@@ -432,17 +431,7 @@ class KexoBot:
             # I've played these games before!!!
             await node.fetch_info()
             return True
-        except (
-            asyncio.TimeoutError,
-            wavelink.exceptions.LavalinkException,
-            wavelink.exceptions.NodeException,
-            aiohttp.client_exceptions.ServerDisconnectedError,
-            aiohttp.client_exceptions.ClientConnectorError,
-            aiohttp.client_exceptions.ClientConnectionError,
-            aiohttp.client_exceptions.InvalidUrlClientError,
-            ConnectionRefusedError,
-            AttributeError,
-        ):
+        except Exception:
             logging.info(f"[Lavalink] Node failed to connect: ({node.uri})")
             bot.cached_lavalink_servers[node.uri]["score"] -= 1
         return False
