@@ -21,7 +21,8 @@ Discord python bot which is used for:
 * [py-cord](https://docs.pycord.dev/en/stable/) - Modern, easy to use, feature-rich, and async ready API wrapper for Discord written in Python
 * [asyncpraw](https://asyncpraw.readthedocs.io/en/stable/) - Asynchronous Python Reddit API Wrapper
 * [wavelink](https://wavelink.dev/en/latest/) - Fully asynchronous Python Lavalink wrapper for discord.py
-* [MongoDB](https://www.mongodb.com/) - Document database with the scalability and flexibility for querying and indexing collections.
+* [pymongo](https://www.mongodb.com/docs/languages/python/pymongo-driver/current/) - Python distribution containing tools for working with MongoDB
+* [matplotlib](https://matplotlib.org/) - Comprehensive library for creating static, animated, and interactive visualizations in Python
 
 ## Acknowledgments
 
