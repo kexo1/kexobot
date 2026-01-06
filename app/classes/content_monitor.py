@@ -609,7 +609,12 @@ class ContentMonitor:
 
         article_content = article.find("content:encoded").text
         soup = BeautifulSoup(article_content, "html.parser")
-        contest_ending_time = soup.find("h4").text.strip()
+        contest_ending_time = soup.find("h4")
+        if not contest_ending_time or not contest_ending_time.text:
+            logging.warning("[Esutaze] Contest ending time not found")
+            contest_ending_time = "Unknown"
+        else:
+            contest_ending_time = contest_ending_time.text.strip()
 
         img_tag = soup.find("img")
         if not isinstance(img_tag, Tag):
