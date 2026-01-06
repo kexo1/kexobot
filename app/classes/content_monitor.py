@@ -612,7 +612,7 @@ class ContentMonitor:
         contest_ending_time = soup.find("h4")
         if not contest_ending_time or not contest_ending_time.text:
             logging.warning("[Esutaze] Contest ending time not found")
-            contest_ending_time = "Unknown"
+            contest_ending_time = ""
         else:
             contest_ending_time = contest_ending_time.text.strip()
 
