@@ -112,7 +112,9 @@ class Listeners(commands.Cog):
             logging.warning(
                 f"[Lavalink] Node got disconnected, connecting new node. ({payload.node.uri})"
             )
-            self._bot.cached_lavalink_servers[payload.node.uri]["score"] -= 1
+            node = self._bot.cached_lavalink_servers.get(payload.node.uri)
+            if node:
+                node["score"] -= 1
             await self._bot.connect_node()
 
     @commands.Cog.listener()
