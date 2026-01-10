@@ -1,5 +1,6 @@
 import asyncio
 import copy
+from re import A
 import socket
 from datetime import datetime
 from itertools import islice
@@ -283,7 +284,12 @@ class KexoBot:
         node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
 
         if switch_node:
-            del node_candidates[bot.node.uri]
+            try:
+                del node_candidates[bot.node.uri]
+            except AttributeError:
+                logging.critical(
+                    f"[Lavalink] Type: {type(bot.node)}, Value: {bot.node}, Repr: {repr(bot.node)}, Full: {bot.node.__dict__}"
+                )
 
         # Try to connect to the best node based on score
         while node_candidates:
