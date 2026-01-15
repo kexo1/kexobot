@@ -1,11 +1,11 @@
 import asyncio
+import logging
 import random
 import re
-from typing import Union, Optional, List
+from typing import List, Optional, Union
 
 import discord
 import wavelink
-import logging
 from discord import option
 from discord.commands import guild_only
 from discord.ext import commands
@@ -13,21 +13,21 @@ from wavelink.exceptions import LavalinkLoadException
 
 from app.constants import (
     COUNTRIES,
-    RADIOGARDEN_PLACES_URL,
-    RADIOGARDEN_PAGE_URL,
-    RADIOGARDEN_SEARCH_URL,
-    RADIOGARDEN_LISTEN_URL,
     KEXO_SERVER,
+    RADIOGARDEN_LISTEN_URL,
+    RADIOGARDEN_PAGE_URL,
+    RADIOGARDEN_PLACES_URL,
+    RADIOGARDEN_SEARCH_URL,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import send_response
 from app.utils import (
     find_track,
     fix_audio_title,
+    get_guild_data,
+    get_search_prefix,
     make_http_request,
     switch_node,
-    get_search_prefix,
-    get_guild_data,
 )
 
 
@@ -97,7 +97,9 @@ class MusicCommands(commands.Cog):
         if not ctx.voice_client:
             joined: bool = await self._join_channel(ctx)
             if not joined:
-                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] -= 1
+                node = self._bot.cached_lavalink_servers.get(self._bot.node.uri)
+                if node:
+                    node["score"] -= 1
                 return
             await self._prepare_wavelink(ctx)
 
@@ -656,7 +658,10 @@ class MusicCommands(commands.Cog):
             except Exception:
                 logging.warning(f"[Lavalink] Node join timeout. ({self._bot.node.uri})")
                 self._node_is_switching[ctx.guild_id] = True
-                self._bot.cached_lavalink_servers[self._bot.node.uri]["score"] -= 1
+                node = self._bot.cached_lavalink_servers.get(self._bot.node.uri)
+                if node:
+                    node["score"] -= 1
+
                 if i == 0:
                     await send_response(
                         ctx,
@@ -692,7 +697,9 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "NODE_UNRESPONSIVE", ephemeral=False)
             await switch_node(bot=self._bot, player=player)
 
-        self._bot.cached_lavalink_servers[player.node.uri]["score"] += 1
+        node = self._bot.cached_lavalink_servers.get(self._bot.node.uri)
+        if node:
+            node["score"] += 1
         return True
 
     async def _prepare_wavelink(self, ctx: discord.ApplicationContext) -> None:

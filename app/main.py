@@ -1,6 +1,5 @@
 import asyncio
 import copy
-from re import A
 import socket
 from datetime import datetime
 from itertools import islice
