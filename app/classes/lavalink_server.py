@@ -1,11 +1,11 @@
 import copy
+import logging
 
 import discord
 import httpx
-import logging
 import wavelink
 
-from app.constants import LAVALIST_URL, LAVALINK_API_URL, DB_CACHE
+from app.constants import DB_CACHE, LAVALINK_API_URL, LAVALIST_URL
 from app.utils import make_http_request
 
 
@@ -72,9 +72,9 @@ class LavalinkServerManager:
     def _parse_lavalink_servers(self, json_data: list) -> list[wavelink.Node]:
         for server in json_data:
             if (
-                (server.get("restVersion") and server.get("restVersion") != "v4")
-                or (server.get("version") and server.get("version") != "v4")
-                or (not server.get("host"))
+                (server.get("restVersion") not in (None, "v4"))
+                or (server.get("version") not in (None, "v4"))
+                or not server.get("host")
             ):
                 continue
 
