@@ -46,7 +46,7 @@ class LavalinkServerManager:
             self._session, LAVALINK_API_URL, get_json=True
         )
         if json_data:
-            self._parse_lavalink_servers(json_data["nodes"])
+            self._parse_lavalink_servers(json_data)
 
         # Lavalist
         json_data: list = await make_http_request(
