@@ -1,47 +1,57 @@
 import datetime
+import logging
 import re
 from io import BytesIO
-from typing import List, Tuple
 
+import cloudscraper
 import discord
 import httpx
-import cloudscraper
 import unidecode
-import logging
 from bs4 import BeautifulSoup, Tag
 from deep_translator import GoogleTranslator
 from pymongo import AsyncMongoClient
 
 from app.constants import (
+    ALIENWAREARENA_MAX_RESULTS,
+    ALIENWAREARENA_NEWS_URL,
+    ALIENWAREARENA_TO_REMOVE,
+    API_FANATICAL,
+    API_FANATICAL_IMG,
+    API_FANATICAL_MEGAMENU,
     DB_CACHE,
     DB_LISTS,
-    ALIENWAREARENA_MAX_POSTS,
-    ALIENWAREARENA_STRIP,
-    ALIENWAREARENA_URL,
-    ALIENWAREARENA_NEWS_URL,
-    ALIENWAREARENA_ICON,
-    GAME3RB_STRIP,
-    GAME3RB_URL,
-    GAME3RB_ICON,
-    FANATICAL_MAX_POSTS,
-    FANATICAL_API_URL,
-    FANATICAL_API_MEGAMENU_URL,
-    FANATICAL_IMG_URL,
-    FANATICAL_STRIP,
-    ONLINEFIX_MAX_GAMES,
-    ONLINEFIX_URL,
-    ONLINEFIX_ICON,
-    POWER_OUTAGES_URL,
-    POWER_OUTAGES_MAX_ARTICLES,
-    POWER_OUTAGES_ICON,
-    ESUTAZE_URL,
-    ESUTAZE_ICON,
+    FANATICAL_MAX_RESULTS,
+    FANATICAL_TO_REMOVE,
+    GAME3RB_TO_REMOVE,
+    ICON_ALIENWAREARENA,
+    ICON_ESUTAZE,
+    ICON_GAME3RB,
+    ICON_ONLINEFIX,
+    ICON_POWER_OUTAGES,
+    ONLINEFIX_MAX_RESULTS,
+    POWER_OUTAGES_MAX_RESULTS,
+    SITE_URL_ALIENWAREARENA,
+    SITE_URL_ESUTAZE,
+    SITE_URL_GAME3RB,
+    SITE_URL_ONLINEFIX,
+    SITE_URL_POWER_OUTAGES,
 )
-from app.utils import (
-    make_http_request,
-    strip_text,
-    iso_to_timestamp,
-)
+from app.utils import iso_to_timestamp, make_http_request, strip_text
+
+
+async def get_onlinefix_messages(chat_log: str) -> list:
+    soup = BeautifulSoup(chat_log, "html.parser")
+    chat_element = soup.find("ul", id="lc_chat")
+    if not isinstance(chat_element, Tag):
+        logging.warning("[Online-Fix] Chat element not found")
+        return []
+    return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
+
+
+def get_power_outage_articles(html_content: str) -> list:
+    soup = BeautifulSoup(html_content, "xml")
+    articles = soup.find_all("entry")
+    return articles[:POWER_OUTAGES_MAX_RESULTS]
 
 
 class ContentMonitor:
@@ -88,7 +98,7 @@ class ContentMonitor:
         """Checks for free games from Alienware Arena."""
         alienwarearena_cache, to_filter = await self._load_alienware_cache()
         json_data = await make_http_request(
-            self._session, ALIENWAREARENA_URL, get_json=True
+            self._session, SITE_URL_ALIENWAREARENA, get_json=True
         )
         if not json_data:
             return
@@ -114,7 +124,7 @@ class ContentMonitor:
 
         game_list = await self._bot_config.find_one(DB_LISTS)
         game_list = "\n".join(game_list["games"])
-        source = await make_http_request(self._session, GAME3RB_URL)
+        source = await make_http_request(self._session, SITE_URL_GAME3RB)
         if not source:
             return
 
@@ -139,7 +149,7 @@ class ContentMonitor:
             game_title = line.get("title")
             full_title = game_title
 
-            game_title: list = strip_text(game_title, GAME3RB_STRIP).split()
+            game_title: list = strip_text(game_title, GAME3RB_TO_REMOVE).split()
             version = ""
             regex = re.compile(r"v\d+(\.\d+)*")
 
@@ -252,7 +262,7 @@ class ContentMonitor:
                 embed.add_field(name="Update links:", value=game_update, inline=False)
             embed.set_footer(
                 text=", ".join(game["carts"]),
-                icon_url=GAME3RB_ICON,
+                icon_url=ICON_GAME3RB,
             )
             embed.set_image(url=game["image"])
             await self._game_updates_channel.send(embed=embed)
@@ -265,9 +275,7 @@ class ContentMonitor:
     async def fanatical(self) -> None:
         """Checks for free games from Fanatical."""
         fanatical_cache = await self._load_fanatical_cache()
-        json_data = await make_http_request(
-            self._session, FANATICAL_API_URL, get_json=True
-        )
+        json_data = await make_http_request(self._session, API_FANATICAL, get_json=True)
         if not json_data:
             return
         await self._send_fanatical_embed(json_data, fanatical_cache)
@@ -275,20 +283,20 @@ class ContentMonitor:
     async def online_fix(self) -> None:
         """Checks for selected games from Online-Fix."""
         onlinefix_cache, games = await self._load_onlinefix_cache()
-        chat_log = self._cloudscraper_session.get(ONLINEFIX_URL)
+        chat_log = self._cloudscraper_session.get(SITE_URL_ONLINEFIX)
         if not chat_log:
             return
-        chat_messages = await self._get_onlinefix_messages(chat_log.text)
+        chat_messages = await get_onlinefix_messages(chat_log.text)
         await self._process_onlinefix_messages(chat_messages, onlinefix_cache, games)
 
     async def power_outages(self) -> None:
         """Checks for power outages."""
         elektrinavypadky_cache = await self._load_power_outages_cache()
-        html_content = await make_http_request(self._session, POWER_OUTAGES_URL)
+        html_content = await make_http_request(self._session, SITE_URL_POWER_OUTAGES)
         if not html_content:
             return
 
-        articles = self._get_power_outage_articles(html_content.text)
+        articles = get_power_outage_articles(html_content.text)
         await self._process_power_outage_articles(articles, elektrinavypadky_cache)
 
     async def contests(self) -> None:
@@ -327,7 +335,7 @@ class ContentMonitor:
         self, json_data: dict, alienwarearena_cache: list, to_filter: list
     ) -> None:
         alienwarearena_cache_copy = alienwarearena_cache.copy()
-        for giveaway in json_data["data"][:ALIENWAREARENA_MAX_POSTS]:
+        for giveaway in json_data["data"][:ALIENWAREARENA_MAX_RESULTS]:
             url = "https://eu.alienwarearena.com" + giveaway["url"]
 
             if url in alienwarearena_cache_copy:
@@ -339,7 +347,7 @@ class ContentMonitor:
             if is_filtered:
                 continue
 
-            title = strip_text(title, ALIENWAREARENA_STRIP)
+            title = strip_text(title, ALIENWAREARENA_TO_REMOVE)
 
             alienwarearena_cache.pop(0)
             alienwarearena_cache.append(url)
@@ -393,7 +401,7 @@ class ContentMonitor:
                 description=f"**[eu.alienwarearena.com](https://eu.alienwarearena.com{url})**",
                 colour=discord.Colour.dark_theme(),
                 timestamp=post_date,
-                thumbnail=ALIENWAREARENA_ICON,
+                thumbnail=ICON_ALIENWAREARENA,
             )
             await self._alienware_arena_news_channel.send(embed=embed)
 
@@ -407,7 +415,7 @@ class ContentMonitor:
         self, json_data: dict, fanatical_cache: list
     ) -> None:
         fanatical_cache_copy = fanatical_cache.copy()
-        for giveaway in json_data["freeProducts"][:FANATICAL_MAX_POSTS]:
+        for giveaway in json_data["freeProducts"][:FANATICAL_MAX_RESULTS]:
             if giveaway["min_spend"]["EUR"] != 0:
                 continue  # Skip if not free
 
@@ -420,7 +428,7 @@ class ContentMonitor:
             # Check if product is preorder
             product_data: dict = await make_http_request(
                 self._session,
-                FANATICAL_API_MEGAMENU_URL,
+                API_FANATICAL_MEGAMENU,
                 headers={"referer": url},
                 get_json=True,
             )
@@ -430,7 +438,7 @@ class ContentMonitor:
                 continue
 
             title = product_info["name"]
-            title_strip = strip_text(title, FANATICAL_STRIP)
+            title_strip = strip_text(title, FANATICAL_TO_REMOVE)
 
             is_preorder = False
             for unreleased_game in product_data["comingSoon"]:
@@ -447,7 +455,7 @@ class ContentMonitor:
             if is_preorder:
                 continue
 
-            img_url = FANATICAL_IMG_URL + product_info["cover"]
+            img_url = API_FANATICAL_IMG + product_info["cover"]
             timestamp = (
                 f"<t:{int(iso_to_timestamp(giveaway['valid_until']).timestamp())}:F>"
             )
@@ -500,7 +508,7 @@ class ContentMonitor:
         )
         embed.set_footer(
             text="online-fix.me",
-            icon_url=ONLINEFIX_ICON,
+            icon_url=ICON_ONLINEFIX,
         )
         embed.set_thumbnail(url=img_url)
         await self._game_updates_channel.send(embed=embed)
@@ -508,7 +516,7 @@ class ContentMonitor:
     async def _process_onlinefix_messages(
         self, messages: list, onlinefix_cache: list, games: list
     ) -> None:
-        limit = ONLINEFIX_MAX_GAMES
+        limit = ONLINEFIX_MAX_RESULTS
         to_upload = []
         for message in messages:
             message_text = message.find("div", class_="lc_chat_li_text")
@@ -584,7 +592,7 @@ class ContentMonitor:
 
             embed.set_footer(
                 text="",
-                icon_url=POWER_OUTAGES_ICON,
+                icon_url=ICON_POWER_OUTAGES,
             )
             await self._user_kexo.send(embed=embed)
 
@@ -635,36 +643,21 @@ class ContentMonitor:
         embed.set_image(url="attachment://image.png")
         embed.set_footer(
             text="www.esutaze.sk",
-            icon_url=ESUTAZE_ICON,
+            icon_url=ICON_ESUTAZE,
         )
         await self._esutaze_channel.send(
             embed=embed, file=discord.File(image, "image.png")
         )
 
     async def _get_contest_articles(self) -> list:
-        xml_content = await make_http_request(self._session, ESUTAZE_URL)
+        xml_content = await make_http_request(self._session, SITE_URL_ESUTAZE)
         if not xml_content:
             return []
 
         soup = BeautifulSoup(xml_content.content, "xml")
         return soup.find_all("item")
 
-    @staticmethod
-    async def _get_onlinefix_messages(chat_log: str) -> list:
-        soup = BeautifulSoup(chat_log, "html.parser")
-        chat_element = soup.find("ul", id="lc_chat")
-        if not isinstance(chat_element, Tag):
-            logging.warning("[Online-Fix] Chat element not found")
-            return []
-        return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
-
-    @staticmethod
-    def _get_power_outage_articles(html_content: str) -> list:
-        soup = BeautifulSoup(html_content, "xml")
-        articles = soup.find_all("entry")
-        return articles[:POWER_OUTAGES_MAX_ARTICLES]
-
-    async def _load_alienware_cache(self) -> Tuple[List[str], List[str]]:
+    async def _load_alienware_cache(self) -> tuple[list[str], list[str]]:
         alienwarearena_cache = await self._bot_config.find_one(DB_CACHE)
         to_filter = await self._bot_config.find_one(DB_LISTS)
         return (
@@ -672,15 +665,15 @@ class ContentMonitor:
             to_filter["alienwarearena_exceptions"],
         )
 
-    async def _load_fanatical_cache(self) -> List[str]:
+    async def _load_fanatical_cache(self) -> list[str]:
         fanatical_cache = await self._bot_config.find_one(DB_CACHE)
         return fanatical_cache["fanatical_cache"]
 
-    async def _load_alienware_news_cache(self) -> List[str]:
+    async def _load_alienware_news_cache(self) -> list[str]:
         alienwarearena_news_cache = await self._bot_config.find_one(DB_CACHE)
         return alienwarearena_news_cache["alienwarearena_news_cache"]
 
-    async def _load_onlinefix_cache(self) -> Tuple[List[str], List[str]]:
+    async def _load_onlinefix_cache(self) -> tuple[list[str], list[str]]:
         onlinefix_cache = await self._bot_config.find_one(DB_CACHE)
         games = await self._bot_config.find_one(DB_LISTS)
         # Remove quotes due to online-fix.me not using quotes

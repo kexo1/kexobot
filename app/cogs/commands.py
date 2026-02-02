@@ -1,39 +1,38 @@
 import datetime
+import logging
 import os
 import random
 import sys
 import time
 from urllib.parse import urlparse
 
-import aiohttp
-import logging
 import asyncpraw.models
 import discord
 import httpx
 import wavelink
-from discord.commands import slash_command, guild_only, option
+from discord.commands import guild_only, option, slash_command
 from discord.ext import commands
 from pymongo import AsyncMongoClient
 
 from app.__init__ import __version__
 from app.classes.sfd_servers import SFDServers
 from app.constants import (
-    DB_LISTS,
-    KEXO_SERVER,
+    CHANNEL_ID_KEXO_SERVER,
     DB_CHOICES,
+    DB_LISTS,
+    MUSIC_SUPPORTED_PLATFORMS,
     SFD_TIMEZONE_CHOICE,
     SHITPOST_SUBREDDITS_ALL,
-    SUPPORTED_PLATFORMS,
 )
 from app.response_handler import send_response
 from app.utils import (
-    get_memory_usage,
-    iso_to_timestamp,
-    get_file_age,
-    check_node_status,
-    get_user_data,
-    switch_node,
     QueuePaginator,
+    check_node_status,
+    get_file_age,
+    get_memory_usage,
+    get_user_data,
+    iso_to_timestamp,
+    switch_node,
 )
 
 host_authors = []
@@ -82,7 +81,7 @@ class CommandCog(commands.Cog):
 
     # -------------------- Node Managment -------------------- #
     @slash_node.command(
-        name="manual_connect", description="Manually input Lavalink adress"
+        name="manual_connect", description="Manually input Lavalink address"
     )
     @guild_only()
     @option(
@@ -134,11 +133,11 @@ class CommandCog(commands.Cog):
 
     @slash_node.command(
         name="reconnect",
-        description="Automatically reconnect to avaiable node",
+        description="Automatically reconnect to available node",
     )
     @guild_only()
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def recconect_node(self, ctx: discord.ApplicationContext) -> None:
+    async def reconnect_node(self, ctx: discord.ApplicationContext) -> None:
         """Method to reconnect to an available Lavalink node.
 
         This method checks if the bot is connected to a voice channel and if so,
@@ -245,7 +244,7 @@ class CommandCog(commands.Cog):
         )
 
         if lavasrc_plugin:
-            supported_platforms_count = len(SUPPORTED_PLATFORMS)
+            supported_platforms_count = len(MUSIC_SUPPORTED_PLATFORMS)
         elif youtube_plugin:
             supported_platforms_count = 3
         else:
@@ -261,7 +260,7 @@ class CommandCog(commands.Cog):
             embed.add_field(
                 name=f"_{supported_platforms_count} platforms supported {no_search_warning}_",
                 value="\n".join(
-                    f"{i + 1}. {SUPPORTED_PLATFORMS[i]}"
+                    f"{i + 1}. {MUSIC_SUPPORTED_PLATFORMS[i]}"
                     for i in range(supported_platforms_count)
                 ),
             )
@@ -479,7 +478,7 @@ class CommandCog(commands.Cog):
     @option("server_name", description="Your server name.")
     @option(
         "duration",
-        description="How long are you going to be hositng.",
+        description="How long are you going to be hosting.",
         choices=[
             "As long as I want",
             "15 minutes",
@@ -651,7 +650,7 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self._bot.latency * 1000)} ms")
         embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
         embed.add_field(name="Online nodes:ㅤ", value=self._bot.get_online_nodes())
-        embed.add_field(name="Available nodes:ㅤ", value=self._bot.get_avaiable_nodes())
+        embed.add_field(name="Available nodes:ㅤ", value=self._bot.get_available_nodes())
         embed.add_field(name="Joined servers:ㅤ", value=len(self._bot.guilds))
         embed.add_field(name="Bot version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
@@ -664,7 +663,7 @@ class CommandCog(commands.Cog):
 
     @slash_command(name="random_number", description="Choose number between intervals.")
     async def random_number(
-        self, ctx: discord.ApplicationContext, ineteger1: int, ineteger2: int
+        self, ctx: discord.ApplicationContext, integer1: int, integer2: int
     ) -> None:
         """Method to generate a random number between two integers.
 
@@ -672,21 +671,21 @@ class CommandCog(commands.Cog):
         ----------
         ctx: :class:`discord.ApplicationContext`
             The context of the command invocation.
-        ineteger1: int
+        integer1: int
             The first integer of the range.
-        ineteger2: int
+        integer2: int
             The second integer of the range.
         """
-        if ineteger1 > ineteger2:
-            ineteger2, ineteger1 = ineteger1, ineteger2
-        await ctx.respond(f"I chose `{random.randint(ineteger1, ineteger2)}`")
+        if integer1 > integer2:
+            integer2, integer1 = integer1, integer2
+        await ctx.respond(f"I chose `{random.randint(integer1, integer2)}`")
 
     @slash_command(
         name="pick",
         description="Selects one word, words needs to be separated by space.",
     )
-    @option("words", description="Seperate words by space.")
-    async def pick(self, ctx, words: str) -> None:
+    @option("words", description="Separate words by space.")
+    async def pick(self, ctx: discord.ApplicationContext, words: str) -> None:
         """Method to pick a random word from a list of words.
         Parameter is a string of words separated by spaces,
         but it is split into a list.
@@ -724,7 +723,7 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="add",
         description="Adds string to selected list.",
-        guild_ids=[KEXO_SERVER],
+        guild_ids=[CHANNEL_ID_KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
@@ -747,7 +746,7 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="remove",
         description="Removes string from selected list.",
-        guild_ids=[KEXO_SERVER],
+        guild_ids=[CHANNEL_ID_KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())
@@ -770,7 +769,7 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="show",
         description="Shows data from selected lists.",
-        guild_ids=[KEXO_SERVER],
+        guild_ids=[CHANNEL_ID_KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
     @option("collection", description="Choose database", choices=DB_CHOICES.keys())

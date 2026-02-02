@@ -1,20 +1,19 @@
 import asyncio
 import copy
+import logging
 import socket
 from datetime import datetime
 from itertools import islice
-from typing import Optional
 from zoneinfo import ZoneInfo
 
-import logging
 import asyncpraw
 import asyncpraw.models
 import asyncprawcore.exceptions
+import cloudscraper
 import discord
 import httpx
 import wavelink
-import cloudscraper
-from discord.ext import tasks, commands
+from discord.ext import commands, tasks
 from fake_useragent import UserAgent
 from pycord.multicog import Bot
 from pymongo import AsyncMongoClient
@@ -25,33 +24,205 @@ from app.classes.lavalink_server import LavalinkServerManager
 from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
 from app.constants import (
-    DISCORD_TOKEN,
-    MONGO_DB_URL,
-    REDDIT_PASSWORD,
-    REDDIT_SECRET,
-    REDDIT_USER_AGENT,
-    REDDIT_USERNAME,
-    REDDIT_CLIENT_ID,
-    SHITPOST_SUBREDDITS_ALL,
+    API_WORDNIK,
+    CHANNEL_ID_ALIENWARE_ARENA_NEWS_CHANNEL,
+    CHANNEL_ID_ESUTAZE_CHANNEL,
+    CHANNEL_ID_FREE_STUFF_CHANNEL,
+    CHANNEL_ID_GAME_UPDATES_CHANNEL,
     DB_CACHE,
-    ESUTAZE_CHANNEL,
-    GAME_UPDATES_CHANNEL,
-    FREE_STUFF_CHANNEL,
-    ALIENWARE_ARENA_NEWS_CHANNEL,
-    HUMOR_API_SECRET,
+    ENV_API_DB,
+    ENV_DISCORD_TOKEN,
+    ENV_HUMOR_KEY,
+    ENV_REDDIT_CLIENT_ID,
+    ENV_REDDIT_PASSWORD,
+    ENV_REDDIT_SECRET,
+    ENV_REDDIT_USER_AGENT,
+    ENV_REDDIT_USERNAME,
+    ENV_WORDNIK_KEY,
+    ICON_REDDIT,
     LOCAL_MACHINE_NAME,
-    REDDIT_ICON,
-    WORDNIK_API_KEY,
-    WORDNIK_API_URL,
+    SHITPOST_SUBREDDITS_ALL,
 )
 from app.utils import (
+    generate_temp_guild_data,
     get_guild_data,
     is_older_than,
-    generate_temp_guild_data,
     make_http_request,
 )
 
 bot = Bot()
+
+
+async def get_guild_node(guild_id: int) -> tuple[str, dict]:
+    """Get the next lavalink node, cycling is guild based.
+
+    Parameters
+    ----------
+    guild_id: int
+        The guild ID to get the node for.
+
+    Returns
+    -------
+    tuple[str, dict]
+        The next lavalink node URI and its metadata.
+    """
+    _, temp_guild_data = await get_guild_data(bot, guild_id)
+    lavalink_server_pos = temp_guild_data["lavalink_server_pos"]
+
+    lavalink_server_pos += 1
+    if lavalink_server_pos >= len(bot.cached_lavalink_servers):
+        lavalink_server_pos = 0
+
+    temp_guild_data["lavalink_server_pos"] = lavalink_server_pos
+    bot.temp_guild_data[guild_id] = temp_guild_data
+    return next(
+        islice(
+            bot.cached_lavalink_servers.items(),
+            lavalink_server_pos,
+            lavalink_server_pos + 1,
+        )
+    )
+
+
+async def check_node_status(node: wavelink.Node) -> bool:
+    """Check the status of a lavalink node.
+    This function will try to connect to the lavalink node
+
+    Parameters
+    ----------
+    node: wavelink.Node
+        The lavalink node to check the status of.
+    Returns
+    -------
+    bool
+        True if the node is connected, False otherwise.
+    """
+    try:
+        await asyncio.wait_for(
+            wavelink.Pool.connect(nodes=[node], client=bot), timeout=2
+        )
+        # Some fucking nodes secretly don't respond,
+        # I've played these games before!!!
+        await node.fetch_info()
+        return True
+    except Exception:
+        logging.info(f"[Lavalink] Node failed to connect: ({node.uri})")
+        bot.cached_lavalink_servers[node.uri]["score"] -= 1
+        # Test
+        try:
+            await node.close(eject=True)
+        except Exception:
+            await node.close()
+    return False
+
+
+def load_humor_api_tokens() -> None:
+    """Load the humor API tokens."""
+    bot.humor_api_tokens = {token: {"exhausted": False} for token in ENV_HUMOR_KEY}
+
+
+async def close_unused_nodes() -> None:
+    """Clear unused lavalink nodes.
+
+    This function will check if there are any lavalink nodes
+    that are not being used and will close them.
+    """
+    nodes = list(wavelink.Pool.nodes.values())
+    for node in nodes:
+        if len(wavelink.Pool.nodes) == 1:
+            break
+
+        if len(node.players) == 0:
+            logging.info(f"[Lavalink] Node is empty, removing. ({node.uri})")
+            await node._pool_closer()  # Node is not properly closed
+            try:
+                await node.close(eject=True)
+            except Exception:
+                await node.close()
+
+
+async def fetch_channel(channel_id: int) -> discord.TextChannel:
+    """Helper to fetch a channel by ID, returns :class:`discord.TextChannel`.
+
+    Parameters
+    ----------
+    channel_id: int
+        The ID of the channel to fetch.
+    """
+    return await bot.fetch_channel(channel_id)
+
+
+def initialize_class(cls, *args) -> object:
+    """Helper to initialize a class with arguments.
+
+    Parameters
+    ----------
+    cls: type
+        The class to initialize.
+    *args: tuple
+        The arguments to pass to the class.
+    """
+    return cls(*args)
+
+
+def get_online_nodes() -> int:
+    """Get the number of online lavalink nodes,
+    returns ``int`` of online nodes.
+    """
+    return len(
+        [
+            node
+            for node in wavelink.Pool.nodes.values()
+            if node.status == NodeStatus.CONNECTED
+        ]
+    )
+
+
+def get_available_nodes() -> int:
+    """Get the number of available lavalink nodes.
+
+    Returns the count of cached lavalink nodes.
+    """
+    return len(bot.cached_lavalink_servers)
+
+
+def clear_temp_reddit_data() -> None:
+    """Clear the temporary user reddit data."""
+    if not bot.temp_user_data:
+        return
+
+    for _, user_data in bot.temp_user_data.items():
+        reddit_data = user_data["reddit"]
+        last_used = reddit_data["last_used"]
+        if not last_used:
+            continue
+
+        if is_older_than(5, last_used):
+            reddit_data["last_used"] = None
+            reddit_data["viewed_posts"] = set()
+            reddit_data["search_limit"] = 3
+
+
+def clear_temp_guild_data() -> None:
+    """Clear the temporary guild data."""
+    for guild_id in bot.temp_guild_data:
+        bot.temp_guild_data[guild_id] = generate_temp_guild_data()
+
+
+def clear_cached_jokes() -> None:
+    """Clear the cached jokes loaded from FunCommands"""
+    bot.loaded_jokes = []
+    bot.loaded_dad_jokes = []
+    bot.loaded_yo_mama_jokes = []
+
+
+def build_node(uri: str, password: str) -> wavelink.Node:
+    return wavelink.Node(
+        uri=uri,
+        password=password,
+        retries=1,
+        inactive_player_timeout=600,
+    )
 
 
 class KexoBot:
@@ -66,39 +237,39 @@ class KexoBot:
     """
 
     def __init__(self):
-        self.session = None | httpx.AsyncClient
-        self.cloudscraper_session = None | cloudscraper.CloudScraper
-        self._user_kexo = None | discord.User
-        self._subreddit_cache = None | dict
+        self.session: httpx.AsyncClient | None = None
+        self.cloudscraper_session: cloudscraper.CloudScraper | None = None
+        self._user_kexo: discord.User | None = None
+        self._subreddit_cache: dict | None = None
         self._hostname = socket.gethostname()
         self._main_loop_counter = 0
-        self.cached_lavalink_servers_copy = None | dict
+        self.cached_lavalink_servers_copy: dict | None = None
 
-        database = AsyncMongoClient(MONGO_DB_URL)["KexoBOTDatabase"]
+        database = AsyncMongoClient(ENV_API_DB)["KexoBOTDatabase"]
         self._bot_config = database["BotConfig"]
         self._user_data_db = database["UserData"]
         self._guild_data_db = database["GuildData"]
 
         self._reddit_agent = asyncpraw.Reddit(
-            client_id=REDDIT_CLIENT_ID,
-            client_secret=REDDIT_SECRET,
-            user_agent=REDDIT_USER_AGENT,
-            username=REDDIT_USERNAME,
-            password=REDDIT_PASSWORD,
+            client_id=ENV_REDDIT_CLIENT_ID,
+            client_secret=ENV_REDDIT_SECRET,
+            user_agent=ENV_REDDIT_USER_AGENT,
+            username=ENV_REDDIT_USERNAME,
+            password=ENV_REDDIT_PASSWORD,
         )
 
-        self._reddit_fetcher = None | RedditFetcher
-        self._content_monitor = None | ContentMonitor
-        self._lavalink_server_manager = None | LavalinkServerManager
-        self._sfd_servers = None | SFDServers
+        self._reddit_fetcher: RedditFetcher | None = None
+        self._content_monitor: ContentMonitor | None = None
+        self._lavalink_server_manager: LavalinkServerManager | None = None
+        self._sfd_servers: SFDServers | None = None
 
-        self._channel_esutaze = None | discord.TextChannel
-        self._channel_game_updates = None | discord.TextChannel
-        self._channel_free_stuff = None | discord.TextChannel
-        self._channel_alienware_arena_news = None | discord.TextChannel
+        self._channel_esutaze: discord.TextChannel | None = None
+        self._channel_game_updates: discord.TextChannel | None = None
+        self._channel_free_stuff: discord.TextChannel | None = None
+        self._channel_alienware_arena_news: discord.TextChannel | None = None
 
         # Attach to bot, so we can use it in cogs
-        bot.node = None | wavelink.Node
+        bot.node = None
 
         bot.user_data = {}
         bot.temp_user_data = {}
@@ -113,9 +284,9 @@ class KexoBot:
 
         bot.reddit_agent = self._reddit_agent
         bot.connect_node = self.connect_node
-        bot.close_unused_nodes = self.close_unused_nodes
-        bot.get_online_nodes = self.get_online_nodes
-        bot.get_avaiable_nodes = self.get_avaiable_nodes
+        bot.close_unused_nodes = close_unused_nodes
+        bot.get_online_nodes = get_online_nodes
+        bot.get_available_nodes = get_available_nodes
 
         bot.humor_api_tokens = {}
         bot.loaded_jokes = []
@@ -128,17 +299,19 @@ class KexoBot:
         await self._fetch_channels()
         await self._fetch_subreddit_icons()
         await self._fetch_cached_lavalink_servers()
-        self._load_humor_api_tokens()
+        load_humor_api_tokens()
         self._create_http_sessions()
         self._define_classes()
 
     async def _fetch_channels(self) -> None:
         """Fetch all channels for the bot."""
-        self._channel_esutaze = await self._fetch_channel(ESUTAZE_CHANNEL)
-        self._channel_game_updates = await self._fetch_channel(GAME_UPDATES_CHANNEL)
-        self._channel_free_stuff = await self._fetch_channel(FREE_STUFF_CHANNEL)
-        self._channel_alienware_arena_news = await self._fetch_channel(
-            ALIENWARE_ARENA_NEWS_CHANNEL
+        self._channel_esutaze = await fetch_channel(CHANNEL_ID_ESUTAZE_CHANNEL)
+        self._channel_game_updates = await fetch_channel(
+            CHANNEL_ID_GAME_UPDATES_CHANNEL
+        )
+        self._channel_free_stuff = await fetch_channel(CHANNEL_ID_FREE_STUFF_CHANNEL)
+        self._channel_alienware_arena_news = await fetch_channel(
+            CHANNEL_ID_ALIENWARE_ARENA_NEWS_CHANNEL
         )
         logging.info("[Starter] Channels fetched.")
 
@@ -157,7 +330,7 @@ class KexoBot:
 
     def _define_classes(self) -> None:
         """Define classes for the bot."""
-        self._content_monitor = self._initialize_class(
+        self._content_monitor = initialize_class(
             ContentMonitor,
             self._bot_config,
             self.session,
@@ -169,7 +342,7 @@ class KexoBot:
             self._user_kexo,
         )
 
-        self._reddit_fetcher = self._initialize_class(
+        self._reddit_fetcher = initialize_class(
             RedditFetcher,
             self._bot_config,
             self.session,
@@ -177,10 +350,8 @@ class KexoBot:
             self._channel_free_stuff,
             self._channel_game_updates,
         )
-        self._sfd_servers = self._initialize_class(
-            SFDServers, self._bot_config, self.session
-        )
-        self._lavalink_server_manager = self._initialize_class(
+        self._sfd_servers = initialize_class(SFDServers, self._bot_config, self.session)
+        self._lavalink_server_manager = initialize_class(
             LavalinkServerManager, bot, self.session
         )
 
@@ -232,15 +403,15 @@ class KexoBot:
         """
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
         if now.day == 6 and now.hour == 0:
-            self._clear_cached_jokes()
-            self._clear_temp_guild_data()
+            clear_cached_jokes()
+            clear_temp_guild_data()
             await self._refresh_subreddit_icons()
 
         if now.hour % 6 == 0:
-            self._clear_temp_reddit_data()
+            clear_temp_reddit_data()
 
         if now.hour == 0:
-            self._load_humor_api_tokens()
+            load_humor_api_tokens()
             await self._upload_cached_lavalink_servers()
             await self._lavalink_server_manager.fetch()
 
@@ -252,7 +423,7 @@ class KexoBot:
 
     async def connect_node(
         self, guild_id: int | None = None, switch_node: bool = True
-    ) -> Optional[wavelink.Node]:
+    ) -> wavelink.Node | None:
         """Connect to lavalink node.
 
         This function will try to connect to the lavalink node
@@ -265,17 +436,17 @@ class KexoBot:
             The guild ID to connect to.
         Returns
         -------
-        Optional[wavelink.Node]
-            The lavalink that was connected to.
+        wavelink.Node | None
+            The lavalink node that was connected to.
         """
 
-        # If user requested to recconect node, we will try to
+        # If user requested to reconnect node, we will try to
         # connect to the next node based on the guild ID.
         if guild_id:
             for _ in range(len(bot.cached_lavalink_servers)):
-                uri, info = await self.get_guild_node(guild_id)
-                node = self._return_node(uri, info["password"])
-                is_connected = await self._check_node_status(node)
+                uri, info = await get_guild_node(guild_id)
+                node = build_node(uri, info["password"])
+                is_connected = await check_node_status(node)
                 if is_connected:
                     return node
 
@@ -297,8 +468,8 @@ class KexoBot:
                 key=lambda x: x[1]["score"],
             )
             node_uri, node_info = best_node
-            node = self._return_node(node_uri, node_info["password"])
-            is_connected = await self._check_node_status(node)
+            node = build_node(node_uri, node_info["password"])
+            is_connected = await check_node_status(node)
             if is_connected:
                 bot.cached_lavalink_servers[node.uri]["score"] += 1
                 break
@@ -316,7 +487,7 @@ class KexoBot:
 
     async def wordnik_presence(self) -> None:
         """Fetches the word of the day from Wordnik API."""
-        url = WORDNIK_API_URL + WORDNIK_API_KEY
+        url = API_WORDNIK + ENV_WORDNIK_KEY
         json_data = await make_http_request(self.session, url, get_json=True)
         if not json_data:
             logging.warning("[API] Wordnik API returned no data.")
@@ -348,7 +519,7 @@ class KexoBot:
                 pass
 
             if not subreddit.icon_img:
-                subreddit_icons[subreddit.display_name] = REDDIT_ICON
+                subreddit_icons[subreddit.display_name] = ICON_REDDIT
                 continue
             subreddit_icons[subreddit.display_name] = subreddit.icon_img
 
@@ -382,173 +553,6 @@ class KexoBot:
             {"$set": {"lavalink_servers": bot.cached_lavalink_servers}},
         )
         self.cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
-
-    @staticmethod
-    async def get_guild_node(guild_id: int) -> dict:
-        """Get the next lavalink node, cycling is guild based.
-
-        Parameters
-        ----------
-        guild_id: int
-            The guild ID to get the node for.
-
-        Returns
-        -------
-        dict
-            The lavalink node to use.
-        """
-        _, temp_guild_data = await get_guild_data(bot, guild_id)
-        lavalink_server_pos = temp_guild_data["lavalink_server_pos"]
-
-        lavalink_server_pos += 1
-        if lavalink_server_pos >= len(bot.cached_lavalink_servers):
-            lavalink_server_pos = 0
-
-        temp_guild_data["lavalink_server_pos"] = lavalink_server_pos
-        bot.temp_guild_data[guild_id] = temp_guild_data
-        return next(
-            islice(
-                bot.cached_lavalink_servers.items(),
-                lavalink_server_pos,
-                lavalink_server_pos + 1,
-            )
-        )
-
-    @staticmethod
-    async def _check_node_status(node: wavelink.Node) -> bool:
-        """Check the status of a lavalink node.
-        This function will try to connect to the lavalink node
-
-        Parameters
-        ----------
-        node: wavelink.Node
-            The lavalink node to check the status of.
-        Returns
-        -------
-        bool
-            True if the node is connected, False otherwise.
-        """
-        try:
-            await asyncio.wait_for(
-                wavelink.Pool.connect(nodes=[node], client=bot), timeout=2
-            )
-            # Some fucking nodes secretly don't respond,
-            # I've played these games before!!!
-            await node.fetch_info()
-            return True
-        except Exception:
-            logging.info(f"[Lavalink] Node failed to connect: ({node.uri})")
-            bot.cached_lavalink_servers[node.uri]["score"] -= 1
-        return False
-
-    @staticmethod
-    def _load_humor_api_tokens() -> None:
-        """Load the humor API tokens."""
-        bot.humor_api_tokens = {}
-        for token in HUMOR_API_SECRET:
-            bot.humor_api_tokens[token] = {
-                "exhausted": False,
-            }
-
-    @staticmethod
-    async def close_unused_nodes() -> None:
-        """Clear unused lavalink nodes.
-
-        This function will check if there are any lavalink nodes
-        that are not being used and will close them.
-        """
-        nodes: list[wavelink.Node] = wavelink.Pool.nodes.values()
-        for node in nodes:
-            if len(wavelink.Pool.nodes) == 1:
-                break
-
-            if len(node.players) == 0:
-                logging.info(f"[Lavalink] Node is empty, removing. ({node.uri})")
-                await node._pool_closer()  # Node is not properly closed
-                await node.close(eject=True)
-
-    @staticmethod
-    async def _fetch_channel(channel_id: int) -> discord.TextChannel:
-        """Helper to fetch a channel by ID, returns :class:`discord.TextChannel`.
-
-        Parameters
-        ----------
-        channel_id: int
-            The ID of the channel to fetch.
-        """
-        return await bot.fetch_channel(channel_id)
-
-    @staticmethod
-    def _initialize_class(cls, *args) -> object:
-        """Helper to initialize a class with arguments.
-
-        Parameters
-        ----------
-        cls: type
-            The class to initialize.
-        *args: tuple
-            The arguments to pass to the class.
-        """
-        return cls(*args)
-
-    @staticmethod
-    def get_online_nodes() -> int:
-        """Get the number of online lavalink nodes,
-        returns ``int`` of online nodes.
-        """
-        return len(
-            [
-                node
-                for node in wavelink.Pool.nodes.values()
-                if node.status == NodeStatus.CONNECTED
-            ]
-        )
-
-    @staticmethod
-    def get_avaiable_nodes() -> int:
-        """Get the number of available lavalink nodes,
-        returns ``int`` of available nodes.
-        """
-        return len(bot.cached_lavalink_servers)
-
-    @staticmethod
-    def _clear_temp_reddit_data() -> None:
-        """Clear the temporary user reddit data."""
-        if not bot.temp_user_data:
-            return
-
-        for _, user_data in bot.temp_user_data.items():
-            reddit_data = user_data["reddit"]
-            last_used = reddit_data["last_used"]
-            if not last_used:
-                continue
-
-            if is_older_than(5, last_used):
-                reddit_data["last_used"] = None
-                reddit_data["viewed_posts"] = set()
-                reddit_data["search_limit"] = 3
-
-    @staticmethod
-    def _clear_temp_guild_data() -> None:
-        """Clear the temporary guild data."""
-        for guild_id in bot.temp_guild_data:
-            bot.temp_guild_data[guild_id] = generate_temp_guild_data()
-
-    @staticmethod
-    def _clear_cached_jokes() -> None:
-        """Clear the cached jokes loaded from FunCommands"""
-        bot.loaded_jokes = []
-        bot.loaded_dad_jokes = []
-        bot.loaded_yo_mama_jokes = []
-
-    @staticmethod
-    def _return_node(uri: str, password: str) -> wavelink.Node:
-        return wavelink.Node(
-            uri=uri,
-            password=password,
-            retries=1,
-            inactive_player_timeout=600,
-        )
 
 
 kexobot = KexoBot()
@@ -640,7 +644,7 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
-    """This event is called when an error occurs in an appliacation command.
+    """This event is called when an error occurs in an application command.
 
     Parameters
     ----------
@@ -721,4 +725,4 @@ async def on_guild_join(guild: discord.Guild) -> None:
     logging.info(f"Joined new guild: {guild.name}")
 
 
-bot.run(DISCORD_TOKEN)
+bot.run(ENV_DISCORD_TOKEN)

@@ -1,10 +1,10 @@
-from typing import Dict, Callable, Any, Union
+from typing import Any, Callable
 
 import discord
 
-ResponseHandler = Callable[[discord.ApplicationContext], discord.Embed]
+ResponseBuilder = Callable[..., discord.Embed]
 
-RESPONSE_CODES: Dict[str, ResponseHandler] = {
+RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     # Error responses
     "NO_VOICE_CHANNEL": discord.Embed(
         title="",
@@ -101,14 +101,14 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "LAVALINK_ERROR": discord.Embed(
         title="",
-        description=":x: Failed to load tracks, you probably inputted"
-        " wrong link or this Lavalink server doesn't have "
-        "necessary plugins.\nTo fix this, use command `/node reconnect`",
+        description=":x: Failed to load tracks. You likely entered"
+        " a wrong link or this Lavalink server lacks necessary plugins."
+        "\nTo fix this, use command `/node reconnect`",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NODE_REQUEST_ERROR": lambda **kwargs: discord.Embed(
         title="",
-        description=":warning: An error occured when trying to send"
+        description=":warning: An error occurred when trying to send"
         " request to the node, trying to connect to a new node in a moment."
         f"\n\n**Message: {kwargs.get('error')}**",
         color=discord.Color.yellow(),
@@ -120,7 +120,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     ),
     "TRACK_EXCEPTION": lambda **kwargs: discord.Embed(
         title="",
-        description=":warning: An error occured when playing song, trying to connect to a new node."
+        description=":warning: An error occurred when playing song, trying to connect to a new node."
         f"\n**Message**: {kwargs.get('message')}"
         f"\n**Severity**: {kwargs.get('severity')}",
         color=discord.Color.yellow(),
@@ -188,12 +188,12 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "ALREADY_HOSTING": discord.Embed(
         title="",
         description=":x: You have already created host embed!\n"
-        "Click on button embed to stop it from beign active.",
+        "Click on button embed to stop it from being active.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "INCORRECT_IMAGE_URL": discord.Embed(
         title="",
-        description=":x: Image URL needs to end with .png, .gif and etc.",
+        description=":x: Image URL must end with .png, .gif, etc.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "DB_ALREADY_IN_LIST": lambda **kwargs: discord.Embed(
@@ -289,7 +289,7 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
     "DISCONNECTED_MANUALLY": lambda **kwargs: discord.Embed(
         title="",
         description=f"**Disconnected from <#{kwargs.get('channel_id')}>,"
-        f" please next time use command `/leave`**",
+        f" please use `/leave` next time.**",
         color=discord.Color.blue(),
     ),
     "JOINED": lambda **kwargs: discord.Embed(
@@ -360,11 +360,11 @@ RESPONSE_CODES: Dict[str, ResponseHandler] = {
 
 
 async def send_response(
-    ctx: Union[discord.ApplicationContext, discord.TextChannel],
+    ctx: discord.ApplicationContext | discord.TextChannel,
     response_code: str,
     respond: bool = True,
     ephemeral: bool = True,
-    delete_after: int = None,
+    delete_after: int | None = None,
     **kwargs: Any,
 ) -> None:
     """This method sends a response to the user based on the response code.

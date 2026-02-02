@@ -3,7 +3,7 @@ from typing import Optional
 import discord
 import wavelink
 from discord import option
-from discord.commands import slash_command, guild_only
+from discord.commands import guild_only, slash_command
 from discord.ext import commands
 from pycord.multicog import subcommand
 
@@ -18,7 +18,7 @@ class Audio(commands.Cog):
     Parameters
     ----------
     bot: class:`discord.Bot`
-        The _bot instance.
+        The bot instance.
     """
 
     def __init__(self, bot: commands.Bot):
@@ -77,7 +77,7 @@ class Audio(commands.Cog):
     )
     @is_joined()
     async def speed(
-        self, ctx: discord.ApplicationContext, multiplier: Optional[int] = 2
+        self, ctx: discord.ApplicationContext, multiplier: Optional[int] = 1
     ) -> None:
         """Sets the speed of the player.
 

@@ -2,7 +2,7 @@ import asyncio
 import logging
 import random
 import re
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import discord
 import wavelink
@@ -12,12 +12,12 @@ from discord.ext import commands
 from wavelink.exceptions import LavalinkLoadException
 
 from app.constants import (
+    API_RADIOGARDEN_LISTEN,
+    API_RADIOGARDEN_PAGE,
+    API_RADIOGARDEN_PLACES,
+    API_RADIOGARDEN_SEARCH,
+    CHANNEL_ID_KEXO_SERVER,
     COUNTRIES,
-    KEXO_SERVER,
-    RADIOGARDEN_LISTEN_URL,
-    RADIOGARDEN_PAGE_URL,
-    RADIOGARDEN_PLACES_URL,
-    RADIOGARDEN_SEARCH_URL,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import send_response
@@ -29,6 +29,102 @@ from app.utils import (
     make_http_request,
     switch_node,
 )
+
+
+async def disconnect_after_timeout(player: wavelink.Player, timeout: float) -> None:
+    """Disconnect the player after a timeout if no further activity.
+
+    Parameters:
+    -----------
+    player: :class:`wavelink.Player`
+        The player to disconnect.
+    timeout: float
+        The timeout in seconds.
+    """
+    try:
+        await asyncio.sleep(timeout)
+        if player and player.connected:
+            player.cleanup()
+            await player.disconnect()
+    except asyncio.CancelledError:
+        pass
+
+
+async def fetch_first_track(
+    ctx: discord.ApplicationContext,
+    tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
+) -> wavelink.Playable:
+    player: wavelink.Player = ctx.voice_client
+    # If it's a playlist
+    if isinstance(tracks, wavelink.Playlist):
+        if player.should_respond:
+            await ctx.defer()
+
+        for track in tracks:
+            track.requester = ctx.author
+
+        track = tracks.pop(0)
+        song_count: int = player.queue.put(tracks)
+
+        embed = discord.Embed(
+            title="",
+            description=f"Added the playlist **`{tracks.name}`**"
+            f" ({song_count} songs) to the queue.",
+            color=discord.Color.blue(),
+        )
+        if player.should_respond:
+            await ctx.respond(embed=embed)
+        else:
+            await ctx.send(embed=embed)
+
+        player.should_respond = False
+        return track
+
+    track = tracks[0]
+    track.requester = ctx.author
+    return track
+
+
+async def should_move_to_channel(ctx: discord.ApplicationContext) -> bool:
+    player: wavelink.Player = ctx.voice_client
+    if player and player.channel.id == ctx.author.voice.channel.id:
+        return True
+
+    if player.playing:
+        await send_response(ctx, "NOT_IN_SAME_VOICE_CHANNEL_PLAYING")
+        return False
+
+    await player.move_to(ctx.author.voice.channel)
+    await send_response(
+        ctx,
+        "MOVED",
+        ephemeral=False,
+        channel_id=ctx.author.voice.channel.id,
+    )
+    player.should_respond = False
+    return True
+
+
+def queue_embed(track: wavelink.Playable) -> discord.Embed:
+    return discord.Embed(
+        title="",
+        description=f"**Added to queue:\n [{fix_audio_title(track)}]({track.uri})**",
+        color=discord.Color.blue(),
+    )
+
+
+def playing_embed(track: wavelink.Playable) -> discord.Embed:
+    avatar = getattr(track.requester, "avatar", None)
+    author_pfp = getattr(avatar, "url", None)
+
+    embed = discord.Embed(
+        title="Now playing",
+        description=f"[**{fix_audio_title(track)}**]({track.uri})",
+        color=discord.Colour.green(),
+    )
+    embed.set_footer(text=f"Requested by {track.requester.name}", icon_url=author_pfp)
+    embed.set_thumbnail(url=track.artwork)
+    return embed
 
 
 class MusicCommands(commands.Cog):
@@ -52,7 +148,7 @@ class MusicCommands(commands.Cog):
         self._bot = bot
         self._session = self._bot.session
         self._node_is_switching: dict[int, bool] = {}
-        self._radiomap_cache: List[str] = []
+        self._radiomap_cache: list[str] = []
 
     music = discord.SlashCommandGroup("music", "All music commands")
     radio = discord.SlashCommandGroup("radio", "All radio commands")
@@ -103,7 +199,7 @@ class MusicCommands(commands.Cog):
                 return
             await self._prepare_wavelink(ctx)
 
-        is_moved: bool = await self._should_move_to_channel(ctx)
+        is_moved: bool = await should_move_to_channel(ctx)
         if not is_moved:
             return
 
@@ -125,7 +221,7 @@ class MusicCommands(commands.Cog):
                 player.queue.put_at(0, track)
             else:
                 player.queue.put(track)
-            await ctx.respond(embed=self._queue_embed(track))
+            await ctx.respond(embed=queue_embed(track))
             return
 
         if player.queue.is_empty:
@@ -140,7 +236,7 @@ class MusicCommands(commands.Cog):
             return
 
         if player.should_respond:
-            await ctx.respond(embed=self._playing_embed(track))
+            await ctx.respond(embed=playing_embed(track))
             player.should_respond = False
 
     @radio.command(name="random", description="Gets random radio from RadioMap.")
@@ -173,7 +269,7 @@ class MusicCommands(commands.Cog):
 
         response = await make_http_request(
             self._session,
-            f"{RADIOGARDEN_PAGE_URL}{place_id}/channels",
+            f"{API_RADIOGARDEN_PAGE}{place_id}/channels",
             headers={"accept": "application/json"},
         )
         if not response:
@@ -190,7 +286,7 @@ class MusicCommands(commands.Cog):
             return
         response = await make_http_request(
             self._session,
-            f"{RADIOGARDEN_LISTEN_URL}{station_id}/channel.mp3",
+            f"{API_RADIOGARDEN_LISTEN}{station_id}/channel.mp3",
             headers={"accept": "application/json"},
         )
         if not response:
@@ -249,7 +345,7 @@ class MusicCommands(commands.Cog):
         encoded_station = discord.utils.escape_markdown(station)
         response = await make_http_request(
             self._session,
-            f"{RADIOGARDEN_SEARCH_URL}{encoded_station}",
+            f"{API_RADIOGARDEN_SEARCH}{encoded_station}",
             headers={"accept": "application/json"},
         )
         if not response:
@@ -432,7 +528,7 @@ class MusicCommands(commands.Cog):
     @music.command(
         name="play_troll",
         description="Play music bot into typed channel.",
-        guild_ids=[KEXO_SERVER],
+        guild_ids=[CHANNEL_ID_KEXO_SERVER],
     )
     @discord.ext.commands.is_owner()
     @option("channel_id", description="ID of the channel to play music in.")
@@ -486,30 +582,9 @@ class MusicCommands(commands.Cog):
             await player.play(track)
 
         disconnect_task = asyncio.create_task(
-            self._disconnect_after_timeout(player, track.length / 1000 + 2)
+            disconnect_after_timeout(player, track.length / 1000 + 2)
         )
         player.disconnect_task = disconnect_task
-
-    @staticmethod
-    async def _disconnect_after_timeout(
-        player: wavelink.Player, timeout: float
-    ) -> None:
-        """Disconnect the player after a timeout if no further activity.
-
-        Parameters:
-        -----------
-        player: :class:`wavelink.Player`
-            The player to disconnect.
-        timeout: float
-            The timeout in seconds.
-        """
-        try:
-            await asyncio.sleep(timeout)
-            if player and player.connected:
-                player.cleanup()
-                await player.disconnect()
-        except asyncio.CancelledError:
-            pass
 
     # ----------------------- Helper functions ------------------------ #
     async def _fetch_tracks(
@@ -517,43 +592,8 @@ class MusicCommands(commands.Cog):
     ) -> Optional[wavelink.Playable]:
         tracks = await self._search_tracks(ctx, search)
         if tracks:
-            return await self._fetch_first_track(ctx, tracks)
+            return await fetch_first_track(ctx, tracks)
         return None
-
-    @staticmethod
-    async def _fetch_first_track(
-        ctx: discord.ApplicationContext,
-        tracks: Union[wavelink.Playlist, list[wavelink.Playable]],
-    ) -> wavelink.Playable:
-        player: wavelink.Player = ctx.voice_client
-        # If it's a playlist
-        if isinstance(tracks, wavelink.Playlist):
-            if player.should_respond:
-                await ctx.defer()
-
-            for track in tracks:
-                track.requester = ctx.author
-
-            track = tracks.pop(0)
-            song_count: int = player.queue.put(tracks)
-
-            embed = discord.Embed(
-                title="",
-                description=f"Added the playlist **`{tracks.name}`**"
-                f" ({song_count} songs) to the queue.",
-                color=discord.Color.blue(),
-            )
-            if player.should_respond:
-                await ctx.respond(embed=embed)
-            else:
-                await ctx.send(embed=embed)
-
-            player.should_respond = False
-            return track
-
-        track = tracks[0]
-        track.requester = ctx.author
-        return track
 
     async def _search_tracks(
         self, ctx: discord.ApplicationContext, search: str
@@ -577,7 +617,7 @@ class MusicCommands(commands.Cog):
                 )
                 if tracks:
                     return tracks
-            except (TimeoutError, AttributeError):
+            except (asyncio.TimeoutError, AttributeError):
                 last_error = "NODE_UNRESPONSIVE"
             except LavalinkLoadException:
                 last_error = "LAVALINK_ERROR"
@@ -607,26 +647,6 @@ class MusicCommands(commands.Cog):
             )
         player.just_joined = False
         return None
-
-    @staticmethod
-    async def _should_move_to_channel(ctx: discord.ApplicationContext) -> bool:
-        player: wavelink.Player = ctx.voice_client
-        if player and player.channel.id == ctx.author.voice.channel.id:
-            return True
-
-        if player.playing:
-            await send_response(ctx, "NOT_IN_SAME_VOICE_CHANNEL_PLAYING")
-            return False
-
-        await player.move_to(ctx.author.voice.channel)
-        await send_response(
-            ctx,
-            "MOVED",
-            ephemeral=False,
-            channel_id=ctx.author.voice.channel.id,
-        )
-        player.should_respond = False
-        return True
 
     async def _join_channel(self, ctx: discord.ApplicationContext) -> bool:
         if not ctx.author.voice or not ctx.author.voice.channel:
@@ -731,39 +751,14 @@ class MusicCommands(commands.Cog):
             text_channel_id=player.text_channel.id,
         )
 
-    @staticmethod
-    def _queue_embed(track: wavelink.Playable) -> discord.Embed:
-        return discord.Embed(
-            title="",
-            description=f"**Added to queue:\n [{fix_audio_title(track)}]({track.uri})**",
-            color=discord.Color.blue(),
-        )
-
-    @staticmethod
-    def _playing_embed(track: wavelink.Playable) -> discord.Embed:
-        author_pfp = None
-        if hasattr(track.requester.avatar, "url"):
-            author_pfp = track.requester.avatar.url
-
-        embed = discord.Embed(
-            title="Now playing",
-            description=f"[**{fix_audio_title(track)}**]({track.uri})",
-            color=discord.Colour.green(),
-        )
-        embed.set_footer(
-            text=f"Requested by {track.requester.name}", icon_url=author_pfp
-        )
-        embed.set_thumbnail(url=track.artwork)
-        return embed
-
-    async def _get_radiomap_data(self) -> List[str]:
+    async def _get_radiomap_data(self) -> list[str]:
         """Get radio map data with caching."""
         if self._radiomap_cache:
             return self._radiomap_cache
 
         response = await make_http_request(
             self._session,
-            RADIOGARDEN_PLACES_URL,
+            API_RADIOGARDEN_PLACES,
             headers={"accept": "application/json"},
         )
         if not response:

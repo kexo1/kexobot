@@ -3,10 +3,15 @@ import logging
 
 import discord
 import httpx
-import wavelink
 
-from app.constants import DB_CACHE, LAVALINK_API_URL, LAVALIST_URL
+from app.constants import API_LAVALIST, DB_CACHE, RAW_LAVALINK
 from app.utils import make_http_request
+
+
+def get_full_node_url(host: str, port: int, secure: bool = False) -> str:
+    """Construct a full Lavalink node URL."""
+    protocol = "https" if secure else "http"
+    return f"{protocol}://{host}:{port}"
 
 
 class LavalinkServerManager:
@@ -31,26 +36,20 @@ class LavalinkServerManager:
         self._cached_lavalink_servers_copy = copy.deepcopy(
             self._cached_lavalink_servers
         )
-        self._fresh_nodes: list[wavelink.Node] = []
+        self._fresh_nodes: list[str] = []
 
-    async def fetch(self):
-        """Method to get new lavalink servers from lavalist and lavainfo GitHub.
-
-        Returns
-        -------
-        list[wavelink.Node]
-            List of lavalink nodes.
-        """
+    async def fetch(self) -> None:
+        """Get new Lavalink servers from Lavainfo GitHub and Lavalist."""
         # Lavainfo from github
         json_data: list = await make_http_request(
-            self._session, LAVALINK_API_URL, get_json=True
+            self._session, RAW_LAVALINK, get_json=True
         )
         if json_data:
             self._parse_lavalink_servers(json_data)
 
         # Lavalist
         json_data: list = await make_http_request(
-            self._session, LAVALIST_URL, get_json=True
+            self._session, API_LAVALIST, get_json=True
         )
         if json_data:
             self._parse_lavalink_servers(json_data)
@@ -69,7 +68,7 @@ class LavalinkServerManager:
                 "[Lavalink] Lavalink servers list got updated, updating cache."
             )
 
-    def _parse_lavalink_servers(self, json_data: list) -> list[wavelink.Node]:
+    def _parse_lavalink_servers(self, json_data: list) -> None:
         for server in json_data:
             if (
                 (server.get("restVersion") not in (None, "v4"))
@@ -78,7 +77,7 @@ class LavalinkServerManager:
             ):
                 continue
 
-            uri = self._get_full_node_url(
+            uri = get_full_node_url(
                 server["host"], server["port"], server.get("secure", False)
             )
             self._fresh_nodes.append(uri)
@@ -93,17 +92,7 @@ class LavalinkServerManager:
 
     def _clear_removed_nodes(self) -> None:
         """Method to clear old nodes from the cached lavalink servers."""
+        fresh_set = set(self._fresh_nodes)
         for uri in list(self._cached_lavalink_servers.keys()):
-            is_fresh = False
-            for fresh_uri in self._fresh_nodes:
-                if uri == fresh_uri:
-                    is_fresh = True
-                    break
-
-            if not is_fresh:
+            if uri not in fresh_set:
                 del self._cached_lavalink_servers[uri]
-
-    @staticmethod
-    def _get_full_node_url(host: str, port: int, secure: bool = False) -> dict:
-        """Helper method to get the full node URI."""
-        return f"{'https://' if secure else 'http://'}{host}:{port}"

@@ -2,14 +2,113 @@ import datetime
 
 import discord
 import wavelink
-from discord.commands import slash_command, option, guild_only
+from discord.commands import guild_only, option, slash_command
 from discord.ext import commands
 from pycord.multicog import subcommand
 
-from app.constants import YOUTUBE_ICON
-from app.decorators import is_playing, is_joined, is_queue_empty
+from app.constants import ICON_YOUTUBE
+from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import send_response
-from app.utils import find_track, fix_audio_title, has_pfp, QueuePaginator
+from app.utils import QueuePaginator, find_track, fix_audio_title, has_pfp
+
+
+def get_queue_status(queue_mode: wavelink.QueueMode) -> tuple[str, str]:
+    if queue_mode == wavelink.QueueMode.loop_all:
+        return "Looping queue", "🔁 "
+
+    if queue_mode == wavelink.QueueMode.loop:
+        return "Looping currently playing song", "🔁 "
+
+    return "Now Playing", ""
+
+
+def get_queue_embeds(
+    ctx: discord.ApplicationContext, player: wavelink.Player
+) -> list[discord.Embed]:
+    queue_status, footer = get_queue_status(player.queue.mode)
+
+    header = (
+        f"\n***__{queue_status}:__***\n **[{fix_audio_title(player.current)}]"
+        f"({player.current.uri})**\n"
+        f" `{int(divmod(player.current.length, 60000)[0])}:"
+        f"{round(divmod(player.current.length, 60000)[1] / 1000):02} | "
+        f"Requested by: {player.current.requester.name}`\n\n ***__Next:__***\n"
+    )
+
+    pages = []
+    current_description = header
+
+    for pos, track in enumerate(player.queue):
+        song_line = (
+            f"`{pos + 1}.` **[{fix_audio_title(track)}]({track.uri})**\n"
+            f" `{int(divmod(track.length, 60000)[0])}:"
+            f"{round(divmod(track.length, 60000)[1] / 1000):02} | "
+            f"Requested by: {track.requester.name}`\n"
+        )
+        if len(current_description) + len(song_line) > 4096:
+            embed = discord.Embed(
+                title=f"Queue for {ctx.guild.name}",
+                description=current_description,
+                color=discord.Color.blue(),
+            )
+            embed.set_footer(text=f"\n{footer}{player.queue.count} songs in queue")
+            pages.append(embed)
+            current_description = header + song_line
+        else:
+            current_description += song_line
+
+    embed = discord.Embed(
+        title=f"Queue for {ctx.guild.name}",
+        description=current_description,
+        color=discord.Color.blue(),
+    )
+    embed.set_footer(text=f"\n{footer}{player.queue.count} songs in queue")
+    pages.append(embed)
+    return pages
+
+
+def get_playing_embed(
+    ctx: discord.ApplicationContext,
+) -> discord.Embed:
+    player: wavelink.Player = ctx.voice_client
+
+    embed = discord.Embed(
+        title="Now playing",
+        colour=discord.Colour.blue(),
+        timestamp=datetime.datetime.now(datetime.timezone.utc),
+    )
+    embed.set_author(name="Playback Information")
+
+    if hasattr(player.current, "requester"):
+        embed.set_footer(
+            text=f"Requested by {player.current.requester.name}",
+            icon_url=has_pfp(player.current.requester),
+        )
+    else:
+        embed.set_footer(
+            text="YouTube Autoplay",
+            icon_url=ICON_YOUTUBE,
+        )
+    embed.add_field(
+        name="Track title",
+        value=f"**[{player.current.title}]({player.current.uri})**",
+        inline=False,
+    )
+    embed.add_field(
+        name="Artist",
+        value=f"_{player.current.author if player.current.author else 'None'}_",
+        inline=False,
+    )
+    embed.set_image(url=player.current.artwork)
+    position = divmod(player.position, 60000)
+    length = divmod(player.current.length, 60000)
+    embed.add_field(
+        name="Position",
+        value=f"`{int(position[0])}:{round(position[1] / 1000):02}"
+        f"/{int(length[0])}:{round(length[1] / 1000):02}`",
+        inline=False,
+    )
+    return embed
 
 
 class Queue(commands.Cog):
@@ -44,7 +143,7 @@ class Queue(commands.Cog):
             The context of the command invocation.
         """
         player: wavelink.Player = ctx.voice_client
-        pages = await self._get_queue_embeds(ctx, player)
+        pages = get_queue_embeds(ctx, player)
 
         if len(pages) == 1:
             await ctx.respond(embed=pages[0])
@@ -64,7 +163,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.ApplicationContext`
             The context of the command invocation.
         """
-        await ctx.respond(embed=await self._get_playing_embed(ctx))
+        await ctx.respond(embed=get_playing_embed(ctx))
 
     @subcommand("music")
     @slash_command(name="remove", description="Removes a song from the queue")
@@ -145,7 +244,7 @@ class Queue(commands.Cog):
         player: wavelink.Player = ctx.voice_client
 
         if player.queue.mode == wavelink.QueueMode.loop_all:
-            player.queue.mode = wavelink.QueueMode.loop_all
+            player.queue.mode = wavelink.QueueMode.normal
             await send_response(ctx, "QUEUE_LOOP_DISABLED")
             return
 
@@ -203,104 +302,6 @@ class Queue(commands.Cog):
         player: wavelink.Player = ctx.voice_client
         player.queue.clear()
         await send_response(ctx, "QUEUE_CLEARED", ephemeral=False)
-
-    async def _get_queue_embeds(
-        self, ctx: discord.ApplicationContext, player: wavelink.Player
-    ) -> list:
-        queue_status, footer = await self._get_queue_status(player.queue.mode)
-
-        header = (
-            f"\n***__{queue_status}:__***\n **[{fix_audio_title(player.current)}]"
-            f"({player.current.uri})**\n"
-            f" `{int(divmod(player.current.length, 60000)[0])}:"
-            f"{round(divmod(player.current.length, 60000)[1] / 1000):02} | "
-            f"Requested by: {player.current.requester.name}`\n\n ***__Next:__***\n"
-        )
-
-        pages = []
-        current_description = header
-
-        for pos, track in enumerate(player.queue):
-            song_line = (
-                f"`{pos + 1}.` **[{fix_audio_title(track)}]({track.uri})**\n"
-                f" `{int(divmod(track.length, 60000)[0])}:"
-                f"{round(divmod(track.length, 60000)[1] / 1000):02} | "
-                f"Requested by: {track.requester.name}`\n"
-            )
-            if len(current_description) + len(song_line) > 4096:
-                embed = discord.Embed(
-                    title=f"Queue for {ctx.guild.name}",
-                    description=current_description,
-                    color=discord.Color.blue(),
-                )
-                embed.set_footer(text=f"\n{footer}{player.queue.count} songs in queue")
-                pages.append(embed)
-                current_description = header + song_line
-            else:
-                current_description += song_line
-
-        embed = discord.Embed(
-            title=f"Queue for {ctx.guild.name}",
-            description=current_description,
-            color=discord.Color.blue(),
-        )
-        embed.set_footer(text=f"\n{footer}{player.queue.count} songs in queue")
-        pages.append(embed)
-        return pages
-
-    @staticmethod
-    async def _get_queue_status(queue_mode: wavelink.QueueMode) -> tuple:
-        if queue_mode == wavelink.QueueMode.loop_all:
-            return "Looping queue", "🔁 "
-
-        if queue_mode == wavelink.QueueMode.loop:
-            return "Looping currently playing song", "🔁 "
-
-        return "Now Playing", ""
-
-    @staticmethod
-    async def _get_playing_embed(
-        ctx: discord.ApplicationContext,
-    ) -> discord.Embed:
-        player: wavelink.Player = ctx.voice_client
-
-        embed = discord.Embed(
-            title="Now playing",
-            colour=discord.Colour.blue(),
-            timestamp=datetime.datetime.now(datetime.timezone.utc),
-        )
-        embed.set_author(name="Playback Information")
-
-        if hasattr(player.current, "requester"):
-            embed.set_footer(
-                text=f"Requested by {player.current.requester.name}",
-                icon_url=has_pfp(ctx.author),
-            )
-        else:
-            embed.set_footer(
-                text="YouTube Autoplay",
-                icon_url=YOUTUBE_ICON,
-            )
-        embed.add_field(
-            name="Track title",
-            value=f"**[{player.current.title}]({player.current.uri})**",
-            inline=False,
-        )
-        embed.add_field(
-            name="Artist",
-            value=f"_{player.current.author if player.current.author else 'None'}_",
-            inline=False,
-        )
-        embed.set_image(url=player.current.artwork)
-        position = divmod(player.position, 60000)
-        length = divmod(player.current.length, 60000)
-        embed.add_field(
-            name="Position",
-            value=f"`{int(position[0])}:{round(position[1] / 1000):02}"
-            f"/{int(length[0])}:{round(length[1] / 1000):02}`",
-            inline=False,
-        )
-        return embed
 
 
 def setup(bot: commands.Bot) -> None:

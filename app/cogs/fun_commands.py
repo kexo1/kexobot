@@ -8,8 +8,8 @@ import discord
 import httpx
 from asyncprawcore.exceptions import (
     AsyncPrawcoreException,
-    ResponseException,
     RequestException,
+    ResponseException,
 )
 from discord import option
 from discord.commands import slash_command
@@ -18,21 +18,47 @@ from discord.utils import escape_markdown
 from pycord.multicog import subcommand
 
 from app.constants import (
-    HUMOR_API_URL,
-    JOKE_API_URL,
-    DAD_JOKE_API_URL,
+    API_DAD_JOKE,
+    API_HUMORAPI,
+    API_JOKEAPI,
+    CHANNEL_ID_KEXO_SERVER,
+    CHANNEL_ID_SISKA_GANG_SERVER,
     JOKE_EXCLUDED_WORDS,
-    KEXO_SERVER,
-    SISKA_GANG_SERVER,
-    USER_KEXO,
+    USER_ID_KEXO,
 )
 from app.response_handler import send_response
-from app.utils import (
-    load_text_file,
-    get_user_data,
-    get_guild_data,
-    make_http_request,
-)
+from app.utils import get_guild_data, get_user_data, load_text_file, make_http_request
+
+
+async def is_valid_submission(
+    submission: asyncpraw.models.Submission,
+    user_data: dict,
+    temp_user_data: dict,
+) -> bool:
+    """Validate whether a Reddit submission should be processed."""
+    if submission.locked or submission.stickied or hasattr(submission, "poll_data"):
+        return False
+
+    if submission.permalink in temp_user_data["viewed_posts"]:
+        return False
+
+    nsfw_posts: bool = user_data["nsfw_posts"]
+    if submission.over_18 and not nsfw_posts:
+        return False
+
+    return True
+
+
+async def send_multiple_images(
+    ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission
+) -> None:
+    for image in submission.gallery_data["items"]:
+        await ctx.send(f"https://i.redd.it/{image['media_id']}.jpg")
+
+
+async def post_video(ctx: discord.ApplicationContext, submission_url: str) -> None:
+    video_url = submission_url.split("/")[4]
+    await ctx.send(f"https://rxddit.com/{video_url}/", suppress=False)
 
 
 class FunCommands(commands.Cog):
@@ -70,7 +96,7 @@ class FunCommands(commands.Cog):
     @slash_command(
         name="kotrmelec",
         description="Legendárne školské kotrmelce",
-        guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER],
+        guild_ids=[CHANNEL_ID_KEXO_SERVER, CHANNEL_ID_SISKA_GANG_SERVER],
     )
     async def kotrmelec(self, ctx: discord.ApplicationContext) -> None:
         """This command sends a random "kotrmelec" message from a file.
@@ -87,7 +113,7 @@ class FunCommands(commands.Cog):
     @slash_command(
         name="topstropscreenshot",
         description="Topové fotečky z online hodín",
-        guild_ids=[KEXO_SERVER, SISKA_GANG_SERVER],
+        guild_ids=[CHANNEL_ID_KEXO_SERVER, CHANNEL_ID_SISKA_GANG_SERVER],
     )
     async def top_strop_screenshot(self, ctx: discord.ApplicationContext) -> None:
         """This command sends a random screenshot from a file.
@@ -162,7 +188,7 @@ class FunCommands(commands.Cog):
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
             await ctx.defer()
-            jokes = await self._get_dadjokes()
+            jokes = await self._get_dad_jokes()
             if not jokes:
                 await send_response(ctx, "JOKE_TIMEOUT")
                 return
@@ -264,7 +290,7 @@ class FunCommands(commands.Cog):
         channel_id: str, optional
         """
 
-        if ctx.author.id != USER_KEXO:
+        if ctx.author.id != USER_ID_KEXO:
             await send_response(ctx, "NOT_OWNER")
             return
 
@@ -275,7 +301,7 @@ class FunCommands(commands.Cog):
                     await ctx.respond("Invalid channel ID.")
                     return
 
-                await ctx.respond(f"Spamming in `{word}` in <#{channel_id}>")
+                await ctx.respond(f"Spamming `{word}` in <#{channel_id}>")
                 for _ in range(integer):
                     await channel.send(word)
                 return
@@ -323,7 +349,7 @@ class FunCommands(commands.Cog):
 
         try:
             async for submission in multireddit.hot(limit=limit):
-                is_valid = await self._is_valid_submission(
+                is_valid = await is_valid_submission(
                     submission, user_data, temp_user_data
                 )
                 if not is_valid:
@@ -338,11 +364,11 @@ class FunCommands(commands.Cog):
 
                 if submission.media:
                     await ctx.respond(embed=embed)
-                    await self._post_video(ctx, submission.permalink)
+                    await post_video(ctx, submission.permalink)
                 # If it has multiple images
                 elif hasattr(submission, "gallery_data"):
                     await ctx.respond(embed=embed)
-                    await self._send_multiple_images(ctx, submission)
+                    await send_multiple_images(ctx, submission)
                 else:
                     embed.set_image(url=submission.url)
                     await ctx.respond(embed=embed)
@@ -362,7 +388,9 @@ class FunCommands(commands.Cog):
         self._temp_user_data[user_id]["reddit"]["last_used"] = datetime.now()
         self._temp_user_data[user_id]["reddit"]["search_limit"] += 1
 
-    async def _load_user_data(self, ctx: discord.ApplicationContext) -> tuple:
+    async def _load_user_data(
+        self, ctx: discord.ApplicationContext
+    ) -> tuple[dict, dict]:
         user_data, temp_user_data = await get_user_data(
             self._bot,
             ctx,
@@ -386,25 +414,6 @@ class FunCommands(commands.Cog):
         embed.timestamp = datetime.fromtimestamp(submission.created_utc)
         return embed
 
-    @staticmethod
-    async def _is_valid_submission(
-        submission: asyncpraw.models.Submission,
-        user_data: dict,
-        temp_user_data: dict,
-    ) -> bool:
-        # If post is locked, or is stickied, or it's a poll, skip it
-        if submission.locked or submission.stickied or hasattr(submission, "poll_data"):
-            return False
-
-        if submission.permalink in temp_user_data["viewed_posts"]:
-            return False
-
-        nsfw_posts: bool = user_data["nsfw_posts"]
-        if submission.over_18 and not nsfw_posts:
-            return False
-
-        return True
-
     async def _get_jokes(self) -> Optional[list[str]]:
         fetched_jokes: list[str] = []
         jokes = await self._get_humor_api_jokes()
@@ -415,11 +424,11 @@ class FunCommands(commands.Cog):
 
         return fetched_jokes
 
-    async def _get_dadjokes(self) -> Optional[list[str]]:
+    async def _get_dad_jokes(self) -> Optional[list[str]]:
         fetched_jokes: list[str] = []
         response = await make_http_request(
             self._session,
-            DAD_JOKE_API_URL,
+            API_DAD_JOKE,
             retries=3,
             headers={"Accept": "application/json"},
             get_json=True,
@@ -442,27 +451,31 @@ class FunCommands(commands.Cog):
     async def _get_yo_mama_jokes(self) -> Optional[list[str]]:
         token = self._load_humor_api_token()
         fetched_jokes: list[str] = []
-        if self._bot.humor_api_tokens[token]["exhausted"]:
+        if not token or self._bot.humor_api_tokens[token]["exhausted"]:
             return None
 
+        response = None
         for _ in range(len(self._bot.humor_api_tokens)):
             response = await make_http_request(
                 self._session,
-                HUMOR_API_URL + f"yo_mama&api-key={token}&max-length=256",
+                API_HUMORAPI + f"yo_mama&api-key={token}&max-length=256",
                 retries=3,
             )
             token = self._is_token_exhausted(response, token)
-            if not token:
-                token = self._load_humor_api_token()
-                continue
-            break
+            if token:
+                break
+            token = self._load_humor_api_token()
+
+        if not response:
+            return None
 
         jokes = response.json()
-        for joke in jokes["jokes"]:
-            if joke.get("joke") in self._loaded_yo_mama_jokes:
+        for joke in jokes.get("jokes", []):
+            text = joke.get("joke")
+            if not text or text in self._loaded_yo_mama_jokes:
                 continue
 
-            fetched_jokes.append(joke.get("joke"))
+            fetched_jokes.append(text)
 
         return fetched_jokes
 
@@ -470,7 +483,7 @@ class FunCommands(commands.Cog):
         fetched_jokes: list[str] = []
         response = await make_http_request(
             self._session,
-            JOKE_API_URL,
+            API_JOKEAPI,
             get_json=True,
         )
         if not response:
@@ -484,55 +497,54 @@ class FunCommands(commands.Cog):
             return []
 
         for joke in jokes:
-            joke: str = (
+            joke_text: str = (
                 f"{joke.get('setup')}\n{joke.get('delivery')}"
                 if joke.get("type") == "twopart"
                 else joke.get("joke")
             )
-            if joke in self._loaded_jokes:
+            if not joke_text or joke_text in self._loaded_jokes:
                 continue
 
-            is_filtered = [k for k in JOKE_EXCLUDED_WORDS if k in joke.lower().split()]
-            if is_filtered:
+            if any(word in joke_text.lower().split() for word in JOKE_EXCLUDED_WORDS):
                 continue
 
-            fetched_jokes.append(joke)
+            fetched_jokes.append(joke_text)
 
         return fetched_jokes
 
     async def _get_humor_api_jokes(self) -> list[str]:
-        token = self._load_humor_api_token()
         fetched_jokes: list[str] = []
-        if self._bot.humor_api_tokens[token]["exhausted"]:
-            return []
 
         for joke_type in ["racist", "jewish", "nsfw"]:
+            token = self._load_humor_api_token()
+            if not token or self._bot.humor_api_tokens[token]["exhausted"]:
+                break
+
+            response = None
             for _ in range(len(self._bot.humor_api_tokens)):
                 response = await make_http_request(
                     self._session,
-                    HUMOR_API_URL + f"{joke_type}&api-key={token}&max-length=256",
+                    API_HUMORAPI + f"{joke_type}&api-key={token}&max-length=256",
                     retries=3,
                 )
                 token = self._is_token_exhausted(response, token)
-                if not token:
-                    token = self._load_humor_api_token()
-                    continue
-                break
+                if token:
+                    break
+                token = self._load_humor_api_token()
+
+            if not response:
+                continue
 
             jokes = response.json()
-            for joke in jokes["jokes"]:
-                if joke.get("joke") in self._loaded_jokes:
+            for joke in jokes.get("jokes", []):
+                text = joke.get("joke")
+                if not text or text in self._loaded_jokes:
                     continue
 
-                is_filtered = [
-                    k
-                    for k in JOKE_EXCLUDED_WORDS
-                    if k in joke.get("joke").lower().split()
-                ]
-                if is_filtered:
+                if any(k in text.lower().split() for k in JOKE_EXCLUDED_WORDS):
                     continue
 
-                fetched_jokes.append(joke.get("joke"))
+                fetched_jokes.append(text)
 
         return fetched_jokes
 
@@ -543,7 +555,12 @@ class FunCommands(commands.Cog):
             return token
         return None
 
-    def _is_token_exhausted(self, response: httpx.Response, token) -> Optional[str]:
+    def _is_token_exhausted(
+        self, response: Optional[httpx.Response], token: Optional[str]
+    ) -> Optional[str]:
+        if not token:
+            return None
+
         if not response:
             self._bot.humor_api_tokens[token]["exhausted"] = True
             return None
@@ -554,19 +571,6 @@ class FunCommands(commands.Cog):
             return None
 
         return token
-
-    @staticmethod
-    async def _send_multiple_images(
-        ctx: discord.ApplicationContext,
-        submission: asyncpraw.reddit.Submission,
-    ) -> None:
-        for images in submission.gallery_data["items"]:
-            await ctx.send(f"https://i.redd.it/{images['media_id']}.jpg")
-
-    @staticmethod
-    async def _post_video(ctx: discord.ApplicationContext, submission_url: str) -> None:
-        video_url = submission_url.split("/")[4]
-        await ctx.send(f"https://rxddit.com/{video_url}/", suppress=False)
 
 
 def setup(bot: commands.Bot):

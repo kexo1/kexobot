@@ -1,11 +1,11 @@
 import asyncio
 import json
+import logging
 import os
 from datetime import datetime
-from typing import Optional, Dict, Callable, Any
+from typing import Any, Callable
 
 import aiohttp
-import logging
 import asyncpraw
 import asyncpraw.models
 import asyncprawcore
@@ -15,15 +15,15 @@ import psutil
 import wavelink
 
 from app.constants import (
+    ICON_DISCORD,
+    MUSIC_SOURCES,
+    MUSIC_TO_REMOVE,
     SHITPOST_SUBREDDITS_DEFAULT,
-    SONG_STRIP,
-    SOURCE_PATTERNS,
-    DISCORD_ICON,
 )
 
 
-def load_text_file(name: str) -> list:
-    """This function loads a text file and returns its content as a list of strings.
+def load_text_file(name: str) -> list[str]:
+    """Load a text file and return its content as lines.
 
     Parameters
     ----------
@@ -31,7 +31,7 @@ def load_text_file(name: str) -> list:
         The name of the text file to load (without the .txt extension).
     """
     with open(f"text_files/{name}.txt", encoding="utf8") as f:
-        return f.read().split("\n")
+        return f.read().splitlines()
 
 
 def iso_to_timestamp(iso_time: str) -> datetime:
@@ -71,7 +71,7 @@ def get_file_age(file_path: str) -> float:
     return 0.0
 
 
-def average(numbers: list) -> float:
+def average(numbers: list[float | int]) -> float:
     """Calculate the average of a list of numbers.
 
     Parameters
@@ -104,7 +104,7 @@ def get_memory_usage():
 
 async def download_video(
     session: httpx.AsyncClient, url: str, nsfw: bool
-) -> Optional[discord.File]:
+) -> discord.File | None:
     """Download a video from a given URL and return it as a discord.File.
 
     Parameters
@@ -144,7 +144,7 @@ async def download_video(
 
 async def check_node_status(
     bot: discord.Bot, uri: str, password: str
-) -> Optional[wavelink.Node]:
+) -> wavelink.Node | None:
     """Check the status of a Lavalink node and return it if it's online.
 
     Parameters
@@ -161,28 +161,30 @@ async def check_node_status(
     :class:`wavelink.Node`
         The Lavalink node if it's online, None otherwise.
     """
-    node = [
-        wavelink.Node(
-            uri=uri,
-            password=password,
-            retries=1,
-            resume_timeout=0,
-        )
-    ]
+    node = wavelink.Node(
+        uri=uri,
+        password=password,
+        retries=1,
+        resume_timeout=0,
+    )
     try:
-        await asyncio.wait_for(wavelink.Pool.connect(nodes=node, client=bot), timeout=3)
-        await node[0].fetch_info()
+        await asyncio.wait_for(
+            wavelink.Pool.connect(nodes=[node], client=bot), timeout=3
+        )
+        await node.fetch_info()
     except (
         asyncio.TimeoutError,
         wavelink.exceptions.NodeException,
         wavelink.LavalinkException,
         aiohttp.NonHttpUrlClientError,
     ):
+        # Test
+        await node.close(eject=True)
         return None
-    return node[0]
+    return node
 
 
-def strip_text(text: str, to_strip: tuple) -> str:
+def strip_text(text: str, to_strip: tuple[str, ...]) -> str:
     """Strip unwanted characters from a string.
 
     Parameters
@@ -220,7 +222,7 @@ def fix_audio_title(track: wavelink.Playable) -> str:
     else:
         title = track.uri
 
-    for char in SONG_STRIP:
+    for char in MUSIC_TO_REMOVE:
         title = title.replace(char, "")
     return title.strip()
 
@@ -248,7 +250,7 @@ def is_older_than(hours: int, custom_datetime: datetime) -> bool:
     return time_difference.total_seconds() > hours * 3600
 
 
-def get_search_prefix(query: str) -> Optional[str]:
+def get_search_prefix(query: str) -> str | None:
     """Get the search prefix for a given query.
 
     Parameters
@@ -261,13 +263,13 @@ def get_search_prefix(query: str) -> Optional[str]:
     str | None
         The search prefix if found, None otherwise.
     """
-    for pattern, prefix in SOURCE_PATTERNS:
+    for pattern, prefix in MUSIC_SOURCES:
         if pattern.search(query):
             return prefix
     return None
 
 
-def find_track(player: wavelink.Player, to_find: str) -> Optional[int]:
+def find_track(player: wavelink.Player, to_find: str) -> int | None:
     """Find a track in the player's queue by title or index.
 
     Parameters
@@ -317,7 +319,7 @@ def has_pfp(member: discord.Member) -> str:
     """
     if hasattr(member.avatar, "url"):
         return member.display_avatar.url
-    return DISCORD_ICON
+    return ICON_DISCORD
 
 
 async def switch_node(
@@ -325,7 +327,7 @@ async def switch_node(
     player: wavelink.Player,
     play_after: bool = True,
     send_message: bool = True,
-) -> Optional[wavelink.Node]:
+) -> wavelink.Node | None:
     """
     Attempt to switch to a new node for audio playback.
 
@@ -457,7 +459,7 @@ async def generate_temp_user_data(bot: discord.Bot, user_id: int) -> dict:
 
     for subreddit in multireddit.subreddits:
         try:
-            # For whatever reason, subbreddits are already added to the multireddit
+            # For whatever reason, subreddits are already added to the multireddit
             await multireddit.remove(subreddit)
         except asyncpraw.exceptions.RedditAPIException:
             pass
@@ -528,8 +530,8 @@ def fix_guild_data(old_data: dict) -> dict:
 
 
 def fix_data(
-    fixed_data: Dict[str, Any], generator: Callable[[], Dict[str, Any]]
-) -> Dict[str, Any]:
+    fixed_data: dict[str, Any], generator: Callable[[], dict[str, Any]]
+) -> dict[str, Any]:
     """Generic function to fix data by adding missing keys and values from a generator.
 
     Parameters
@@ -557,7 +559,9 @@ def fix_data(
     return fixed_data
 
 
-async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tuple:
+async def get_user_data(
+    bot: discord.Bot, ctx: discord.ApplicationContext
+) -> tuple[dict, dict]:
     """Get user data for the given user.
 
     Parameters
@@ -598,7 +602,7 @@ async def get_user_data(bot: discord.Bot, ctx: discord.ApplicationContext) -> tu
     return user_data, temp_user_data
 
 
-async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple:
+async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple[dict, dict]:
     """Get guild data for the given guild.
 
     Parameters
@@ -638,13 +642,13 @@ async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple:
 async def make_http_request(
     session: httpx.AsyncClient,
     url: str,
-    data: Optional[Dict] = None,
-    headers: Optional[Dict] = None,
+    data: dict[str, Any] | None = None,
+    headers: dict[str, Any] | None = None,
     retries: int = 2,
     timeout: float = 3.0,
     get_json: bool = False,
     binary: bool = False,
-) -> Optional[httpx.Response]:
+) -> httpx.Response | Any | None:
     """
     Make an HTTP request with retry logic.
 
@@ -669,8 +673,8 @@ async def make_http_request(
 
     Returns
     -------
-    :class:`httpx.Response` | None
-        The response from the request, or None if the request failed.
+    :class:`httpx.Response` | dict | list | None
+        The response object (or parsed JSON) from the request, or None if the request failed.
     """
     for attempt in range(retries):
         try:
@@ -707,18 +711,18 @@ async def make_http_request(
 class QueuePaginator(discord.ui.View):
     """A paginator for the queue command.
 
-    This class creates a view with two buttons, "Previous" and Next",
-    that allow the user to navigate through the pages of the queue."
+    This view creates two buttons, "Previous" and "Next",
+    that allow the user to navigate through the pages of the queue.
 
     Parameters
     ----------
-    embeds : list
+    embeds : list[discord.Embed]
         A list of embeds to be displayed in the paginator.
     timeout : int
         The time in seconds before the paginator times out. Default is 600 seconds.
     """
 
-    def __init__(self, embeds: list, timeout: int = 600) -> None:
+    def __init__(self, embeds: list[discord.Embed], timeout: int = 600) -> None:
         super().__init__(timeout=timeout)
         self._embeds = embeds
         self._current_page = 0

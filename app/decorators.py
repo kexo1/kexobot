@@ -1,15 +1,19 @@
 from functools import wraps
+from typing import Any, Callable, Protocol
 
 from app.response_handler import send_response
 
 
-def is_joined():
-    """Check if the user is in a voice channel and the bot is
-    connected to a voice channel."""
+class CommandFunc(Protocol):
+    async def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
 
-    def decorator(func) -> None:
+
+def is_joined() -> Callable[[CommandFunc], CommandFunc]:
+    """Ensure the user and bot share a connected voice channel."""
+
+    def decorator(func: CommandFunc) -> CommandFunc:
         @wraps(func)
-        async def wrapper(*args, **kwargs) -> None:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             # args[0] is self and args[1] is ctx.
             ctx = args[1]
             if not ctx.author.voice or not ctx.author.voice.channel:
@@ -17,7 +21,6 @@ def is_joined():
                 return None
 
             vc = ctx.voice_client
-
             if not vc or not getattr(vc, "_connected", False):
                 await send_response(ctx, "NOT_IN_VOICE_CHANNEL")
                 return None
@@ -29,12 +32,12 @@ def is_joined():
     return decorator
 
 
-def is_playing():
-    """Check if the bot is playing a track and the user is in the same voice channel."""
+def is_playing() -> Callable[[CommandFunc], CommandFunc]:
+    """Ensure a track is playing and user shares the voice channel."""
 
-    def decorator(func) -> None:
+    def decorator(func: CommandFunc) -> CommandFunc:
         @wraps(func)
-        async def wrapper(*args, **kwargs) -> None:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             ctx = args[1]
             vc = ctx.voice_client
             if not vc or not vc.playing or not vc.current:
@@ -52,12 +55,12 @@ def is_playing():
     return decorator
 
 
-def is_queue_empty():
-    """Check if queue is empty."""
+def is_queue_empty() -> Callable[[CommandFunc], CommandFunc]:
+    """Ensure the queue is not empty."""
 
-    def decorator(func) -> None:
+    def decorator(func: CommandFunc) -> CommandFunc:
         @wraps(func)
-        async def wrapper(*args, **kwargs) -> None:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             ctx = args[1]
             vc = ctx.voice_client
             if not vc or not vc.queue:

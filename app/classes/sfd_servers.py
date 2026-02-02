@@ -2,7 +2,6 @@ import datetime
 import gc
 import os
 from datetime import timedelta
-from typing import Union
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -11,10 +10,10 @@ from bs4 import BeautifulSoup
 from pymongo import AsyncMongoClient
 
 from app.constants import (
+    API_SFD_SERVER,
     DB_SFD_ACTIVITY,
     SFD_HEADERS,
     SFD_REQUEST,
-    SFD_SERVER_URL,
     TIMEZONES,
 )
 from app.utils import average, is_older_than, make_http_request
@@ -24,6 +23,20 @@ import matplotlib.pyplot as plt
 import mplcyberpunk
 
 plt.style.use("cyberpunk")
+
+
+def generate_lines_and_effects(
+    x_positions: list[int], players: list[int], servers: list[int]
+) -> None:
+    plt.figure(figsize=(14, 7))
+    plt.plot(x_positions, players, color="cyan", label="Players")
+    plt.plot(x_positions, servers, color="magenta", label="Servers")
+    plt.legend(loc="upper center", fontsize=12, bbox_to_anchor=(0.5, 1.05), ncol=2)
+
+    mplcyberpunk.add_glow_effects()
+    mplcyberpunk.add_gradient_fill(alpha_gradientglow=0.5)
+    plt.tight_layout()
+    plt.grid(True)
 
 
 class SFDServer:
@@ -138,7 +151,7 @@ class SFDServers:
             for i in range(23, -1, -1)
         ]
 
-        self._generate_lines_and_effects(list(range(240)), players, servers)
+        generate_lines_and_effects(list(range(240)), players, servers)
 
         # One time position per hour
         time_positions = [i * 10 + 5 for i in range(24)]
@@ -151,7 +164,7 @@ class SFDServers:
         plt.close()
         gc.collect()
 
-    async def generate_graph_week(self, timezone: str):
+    async def generate_graph_week(self, timezone: str) -> None:
         """Method to generate a weekly activity graph.
 
         Parameters:
@@ -183,7 +196,7 @@ class SFDServers:
             ampm = time.strftime("%p")
             hours.append(f"{day_str} {hour}{ampm}")
 
-        self._generate_lines_and_effects(list(range(280)), players, servers)
+        generate_lines_and_effects(list(range(280)), players, servers)
 
         time_positions = [i * 10 + 5 for i in range(28)]
         plt.xticks(time_positions, hours, rotation=45)
@@ -286,7 +299,9 @@ class SFDServers:
             },
         )
 
-    async def get_servers_info(self) -> tuple:
+    async def get_servers_info(
+        self,
+    ) -> tuple[dict[str, list[str]], int] | tuple[None, None]:
         """Method to get the server information.
 
         Returns:
@@ -294,11 +309,15 @@ class SFDServers:
         tuple
             A tuple containing a dictionary with server information and the total number of players.
         """
-        servers: list[SFDServer] = await self._parse_servers()
+        servers = await self._parse_servers()
         if not servers:
             return None, None
 
-        servers_dict: dict = {"server_name": [], "maps": [], "players": []}
+        servers_dict: dict[str, list[str]] = {
+            "server_name": [],
+            "maps": [],
+            "players": [],
+        }
         all_players = 0
 
         for server in servers:
@@ -331,10 +350,10 @@ class SFDServers:
             return None
         return server[0]
 
-    async def _load_sfd_servers(self) -> str:
+    async def _load_sfd_servers(self) -> str | None:
         response = await make_http_request(
             self._session,
-            SFD_SERVER_URL,
+            API_SFD_SERVER,
             data=SFD_REQUEST,
             headers=SFD_HEADERS,
         )
@@ -342,7 +361,7 @@ class SFDServers:
             return None
         return response.text
 
-    async def _get_players_and_servers(self) -> tuple:
+    async def _get_players_and_servers(self) -> tuple[int, int] | tuple[None, None]:
         servers = await self._parse_servers()
         if not servers:
             return None, None
@@ -355,9 +374,7 @@ class SFDServers:
     async def _load_sfd_activity_data(self) -> dict:
         return await self._bot_config.find_one(DB_SFD_ACTIVITY)
 
-    async def _parse_servers(
-        self, search: str = None
-    ) -> Union[list[SFDServer], SFDServer, None]:
+    async def _parse_servers(self, search: str | None = None) -> list[SFDServer] | None:
         response = await self._load_sfd_servers()
         if not response:
             return None
@@ -453,15 +470,3 @@ class SFDServers:
             return filtered_servers
 
         return servers
-
-    @staticmethod
-    def _generate_lines_and_effects(x_positions, players, servers):
-        plt.figure(figsize=(14, 7))
-        plt.plot(x_positions, players, color="cyan", label="Players")
-        plt.plot(x_positions, servers, color="magenta", label="Servers")
-        plt.legend(loc="upper center", fontsize=12, bbox_to_anchor=(0.5, 1.05), ncol=2)
-
-        mplcyberpunk.add_glow_effects()
-        mplcyberpunk.add_gradient_fill(alpha_gradientglow=0.5)
-        plt.tight_layout()
-        plt.grid(True)

@@ -1,20 +1,44 @@
+import logging
 import random
 
 import discord
 import wavelink
-import logging
 from discord.ext import commands
 from wavelink import (
     NodeDisconnectedEventPayload,
     NodeReadyEventPayload,
-    TrackStartEventPayload,
     TrackExceptionEventPayload,
+    TrackStartEventPayload,
     TrackStuckEventPayload,
 )
 
-from app.constants import YOUTUBE_ICON
+from app.constants import ICON_YOUTUBE
 from app.response_handler import send_response
-from app.utils import fix_audio_title, switch_node, has_pfp
+from app.utils import fix_audio_title, has_pfp, switch_node
+
+
+def is_bot_node_connected(bot: commands.Bot) -> bool:
+    return bool(getattr(bot, "node", None))
+
+
+def playing_embed(payload: TrackStartEventPayload) -> discord.Embed:
+    embed = discord.Embed(
+        color=discord.Colour.green(),
+        title="Now playing",
+        description=f"[**{fix_audio_title(payload.track)}**]({payload.track.uri})",
+    )
+    if hasattr(payload.player.current, "requester"):
+        embed.set_footer(
+            text=f"Requested by {payload.player.current.requester.name}",
+            icon_url=has_pfp(payload.player.current.requester),
+        )
+    else:
+        embed.set_footer(
+            text="YouTube Autoplay",
+            icon_url=ICON_YOUTUBE,
+        )
+    embed.set_thumbnail(url=payload.track.artwork)
+    return embed
 
 
 class Listeners(commands.Cog):
@@ -32,6 +56,43 @@ class Listeners(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self._bot = bot
+
+    @commands.Cog.listener()
+    async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
+        """This event is triggered when a Wavelink node is ready.
+
+        It checks if the bot is connected to the node and closes any unused nodes if necessary.
+
+        Parameters
+        ----------
+        payload: :class:`NodeReadyEventPayload`
+            The payload containing information about the node that is ready.
+        """
+        logging.info(f"[Lavalink] Node ({payload.node.uri}) is ready!")
+        if self._bot.get_online_nodes() > 1 and is_bot_node_connected(self._bot):
+            await self._bot.close_unused_nodes()
+
+    @commands.Cog.listener()
+    async def on_wavelink_node_disconnected(
+        self, payload: NodeDisconnectedEventPayload
+    ) -> None:
+        """This event is triggered when a Wavelink node is disconnected.
+
+        It checks if the bot is connected to the node and attempts to reconnect if necessary.
+
+        Parameters
+        ----------
+        payload: :class:`NodeDisconnectedEventPayload`
+            The payload containing information about the node that is disconnected.
+        """
+        if self._bot.get_online_nodes() == 0 and is_bot_node_connected(self._bot):
+            logging.warning(
+                f"[Lavalink] Node got disconnected, connecting new node. ({payload.node.uri})"
+            )
+            node = self._bot.cached_lavalink_servers.get(payload.node.uri)
+            if node:
+                node["score"] -= 1
+            await self._bot.connect_node()
 
     @commands.Cog.listener()  # noinspection PyUnusedLocal
     async def on_wavelink_track_start(self, payload: TrackStartEventPayload) -> None:
@@ -55,14 +116,14 @@ class Listeners(commands.Cog):
         if not payload.player.should_respond or not hasattr(
             payload.player.current, "requester"
         ):
-            await payload.player.text_channel.send(embed=self._playing_embed(payload))
+            await payload.player.text_channel.send(embed=playing_embed(payload))
 
         history_count = payload.player.queue.history.count
         if payload.player.autoplay != wavelink.AutoPlayMode.enabled:
             tips: dict[int, str] = {
                 3: (
                     "-# Not happy with the current node performance?\n"
-                    f"-# You can switch between {self._bot.get_avaiable_nodes()} nodes "
+                    f"-# You can switch between {self._bot.get_available_nodes()} nodes "
                     "by using /node reconnect."
                 ),
                 10: (
@@ -79,43 +140,6 @@ class Listeners(commands.Cog):
             tip = tips.get(history_count)
             if tip and random.randint(0, 2) == 0:
                 await payload.player.text_channel.send(tip)
-
-    @commands.Cog.listener()
-    async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
-        """This event is triggered when a Wavelink node is ready.
-
-        It checks if the bot is connected to the node and closes any unused nodes if necessary.
-
-        Parameters
-        ----------
-        payload: :class:`NodeReadyEventPayload`
-            The payload containing information about the node that is ready.
-        """
-        logging.info(f"[Lavalink] Node ({payload.node.uri}) is ready!")
-        if self._bot.get_online_nodes() > 1 and self._is_bot_node_connected():
-            await self._bot.close_unused_nodes()
-
-    @commands.Cog.listener()
-    async def on_wavelink_node_disconnected(
-        self, payload: NodeDisconnectedEventPayload
-    ) -> None:
-        """This event is triggered when a Wavelink node is disconnected.
-
-        It checks if the bot is connected to the node and attempts to reconnect if necessary.
-
-        Parameters
-        ----------
-        payload: :class:`NodeDisconnectedEventPayload`
-            The payload containing information about the node that is disconnected.
-        """
-        if self._bot.get_online_nodes() == 0 and self._is_bot_node_connected():
-            logging.warning(
-                f"[Lavalink] Node got disconnected, connecting new node. ({payload.node.uri})"
-            )
-            node = self._bot.cached_lavalink_servers.get(payload.node.uri)
-            if node:
-                node["score"] -= 1
-            await self._bot.connect_node()
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(
@@ -228,29 +252,6 @@ class Listeners(commands.Cog):
             except AttributeError:
                 pass
             return
-
-    @staticmethod
-    def _playing_embed(payload: TrackStartEventPayload) -> discord.Embed:
-        embed = discord.Embed(
-            color=discord.Colour.green(),
-            title="Now playing",
-            description=f"[**{fix_audio_title(payload.track)}**]({payload.track.uri})",
-        )
-        if hasattr(payload.player.current, "requester"):
-            embed.set_footer(
-                text=f"Requested by {payload.player.current.requester.name}",
-                icon_url=has_pfp(payload.player.current.requester),
-            )
-        else:
-            embed.set_footer(
-                text="YouTube Autoplay",
-                icon_url=YOUTUBE_ICON,
-            )
-        embed.set_thumbnail(url=payload.track.artwork)
-        return embed
-
-    def _is_bot_node_connected(self) -> bool:
-        return hasattr(self._bot, "node")
 
 
 def setup(bot: commands.Bot) -> None:
