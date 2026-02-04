@@ -28,6 +28,7 @@ from app.constants import (
     CHANNEL_ID_ALIENWARE_ARENA_NEWS_CHANNEL,
     CHANNEL_ID_ESUTAZE_CHANNEL,
     CHANNEL_ID_FREE_STUFF_CHANNEL,
+    CHANNEL_ID_GAME_CRACKS_CHANNEL,
     CHANNEL_ID_GAME_UPDATES_CHANNEL,
     DB_CACHE,
     ENV_API_DB,
@@ -265,6 +266,7 @@ class KexoBot:
 
         self._channel_esutaze: discord.TextChannel | None = None
         self._channel_game_updates: discord.TextChannel | None = None
+        self._channel_game_cracks: discord.TextChannel | None = None
         self._channel_free_stuff: discord.TextChannel | None = None
         self._channel_alienware_arena_news: discord.TextChannel | None = None
 
@@ -309,6 +311,7 @@ class KexoBot:
         self._channel_game_updates = await fetch_channel(
             CHANNEL_ID_GAME_UPDATES_CHANNEL
         )
+        self._channel_game_cracks = await fetch_channel(CHANNEL_ID_GAME_CRACKS_CHANNEL)
         self._channel_free_stuff = await fetch_channel(CHANNEL_ID_FREE_STUFF_CHANNEL)
         self._channel_alienware_arena_news = await fetch_channel(
             CHANNEL_ID_ALIENWARE_ARENA_NEWS_CHANNEL
@@ -348,7 +351,7 @@ class KexoBot:
             self.session,
             self._reddit_agent,
             self._channel_free_stuff,
-            self._channel_game_updates,
+            self._channel_game_cracks,
         )
         self._sfd_servers = initialize_class(SFDServers, self._bot_config, self.session)
         self._lavalink_server_manager = initialize_class(

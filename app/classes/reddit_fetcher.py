@@ -79,13 +79,13 @@ class RedditFetcher:
         session: httpx.AsyncClient,
         reddit_agent: asyncpraw.Reddit,
         free_stuff: discord.TextChannel,
-        game_updates: discord.TextChannel,
+        game_cracks: discord.TextChannel,
     ) -> None:
         self._bot_config = bot_config
         self._session = session
         self._reddit_agent = reddit_agent
         self._free_stuff = free_stuff
-        self._game_updates = game_updates
+        self._game_cracks = game_cracks
 
     async def crackwatch(self) -> None:
         """Method to fetch game repacks from r/CrackWatch subreddit."""
@@ -163,7 +163,7 @@ class RedditFetcher:
                     icon_url=ICON_REDDIT_CRACKWATCH,
                 )
                 embed.timestamp = datetime.fromtimestamp(submission.created_utc)
-                await self._game_updates.send(embed=embed)
+                await self._game_cracks.send(embed=embed)
 
             if crackwatch_cache != crackwatch_cache_upload:
                 await self._bot_config.update_one(
