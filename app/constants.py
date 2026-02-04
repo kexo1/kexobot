@@ -33,7 +33,11 @@ logger.addHandler(console_handler)
 
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
+logging.getLogger("wavelink").setLevel(logging.CRITICAL)
 logging.getLogger("wavelink.node").setLevel(logging.CRITICAL)
+logging.getLogger("wavelink.pool").setLevel(logging.CRITICAL)
+logging.getLogger("wavelink.websocket").setLevel(logging.CRITICAL)
+logging.getLogger("wavelink.player").setLevel(logging.CRITICAL)
 logging.getLogger("discord.client").setLevel(logging.WARNING)
 logging.getLogger("discord.gateway").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -292,6 +296,7 @@ API_LAVALIST = "https://lavalink-list.ajieblogs.eu.org/All"
 RAW_LAVALINK = (
     "https://raw.githubusercontent.com/botxlab/lavalink-list/refs/heads/main/nodes.json"
 )
+NODE_MAX_CANDIDATES = 30
 
 # Radiogarden
 API_RADIOGARDEN_PLACES = "https://radio.garden/api/ara/content/places"

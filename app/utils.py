@@ -326,7 +326,8 @@ async def switch_node(
     bot: discord.Bot,
     player: wavelink.Player,
     play_after: bool = True,
-    send_message: bool = True,
+    send_success_message: bool = True,
+    send_failure_message: bool = True,
 ) -> wavelink.Node | None:
     """
     Attempt to switch to a new node for audio playback.
@@ -339,6 +340,10 @@ async def switch_node(
         The wavelink Player instance to switch the node for.
     play_after: bool
         Whether to play the current track after switching nodes.
+    send_success_message: bool
+        Whether to send a success message in the text channel upon successful node switch.
+    send_failure_message: bool
+        Whether to send a failure message in the text channel if no suitable node is found.
 
     Returns
     -------
@@ -376,7 +381,7 @@ async def switch_node(
                 bot.track_exceptions.pop(player.guild.id, None)
 
         logging.info(f"[Lavalink] {i + 1}. Node switched ({node.uri})")
-        if send_message:
+        if send_success_message:
             embed = discord.Embed(
                 title="",
                 description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
@@ -388,12 +393,14 @@ async def switch_node(
         player.node_is_switching = False
         return node
 
-    embed = discord.Embed(
-        title="",
-        description=":x: Failed to automatically connect to a new node, try `/reconnect_node`",
-        color=discord.Color.from_rgb(r=220, g=0, b=0),
-    )
-    await player.text_channel.send(embed=embed)
+    if send_failure_message:
+        embed = discord.Embed(
+            title="",
+            description=":x: Failed to find node to play requested track.",
+            color=discord.Color.from_rgb(r=220, g=0, b=0),
+        )
+        await player.text_channel.send(embed=embed)
+
     player.node_is_switching = False
     return None
 

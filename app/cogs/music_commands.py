@@ -9,7 +9,7 @@ import wavelink
 from discord import option
 from discord.commands import guild_only
 from discord.ext import commands
-from wavelink.exceptions import LavalinkLoadException
+from wavelink.exceptions import LavalinkLoadException, NodeException
 
 from app.constants import (
     API_RADIOGARDEN_LISTEN,
@@ -618,12 +618,21 @@ class MusicCommands(commands.Cog):
                 if tracks:
                     return tracks
             except (asyncio.TimeoutError, AttributeError):
-                last_error = "NODE_UNRESPONSIVE"
+                last_error = "NODE_NOT_FOUND"
             except LavalinkLoadException:
                 last_error = "LAVALINK_ERROR"
+            except NodeException:
+                last_error = "NODE_NOT_FOUND"
 
             if last_error:
-                await switch_node(bot=self._bot, player=player, play_after=False)
+                await ctx.trigger_typing()
+                play_after = not player.playing
+                await switch_node(
+                    bot=self._bot,
+                    player=player,
+                    play_after=play_after,
+                    send_failure_message=False,
+                )
 
             # Fallback to default search
             source = "ytsearch"

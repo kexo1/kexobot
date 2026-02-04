@@ -68,6 +68,11 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         description=":warning: Node is unresponsive, trying to connect to a new node in a moment.",
         color=discord.Color.yellow(),
     ),
+    "NODE_NOT_FOUND": discord.Embed(
+        title="",
+        description=":x: Couldn't find node to play this music.",
+        color=discord.Color.from_rgb(r=220, g=0, b=0),
+    ),
     "NO_PLAYERS_CONNECTED": discord.Embed(
         title="",
         description=":x: No players are playing music.",

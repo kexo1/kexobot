@@ -4,6 +4,7 @@ import logging
 import socket
 from datetime import datetime
 from itertools import islice
+from typing import Any, TypedDict
 from zoneinfo import ZoneInfo
 
 import asyncpraw
@@ -42,6 +43,7 @@ from app.constants import (
     ENV_WORDNIK_KEY,
     ICON_REDDIT,
     LOCAL_MACHINE_NAME,
+    NODE_MAX_CANDIDATES,
     SHITPOST_SUBREDDITS_ALL,
 )
 from app.utils import (
@@ -51,7 +53,67 @@ from app.utils import (
     make_http_request,
 )
 
-bot = Bot()
+
+class UserRedditData(TypedDict):
+    subreddits: tuple[str, ...] | list[str]
+    nsfw_posts: bool
+
+
+class UserData(TypedDict):
+    reddit: UserRedditData
+
+
+class TempUserRedditData(TypedDict):
+    viewed_posts: set[str]
+    search_limit: int
+    last_used: datetime
+    multireddit: asyncpraw.models.Multireddit
+
+
+class TempUserData(TypedDict):
+    reddit: TempUserRedditData
+
+
+class GuildMusicData(TypedDict):
+    autoplay_mode: int
+    volume: int
+
+
+class GuildData(TypedDict):
+    music: GuildMusicData
+
+
+class GuildJokesData(TypedDict):
+    viewed_jokes: list[str]
+    viewed_dad_jokes: list[str]
+    viewed_yo_mama_jokes: list[str]
+
+
+class TempGuildData(TypedDict):
+    lavalink_server_pos: int
+    jokes: GuildJokesData
+
+
+class KexoBotClient(Bot):
+    node: wavelink.Node | None
+    user_data: dict[int, UserData]
+    temp_user_data: dict[int, TempUserData]
+    guild_data: dict[int, GuildData]
+    temp_guild_data: dict[int, TempGuildData]
+    track_exceptions: dict[str, Any]
+    cached_lavalink_servers: dict[str, dict[str, Any]]
+    bot_config: AsyncMongoClient
+    user_data_db: AsyncMongoClient
+    guild_data_db: AsyncMongoClient
+    reddit_agent: asyncpraw.Reddit
+    humor_api_tokens: dict[str, dict[str, bool]]
+    loaded_jokes: list[str]
+    loaded_dad_jokes: list[str]
+    loaded_yo_mama_jokes: list[str]
+    session: httpx.AsyncClient | None
+
+
+bot = KexoBotClient()
 
 
 async def get_guild_node(guild_id: int) -> tuple[str, dict]:
@@ -109,11 +171,6 @@ async def check_node_status(node: wavelink.Node) -> bool:
     except Exception:
         logging.info(f"[Lavalink] Node failed to connect: ({node.uri})")
         bot.cached_lavalink_servers[node.uri]["score"] -= 1
-        # Test
-        try:
-            await node.close(eject=True)
-        except Exception:
-            await node.close()
     return False
 
 
@@ -463,6 +520,10 @@ class KexoBot:
                 logging.critical(
                     f"[Lavalink] Type: {type(bot.node)}, Value: {bot.node}, Repr: {repr(bot.node)}, Full: {bot.node.__dict__}"
                 )
+
+        # Shorted node candidates if there are too many
+        if len(node_candidates) > NODE_MAX_CANDIDATES:
+            node_candidates = dict(islice(node_candidates.items(), NODE_MAX_CANDIDATES))
 
         # Try to connect to the best node based on score
         while node_candidates:
