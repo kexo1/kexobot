@@ -29,13 +29,10 @@ from app.utils import strip_text
 
 
 def get_image_from_line(line: str) -> Optional[str]:
-    image_url = re.findall(r"\((.*?)\)", line)
-    if not image_url:
+    match = re.search(r"\((https?://[^)\s]+?\.(?:png|jpe?g))\)", line, re.I)
+    if not match:
         return None
-
-    if len(image_url) > 1:
-        return image_url[1]
-    return image_url[0]
+    return match.group(1)
 
 
 async def create_embed_crackwatch(
@@ -134,9 +131,10 @@ class RedditFetcher:
                     if not line:
                         continue
 
-                    if ".png" in line or ".jpeg" in line or ".jpg" in line:
-                        img_url = get_image_from_line(line)
+                    if img_candidate := get_image_from_line(line):
+                        img_url = img_candidate
                         continue
+
                     description_list.append(f"• {line}\n")
 
                 crackwatch_cache_upload.pop(0)
@@ -165,11 +163,6 @@ class RedditFetcher:
                 embed.timestamp = datetime.fromtimestamp(submission.created_utc)
                 await self._game_cracks.send(embed=embed)
 
-            if crackwatch_cache != crackwatch_cache_upload:
-                await self._bot_config.update_one(
-                    DB_CACHE,
-                    {"$set": {"crackwatch_cache": crackwatch_cache_upload}},
-                )
         except discord.errors.HTTPException as e:
             logging.warning(
                 f"[CrackWatch] - Error when sending message ({submission.permalink}):\n{e}"
@@ -180,6 +173,10 @@ class RedditFetcher:
             ResponseException,
         ) as e:
             logging.warning(f"[CrackWatch] - Error when accessing crackwatch:\n{e}")
+        finally:
+            await self._update_cache_if_changed(
+                "crackwatch_cache", crackwatch_cache, crackwatch_cache_upload
+            )
 
     async def freegamefindings(self) -> None:
         """Method to fetch free games from r/FreeGameFindings subreddit."""
@@ -236,11 +233,11 @@ class RedditFetcher:
             logging.warning(
                 f"[FreeGameFindings] - Error while fetching subreddit:\n{e}"
             )
-
-        if freegamefindings_cache_upload != freegamefindings_cache:
-            await self._bot_config.update_one(
-                DB_CACHE,
-                {"$set": {"freegamefindings_cache": freegamefindings_cache_upload}},
+        finally:
+            await self._update_cache_if_changed(
+                "freegamefindings_cache",
+                freegamefindings_cache,
+                freegamefindings_cache_upload,
             )
 
     async def _process_submission(
@@ -288,3 +285,12 @@ class RedditFetcher:
         crackwatch_cache = await self._bot_config.find_one(DB_CACHE)
         to_filter = await self._bot_config.find_one(DB_LISTS)
         return crackwatch_cache[cache], to_filter[exceptions]
+
+    async def _update_cache_if_changed(
+        self, cache_key: str, original: list[str], updated: list[str]
+    ) -> None:
+        if updated != original:
+            await self._bot_config.update_one(
+                DB_CACHE,
+                {"$set": {cache_key: updated}},
+            )
