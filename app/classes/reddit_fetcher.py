@@ -170,6 +170,10 @@ class RedditFetcher:
                     DB_CACHE,
                     {"$set": {"crackwatch_cache": crackwatch_cache_upload}},
                 )
+        except discord.errors.HTTPException as e:
+            logging.warning(
+                f"[CrackWatch] - Error when sending message ({submission.permalink}):\n{e}"
+            )
         except (
             AsyncPrawcoreException,
             RequestException,
@@ -220,6 +224,10 @@ class RedditFetcher:
                 freegamefindings_cache_upload.append(submission.url)
                 await self._process_submission(submission)
 
+        except discord.errors.HTTPException as e:
+            logging.warning(
+                f"[CrackWatch] - Error when sending message ({submission.permalink}):\n{e}"
+            )
         except (
             AsyncPrawcoreException,
             RequestException,
