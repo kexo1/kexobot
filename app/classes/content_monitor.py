@@ -629,10 +629,6 @@ class ContentMonitor:
             logging.warning("[Esutaze] Image tag not found")
             return
 
-        img_url = img_tag.get("src")
-        image_response = await make_http_request(self._session, img_url, binary=True)
-        image = BytesIO(image_response.content)
-
         embed = discord.Embed(
             title=title,
             url=url,
@@ -640,14 +636,21 @@ class ContentMonitor:
             colour=discord.Colour.brand_red(),
             timestamp=timestamp,
         )
-        embed.set_image(url="attachment://image.png")
+
+        img_url = img_tag.get("src")
+        image_response = await make_http_request(self._session, img_url, binary=True)
+
+        image_file = None
+        if image_response:
+            image = BytesIO(image_response.content)
+            embed.set_image(url="attachment://image.png")
+            image_file = discord.File(image, "image.png")
+
         embed.set_footer(
             text="www.esutaze.sk",
             icon_url=ICON_ESUTAZE,
         )
-        await self._esutaze_channel.send(
-            embed=embed, file=discord.File(image, "image.png")
-        )
+        await self._esutaze_channel.send(embed=embed, file=image_file)
 
     async def _get_contest_articles(self) -> list:
         xml_content = await make_http_request(self._session, SITE_URL_ESUTAZE)
