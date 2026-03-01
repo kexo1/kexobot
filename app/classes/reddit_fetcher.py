@@ -247,6 +247,8 @@ class RedditFetcher:
 
         if "gleam" in submission.url:
             await self._create_embed(freegame_embeds["Gleam"], submission.url)
+        elif "fanatical" in submission.url:
+            await self._create_embed(freegame_embeds["Fanatical"], submission.url)
         elif "alienwarearena" in submission.url:
             await self._alienwarearena(submission.url)
         else:

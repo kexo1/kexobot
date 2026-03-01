@@ -130,6 +130,11 @@ REDDIT_FREEGAMEFINDINGS_EMBEDS = {
         "icon": "https://play-lh.googleusercontent.com"
         "/X3K4HfYdxmascX5mRFikhuv8w8BYvg1Ny_R4ndNhF1C7GgjPeIKfROvbcOcjhafFmLdl",
     },
+    "Fanatical": {
+        "title": "Fanatical",
+        "description": "**Fanatical** - keys from this site __disappear really fast__ so you should get it fast!",
+        "icon": "https://cdn.discordapp.com/attachments/796453724713123870/1474746180247486595/Fanatical_Icon-removebg-preview.png?ex=699af7e8&is=6999a668&hm=f8db9f836fa5b3209c1c3e1765c7ab3b90f744a853c61dd4b75111d35e9798dd&animated=true",
+    },
 }
 
 SHITPOST_SUBREDDITS_DEFAULT = (

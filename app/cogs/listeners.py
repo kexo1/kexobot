@@ -154,6 +154,10 @@ class Listeners(commands.Cog):
         payload: :class:`TrackExceptionEventPayload`
             The payload containing information about the track exception.
         """
+        if not hasattr(payload, "player"):
+            logging.warning("Player not found, skipping track exception message.")
+            return
+
         data = self._bot.track_exceptions.get(payload.player.guild.id)
         if data:
             track, track_failed_event = data
@@ -182,6 +186,10 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStuckEventPayload`
             The payload containing information about the track that got stuck.
         """
+        if not hasattr(payload, "player"):
+            logging.error("Player not found, skipping track stuck handling.")
+            return
+
         data = self._bot.track_exceptions.get(payload.player.guild.id)
         if data:
             track, track_failed_event = data
