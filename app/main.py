@@ -26,8 +26,6 @@ from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
 from app.constants import (
     API_WORDNIK,
-    CHANNEL_ID_ALIENWARE_ARENA_NEWS_CHANNEL,
-    CHANNEL_ID_ESUTAZE_CHANNEL,
     CHANNEL_ID_FREE_STUFF_CHANNEL,
     CHANNEL_ID_GAME_CRACKS_CHANNEL,
     CHANNEL_ID_GAME_UPDATES_CHANNEL,
@@ -321,11 +319,9 @@ class KexoBot:
         self._lavalink_server_manager: LavalinkServerManager | None = None
         self._sfd_servers: SFDServers | None = None
 
-        self._channel_esutaze: discord.TextChannel | None = None
         self._channel_game_updates: discord.TextChannel | None = None
         self._channel_game_cracks: discord.TextChannel | None = None
         self._channel_free_stuff: discord.TextChannel | None = None
-        self._channel_alienware_arena_news: discord.TextChannel | None = None
 
         # Attach to bot, so we can use it in cogs
         bot.node = None
@@ -364,15 +360,11 @@ class KexoBot:
 
     async def _fetch_channels(self) -> None:
         """Fetch all channels for the bot."""
-        self._channel_esutaze = await fetch_channel(CHANNEL_ID_ESUTAZE_CHANNEL)
         self._channel_game_updates = await fetch_channel(
             CHANNEL_ID_GAME_UPDATES_CHANNEL
         )
         self._channel_game_cracks = await fetch_channel(CHANNEL_ID_GAME_CRACKS_CHANNEL)
         self._channel_free_stuff = await fetch_channel(CHANNEL_ID_FREE_STUFF_CHANNEL)
-        self._channel_alienware_arena_news = await fetch_channel(
-            CHANNEL_ID_ALIENWARE_ARENA_NEWS_CHANNEL
-        )
         logging.info("[Starter] Channels fetched.")
 
     async def _fetch_cached_lavalink_servers(self) -> None:
@@ -397,8 +389,6 @@ class KexoBot:
             self.cloudscraper_session,
             self._channel_game_updates,
             self._channel_free_stuff,
-            self._channel_esutaze,
-            self._channel_alienware_arena_news,
             self._user_kexo,
         )
 
@@ -444,12 +434,8 @@ class KexoBot:
             await self._reddit_fetcher.crackwatch()
 
         elif self._main_loop_counter == 5:
-            self._main_loop_counter = 6
-            await self._content_monitor.fanatical()
-
-        elif self._main_loop_counter == 6:
             self._main_loop_counter = 0
-            await self._content_monitor.alienware_arena_news()
+            await self._content_monitor.fanatical()
 
         if now.minute % 6 == 0 and self._hostname != LOCAL_MACHINE_NAME:
             await self._sfd_servers.update_stats(now)
@@ -477,9 +463,6 @@ class KexoBot:
 
         if now.hour == 4:
             await self.wordnik_presence()
-
-        await self._content_monitor.power_outages()
-        await self._content_monitor.contests()
 
     async def connect_node(
         self, guild_id: int | None = None, switch_node: bool = True

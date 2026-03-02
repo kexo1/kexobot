@@ -56,7 +56,6 @@ DB_CHOICES = {
     "Games": "games",
     "r/FreeGameFindings Exceptions": "freegamefindings_exceptions",
     "r/CrackWatch Exceptions": "crackwatch_exceptions",
-    "Esutaze Exceptions": "esutaze_exceptions",
     "AlienwareArena Exceptions": "alienwarearena_exceptions",
 }
 
@@ -64,11 +63,9 @@ DB_CHOICES = {
 CHANNEL_ID_KEXO_SERVER = 692810367851692032
 CHANNEL_ID_SISKA_GANG_SERVER = 765262686908186654
 CHANNEL_ID_DUCK_CULT = 484047204202446858
-CHANNEL_ID_ESUTAZE_CHANNEL = 1302271245919981638
 CHANNEL_ID_GAME_UPDATES_CHANNEL = 882185054174994462
 CHANNEL_ID_GAME_CRACKS_CHANNEL = 1468585889574813903
 CHANNEL_ID_FREE_STUFF_CHANNEL = 1081883673902714953
-CHANNEL_ID_ALIENWARE_ARENA_NEWS_CHANNEL = 1368937624496115853
 
 ############################# User IDs ############################
 USER_ID_KEXO = 402221830930432000
@@ -94,11 +91,6 @@ ICON_ONLINEFIX = (
     "https://media.discordapp.net/attachments/"
     "796453724713123870/1035951759505506364/favicon-1.png"
 )
-ICON_ALIENWAREARENA = "https://www.pngarts.com/files/12/Alienware-PNG-Photo.png"
-ICON_POWER_OUTAGES = (
-    "https://www.hliniknadhronom.sk/portals_pictures/i_006868/i_6868718.png"
-)
-ICON_ESUTAZE = "https://www.esutaze.sk/wp-content/uploads/2014/07/esutaze-logo2.jpg"
 
 ############################# Reddit Configuration ############################
 ENV_REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
@@ -198,7 +190,6 @@ ALIENWAREARENA_MAX_RESULTS = 3
 SITE_URL_ALIENWAREARENA = (
     "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
 )
-ALIENWAREARENA_NEWS_URL = "https://eu.alienwarearena.com/relay/my-feed"
 ALIENWAREARENA_TO_REMOVE = ("Key", "Giveaway", "Steam Game")
 
 # Fanatical
@@ -227,13 +218,6 @@ FANATICAL_TO_REMOVE = (
     "Game Bundle",
     "Bundle",
 )
-
-# Power Outages
-POWER_OUTAGES_MAX_RESULTS = 5
-SITE_URL_POWER_OUTAGES = "https://www.hliniknadhronom.sk/get_rss.php?id=1_atom_1947"
-
-# Esutaze
-SITE_URL_ESUTAZE = "https://www.esutaze.sk/category/internetove-sutaze/feed/"
 
 ############################## SFD Configuration ############################
 API_SFD_SERVER = "https://mythologicinteractive.com/SFDGameServices.asmx"

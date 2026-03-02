@@ -4,7 +4,7 @@ import logging
 import discord
 import httpx
 
-from app.constants import API_LAVALIST, DB_CACHE, RAW_LAVALINK
+from app.constants import API_LAVALIST, DB_CACHE
 from app.utils import make_http_request
 
 

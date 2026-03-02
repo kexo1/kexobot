@@ -1,7 +1,6 @@
 import datetime
 import logging
 import re
-from io import BytesIO
 
 import cloudscraper
 import discord
@@ -13,7 +12,6 @@ from pymongo import AsyncMongoClient
 
 from app.constants import (
     ALIENWAREARENA_MAX_RESULTS,
-    ALIENWAREARENA_NEWS_URL,
     ALIENWAREARENA_TO_REMOVE,
     API_FANATICAL,
     API_FANATICAL_IMG,
@@ -23,18 +21,12 @@ from app.constants import (
     FANATICAL_MAX_RESULTS,
     FANATICAL_TO_REMOVE,
     GAME3RB_TO_REMOVE,
-    ICON_ALIENWAREARENA,
-    ICON_ESUTAZE,
     ICON_GAME3RB,
     ICON_ONLINEFIX,
-    ICON_POWER_OUTAGES,
     ONLINEFIX_MAX_RESULTS,
-    POWER_OUTAGES_MAX_RESULTS,
     SITE_URL_ALIENWAREARENA,
-    SITE_URL_ESUTAZE,
     SITE_URL_GAME3RB,
     SITE_URL_ONLINEFIX,
-    SITE_URL_POWER_OUTAGES,
 )
 from app.utils import iso_to_timestamp, make_http_request, strip_text
 
@@ -48,15 +40,9 @@ async def get_onlinefix_messages(chat_log: str) -> list:
     return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
 
 
-def get_power_outage_articles(html_content: str) -> list:
-    soup = BeautifulSoup(html_content, "xml")
-    articles = soup.find_all("entry")
-    return articles[:POWER_OUTAGES_MAX_RESULTS]
-
-
 class ContentMonitor:
     """Class for monitoring and reporting various
-    content updates including games, contests, and power outages.
+    content updates including games.
 
     Parameters
     ----------
@@ -66,10 +52,8 @@ class ContentMonitor:
         HTTP client for making requests.
     game_updates_channel: :class:`discord.TextChannel`
         Discord channel for game updates.
-    esutaze_channel: :class:`discord.TextChannel`
-        Discord channel for contests.
-    alienware_arena_news_channel: :class:`discord.TextChannel`
-        Discord channel for Alienware Arena news.
+    free_stuff_channel: :class:`discord.TextChannel`
+        Discord channel for free stuff.
     user_kexo: :class:`discord.User`
         Discord user for sending messages.
     """
@@ -81,8 +65,6 @@ class ContentMonitor:
         cloudscraper_session: cloudscraper.CloudScraper,
         game_updates_channel: discord.TextChannel,
         free_stuff_channel: discord.TextChannel,
-        esutaze_channel: discord.TextChannel,
-        alienware_arena_news_channel: discord.TextChannel,
         user_kexo: discord.User = None,
     ) -> None:
         self._bot_config = bot_config
@@ -90,8 +72,6 @@ class ContentMonitor:
         self._cloudscraper_session = cloudscraper_session
         self._game_updates_channel = game_updates_channel
         self._free_stuff_channel = free_stuff_channel
-        self._esutaze_channel = esutaze_channel
-        self._alienware_arena_news_channel = alienware_arena_news_channel
         self._user_kexo = user_kexo
 
     async def alienware_arena(self) -> None:
@@ -105,17 +85,6 @@ class ContentMonitor:
         await self._send_alienware_arena_embed(
             json_data, alienwarearena_cache, to_filter
         )
-
-    async def alienware_arena_news(self) -> None:
-        """Checks for news from Alienware Arena."""
-        alienwarearena_news_cache = await self._load_alienware_news_cache()
-        response = await make_http_request(
-            self._session,
-            ALIENWAREARENA_NEWS_URL,
-        )
-        if not response:
-            return
-        await self._send_alienware_arena_news_embed(response, alienwarearena_news_cache)
 
     async def game3rb(self) -> None:
         """Check for selected games from Game3rb."""
@@ -289,48 +258,6 @@ class ContentMonitor:
         chat_messages = await get_onlinefix_messages(chat_log.text)
         await self._process_onlinefix_messages(chat_messages, onlinefix_cache, games)
 
-    async def power_outages(self) -> None:
-        """Checks for power outages."""
-        elektrinavypadky_cache = await self._load_power_outages_cache()
-        html_content = await make_http_request(self._session, SITE_URL_POWER_OUTAGES)
-        if not html_content:
-            return
-
-        articles = get_power_outage_articles(html_content.text)
-        await self._process_power_outage_articles(articles, elektrinavypadky_cache)
-
-    async def contests(self) -> None:
-        """Checks for contests."""
-        to_filter, esutaze_cache = await self._load_contests_cache()
-        esutaze_cache_copy = esutaze_cache.copy()
-        articles = await self._get_contest_articles()
-
-        if not articles:
-            return
-
-        for article in articles:
-            url = article.find("link").text
-            if url in esutaze_cache_copy:
-                continue
-
-            if url in to_filter:
-                continue
-
-            title = article.find("title").text
-            is_filtered = [k for k in to_filter if k.lower() in title]
-            if is_filtered:
-                continue
-
-            esutaze_cache.pop(0)
-            esutaze_cache.append(url)
-
-            await self._send_contest_article(article)
-
-        if esutaze_cache != esutaze_cache_copy:
-            await self._bot_config.update_one(
-                DB_CACHE, {"$set": {"esutaze_cache": esutaze_cache}}
-            )
-
     async def _send_alienware_arena_embed(
         self, json_data: dict, alienwarearena_cache: list, to_filter: list
     ) -> None:
@@ -371,44 +298,6 @@ class ContentMonitor:
             await self._bot_config.update_one(
                 DB_CACHE,
                 {"$set": {"alienwarearena_cache": alienwarearena_cache}},
-            )
-
-    async def _send_alienware_arena_news_embed(
-        self, response: httpx.Response, alienware_arena_news_cache: list
-    ) -> None:
-        soup = BeautifulSoup(response.text, "html.parser")
-        news_widget = soup.find("div", class_="widget-table announcements-table")
-        if not news_widget:
-            logging.warning("[Alienware Arena] News widget not found")
-            return
-
-        alienware_arena_news_cache_copy = alienware_arena_news_cache.copy()
-        for post in news_widget.find_all("div", class_="widget-table-row"):
-            post_info = post.find("a", class_="link relay-announcement-wrap")
-            url = post_info["href"]
-            if url in alienware_arena_news_cache_copy:
-                break
-
-            alienware_arena_news_cache.pop(0)
-            alienware_arena_news_cache.append(url)
-
-            title = post_info.text
-            post_date = post.find("span", class_="timeago").get("title")
-            post_date = datetime.datetime.strptime(post_date, "%Y-%m-%d %H:%M:%S")
-
-            embed = discord.Embed(
-                title=title,
-                description=f"**[eu.alienwarearena.com](https://eu.alienwarearena.com{url})**",
-                colour=discord.Colour.dark_theme(),
-                timestamp=post_date,
-                thumbnail=ICON_ALIENWAREARENA,
-            )
-            await self._alienware_arena_news_channel.send(embed=embed)
-
-        if alienware_arena_news_cache != alienware_arena_news_cache_copy:
-            await self._bot_config.update_one(
-                DB_CACHE,
-                {"$set": {"alienwarearena_news_cache": alienware_arena_news_cache}},
             )
 
     async def _send_fanatical_embed(
@@ -547,119 +436,6 @@ class ContentMonitor:
                 DB_CACHE, {"$set": {"onlinefix_cache": to_upload}}
             )
 
-    async def _process_power_outage_articles(
-        self, articles: list, elektrinavypadky_cache: list
-    ) -> None:
-        elektrinavypadky_cache_copy = elektrinavypadky_cache.copy()
-        above_limit = False
-
-        for article in articles:
-            description = article.find("content").text
-            url = article.find("link")["href"]
-            if url in elektrinavypadky_cache_copy:
-                break
-
-            title = article.find("title").text
-
-            if not (
-                "elektri" in description.lower()
-                or "elektri" in title.lower()
-                or "odstávka vody" in title.lower()
-            ):
-                continue
-
-            elektrinavypadky_cache.pop(0)
-            elektrinavypadky_cache.append(url)
-
-            iso_time = article.find("published").text
-            timestamp = iso_to_timestamp(iso_time)
-
-            if len(description) > 2048:
-                embed = discord.Embed(
-                    title=title,
-                    url=url,
-                    description="Under embed (amount of text in embed is restricted",
-                    timestamp=timestamp,
-                )
-                above_limit = True
-            else:
-                embed = discord.Embed(
-                    title=title,
-                    url=url,
-                    description=description,
-                    timestamp=timestamp,
-                )
-
-            embed.set_footer(
-                text="",
-                icon_url=ICON_POWER_OUTAGES,
-            )
-            await self._user_kexo.send(embed=embed)
-
-            if above_limit:
-                await self._user_kexo.send(description)
-
-        if elektrinavypadky_cache != elektrinavypadky_cache_copy:
-            await self._bot_config.update_one(
-                DB_CACHE,
-                {"$set": {"elektrinavypadky_cache": elektrinavypadky_cache}},
-            )
-
-    async def _send_contest_article(self, article) -> None:
-        title = article.find("title").text
-        url = article.find("link").text
-        contest_description = article.find("description")
-        contest_description = (
-            BeautifulSoup(contest_description.text, "html.parser").find("p").text
-        )
-        unix_time = article.find("pubDate").text
-        timestamp = datetime.datetime.strptime(unix_time, "%a, %d %b %Y %H:%M:%S %z")
-
-        article_content = article.find("content:encoded").text
-        soup = BeautifulSoup(article_content, "html.parser")
-        contest_ending_time = soup.find("h4")
-        if not contest_ending_time or not contest_ending_time.text:
-            logging.warning("[Esutaze] Contest ending time not found")
-            contest_ending_time = ""
-        else:
-            contest_ending_time = contest_ending_time.text.strip()
-
-        img_tag = soup.find("img")
-        if not isinstance(img_tag, Tag):
-            logging.warning("[Esutaze] Image tag not found")
-            return
-
-        embed = discord.Embed(
-            title=title,
-            url=url,
-            description=f"{contest_description}\n\n**{contest_ending_time}**",
-            colour=discord.Colour.brand_red(),
-            timestamp=timestamp,
-        )
-
-        img_url = img_tag.get("src")
-        image_response = await make_http_request(self._session, img_url, binary=True)
-
-        image_file = None
-        if image_response:
-            image = BytesIO(image_response.content)
-            embed.set_image(url="attachment://image.png")
-            image_file = discord.File(image, "image.png")
-
-        embed.set_footer(
-            text="www.esutaze.sk",
-            icon_url=ICON_ESUTAZE,
-        )
-        await self._esutaze_channel.send(embed=embed, file=image_file)
-
-    async def _get_contest_articles(self) -> list:
-        xml_content = await make_http_request(self._session, SITE_URL_ESUTAZE)
-        if not xml_content:
-            return []
-
-        soup = BeautifulSoup(xml_content.content, "xml")
-        return soup.find_all("item")
-
     async def _load_alienware_cache(self) -> tuple[list[str], list[str]]:
         alienwarearena_cache = await self._bot_config.find_one(DB_CACHE)
         to_filter = await self._bot_config.find_one(DB_LISTS)
@@ -672,22 +448,9 @@ class ContentMonitor:
         fanatical_cache = await self._bot_config.find_one(DB_CACHE)
         return fanatical_cache["fanatical_cache"]
 
-    async def _load_alienware_news_cache(self) -> list[str]:
-        alienwarearena_news_cache = await self._bot_config.find_one(DB_CACHE)
-        return alienwarearena_news_cache["alienwarearena_news_cache"]
-
     async def _load_onlinefix_cache(self) -> tuple[list[str], list[str]]:
         onlinefix_cache = await self._bot_config.find_one(DB_CACHE)
         games = await self._bot_config.find_one(DB_LISTS)
         # Remove quotes due to online-fix.me not using quotes
         games = "\n".join(games["games"]).replace("'", "").split("\n")
         return onlinefix_cache["onlinefix_cache"], games
-
-    async def _load_power_outages_cache(self) -> list:
-        elektrinavypadky_cache = await self._bot_config.find_one(DB_CACHE)
-        return elektrinavypadky_cache["elektrinavypadky_cache"]
-
-    async def _load_contests_cache(self) -> tuple:
-        to_filter = await self._bot_config.find_one(DB_LISTS)
-        esutaze_cache = await self._bot_config.find_one(DB_CACHE)
-        return to_filter["esutaze_exceptions"], esutaze_cache["esutaze_cache"]
