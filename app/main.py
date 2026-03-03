@@ -448,7 +448,9 @@ class KexoBot:
         It also updates the reddit cache and fetches lavalink servers.
         """
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
-        if now.day == 6 and now.hour == 0:
+        weekday = now.weekday()
+
+        if weekday == 6 and now.hour == 0:
             clear_cached_jokes()
             clear_temp_guild_data()
             await self._refresh_subreddit_icons()
