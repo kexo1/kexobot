@@ -559,6 +559,9 @@ class MusicCommands(commands.Cog):
             await channel.connect(cls=wavelink.Player, timeout=3)
 
         player: wavelink.Player = channel.guild.voice_client
+        player.node_is_switching = False
+        player.just_joined = False
+        player.text_channel = ctx.channel
         player.should_respond = True
         player.is_troll = True
 

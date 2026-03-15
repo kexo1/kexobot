@@ -15,7 +15,6 @@ import discord
 import httpx
 import wavelink
 from discord.ext import commands, tasks
-from fake_useragent import UserAgent
 from pycord.multicog import Bot
 from pymongo import AsyncMongoClient
 from wavelink.enums import NodeStatus
@@ -43,6 +42,7 @@ from app.constants import (
     LOCAL_MACHINE_NAME,
     NODE_MAX_CANDIDATES,
     SHITPOST_SUBREDDITS_ALL,
+    USER_AGENT,
 )
 from app.utils import (
     generate_temp_guild_data,
@@ -588,7 +588,7 @@ class KexoBot:
     def _create_http_sessions(self) -> None:
         """Create a httpx session for the bot."""
         self.session = httpx.AsyncClient()
-        self.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
+        self.session.headers = httpx.Headers({"User-Agent": USER_AGENT})
         self.cloudscraper_session = cloudscraper.create_scraper()
         logging.info("[Starter] Httpx and cloudscraper session initialized.")
 
@@ -610,7 +610,7 @@ kexobot = KexoBot()
 def initialize_cog_http_session() -> None:
     """Create a httpx and cloudscraper session for the cogs."""
     bot.session = httpx.AsyncClient()
-    bot.session.headers = httpx.Headers({"User-Agent": UserAgent().random})
+    bot.session.headers = httpx.Headers({"User-Agent": USER_AGENT})
 
 
 def setup_cogs() -> None:

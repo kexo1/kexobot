@@ -5,6 +5,7 @@ import socket
 
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
+from fake_useragent import UserAgent
 
 ############################ Environment Variables ############################
 LOCAL_MACHINE_NAME = "mato"
@@ -69,6 +70,13 @@ CHANNEL_ID_FREE_STUFF_CHANNEL = 1081883673902714953
 
 ############################# User IDs ############################
 USER_ID_KEXO = 402221830930432000
+
+############################# User Agent Configuration ############################
+try:
+    USER_AGENT = UserAgent(min_version=120.0).random
+except Exception:
+    USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+
 
 ############################ Icons ############################
 ICON_YOUTUBE = "https://freelogopng.com/images/all_img/1656501968youtube-icon-png.png"
