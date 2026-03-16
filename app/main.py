@@ -20,7 +20,8 @@ from pymongo import AsyncMongoClient
 from wavelink.enums import NodeStatus
 
 from app.classes.content_monitor import ContentMonitor
-from app.classes.lavalink_server import LavalinkServerManager
+
+# from app.classes.lavalink_server import LavalinkServerManager
 from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
 from app.constants import (
@@ -316,7 +317,7 @@ class KexoBot:
 
         self._reddit_fetcher: RedditFetcher | None = None
         self._content_monitor: ContentMonitor | None = None
-        self._lavalink_server_manager: LavalinkServerManager | None = None
+        # self._lavalink_server_manager: LavalinkServerManager | None = None
         self._sfd_servers: SFDServers | None = None
 
         self._channel_game_updates: discord.TextChannel | None = None
@@ -330,18 +331,18 @@ class KexoBot:
         bot.temp_user_data = {}
         bot.guild_data = {}
         bot.temp_guild_data = {}
-        bot.track_exceptions = {}
-        bot.cached_lavalink_servers = []
+        # bot.track_exceptions = {}
+        # bot.cached_lavalink_servers = []
 
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
         bot.guild_data_db = self._guild_data_db
 
         bot.reddit_agent = self._reddit_agent
-        bot.connect_node = self.connect_node
-        bot.close_unused_nodes = close_unused_nodes
-        bot.get_online_nodes = get_online_nodes
-        bot.get_available_nodes = get_available_nodes
+        # bot.connect_node = self.connect_node
+        # bot.close_unused_nodes = close_unused_nodes
+        # bot.get_online_nodes = get_online_nodes
+        # bot.get_available_nodes = get_available_nodes
 
         bot.humor_api_tokens = {}
         bot.loaded_jokes = []
@@ -353,7 +354,7 @@ class KexoBot:
         await self._fetch_users()
         await self._fetch_channels()
         await self._fetch_subreddit_icons()
-        await self._fetch_cached_lavalink_servers()
+        # await self._fetch_cached_lavalink_servers()
         load_humor_api_tokens()
         self._create_http_sessions()
         self._define_classes()
@@ -401,9 +402,9 @@ class KexoBot:
             self._channel_game_cracks,
         )
         self._sfd_servers = initialize_class(SFDServers, self._bot_config, self.session)
-        self._lavalink_server_manager = initialize_class(
-            LavalinkServerManager, bot, self.session
-        )
+        # self._lavalink_server_manager = initialize_class(
+        #     LavalinkServerManager, bot, self.session
+        # )
 
     async def main_loop(self) -> None:
         """Main loop for the bot.
@@ -460,8 +461,8 @@ class KexoBot:
 
         if now.hour == 0:
             load_humor_api_tokens()
-            await self._upload_cached_lavalink_servers()
-            await self._lavalink_server_manager.fetch()
+            # await self._upload_cached_lavalink_servers()
+            # await self._lavalink_server_manager.fetch()
 
         if now.hour == 4:
             await self.wordnik_presence()
@@ -672,7 +673,7 @@ async def bot_loader(main: KexoBot) -> None:
     main_loop_task.start()
     hourly_loop_task.start()
 
-    await main.connect_node(switch_node=False)
+    # await main.connect_node(switch_node=False)
 
     while not main.session:
         await asyncio.sleep(1)

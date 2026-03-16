@@ -117,6 +117,10 @@ class CommandCog(commands.Cog):
         password: str
             The password for the Lavalink server.
         """
+        return await ctx.respond(
+            "This command is currently unavailable due to technical issues with the Wavelink library."
+        )
+
         await ctx.defer()
         node: wavelink.Node = await check_node_status(
             self._bot, f"{uri}:{str(port)}", password
@@ -149,6 +153,10 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.ApplicationContext`
             The context of the command invocation.
         """
+        return await ctx.respond(
+            "This command is currently unavailable due to technical issues with the Wavelink library."
+        )
+
         await ctx.defer()
         player: wavelink.Player = ctx.voice_client
 
@@ -182,6 +190,9 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.ApplicationContext`
             The context of the command invocation.
         """
+        return await ctx.respond(
+            "This command is currently unavailable due to technical issues with the Wavelink library."
+        )
         node: wavelink.Node = self._bot.node
         try:
             node_info: wavelink.InfoResponsePayload = await node.fetch_info()
@@ -220,6 +231,9 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.ApplicationContext`
             The context of the command invocation.
         """
+        return await ctx.respond(
+            "This command is currently unavailable due to technical issues with the Wavelink library."
+        )
         node: wavelink.Node = self._bot.node
 
         try:
@@ -283,6 +297,10 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.ApplicationContext`
             The context of the command invocation.
         """
+        return await ctx.respond(
+            "This command is currently unavailable due to technical issues with the Wavelink library."
+        )
+
         nodes: dict[str, wavelink.Node] = wavelink.Pool.nodes.values()
 
         if not nodes:
@@ -649,8 +667,8 @@ class CommandCog(commands.Cog):
         )
         embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self._bot.latency * 1000)} ms")
         embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
-        embed.add_field(name="Online nodes:ㅤ", value=self._bot.get_online_nodes())
-        embed.add_field(name="Available nodes:ㅤ", value=self._bot.get_available_nodes())
+        # embed.add_field(name="Online nodes:ㅤ", value=self._bot.get_online_nodes())
+        # embed.add_field(name="Available nodes:ㅤ", value=self._bot.get_available_nodes())
         embed.add_field(name="Joined servers:ㅤ", value=len(self._bot.guilds))
         embed.add_field(name="Bot version:", value=__version__)
         embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
