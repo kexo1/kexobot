@@ -617,10 +617,10 @@ def setup_cogs() -> None:
     """Load all cogs for the bot."""
     cogs_list = [
         "commands",
-        "music_commands",
-        "listeners",
-        "queue_commands",
-        "audio_commands",
+        # "music_commands",
+        # "listeners",
+        # "queue_commands",
+        # "audio_commands",
         "fun_commands",
     ]
 
