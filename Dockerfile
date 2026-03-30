@@ -19,10 +19,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy and install Python requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir --no-deps git+https://github.com/PythonistaGuild/Wavelink.git
+RUN pip install --no-cache-dir -r requirements.txt
 
-FROM python:3.13.11-alpine
+FROM python:3.13.12-alpine
 
 # Create a non-root user for security
 RUN addgroup -g 1001 -S botuser && \

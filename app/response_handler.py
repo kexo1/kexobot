@@ -4,6 +4,19 @@ import discord
 
 ResponseBuilder = Callable[..., discord.Embed]
 
+
+def _embed_with_footer(
+    *,
+    title: str,
+    description: str,
+    color: discord.Color,
+    footer_text: str,
+) -> discord.Embed:
+    embed = discord.Embed(title=title, description=description, color=color)
+    embed.set_footer(text=footer_text)
+    return embed
+
+
 RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     # Error responses
     "NO_VOICE_CHANNEL": discord.Embed(
@@ -264,17 +277,17 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         description=f"**🔊 Volume set to `{kwargs.get('volume')}%`**",
         color=discord.Color.blue(),
     ),
-    "TRACK_PAUSED": discord.Embed(
+    "TRACK_PAUSED": _embed_with_footer(
         title="",
         description="**⏸️ Paused**",
         color=discord.Color.blue(),
-        footer=discord.EmbedFooter(text="Deleting in 10s."),
+        footer_text="Deleting in 10s.",
     ),
-    "TRACK_RESUMED": discord.Embed(
+    "TRACK_RESUMED": _embed_with_footer(
         title="",
         description="**:arrow_forward: Resumed**",
         color=discord.Color.blue(),
-        footer=discord.EmbedFooter(text="Deleting in 10s."),
+        footer_text="Deleting in 10s.",
     ),
     "DISCONNECTED": lambda **kwargs: discord.Embed(
         title="",
@@ -318,11 +331,11 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         description=f"**:stopwatch:  Speed increased by `{kwargs.get('multiplier')}x`**",
         color=discord.Color.blue(),
     ),
-    "EFFECTS_CLEARED": discord.Embed(
+    "EFFECTS_CLEARED": _embed_with_footer(
         title="",
         description="**:microphone:  Effects were cleared.**",
         color=discord.Color.blue(),
-        footer=discord.EmbedFooter(text="takes 3 seconds to apply"),
+        footer_text="takes 3 seconds to apply",
     ),
     "AUTOPLAY_MODE_CHANGED": lambda **kwargs: discord.Embed(
         title="",
@@ -347,7 +360,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     "USER_DATA_GENERATED": lambda **kwargs: discord.Embed(
         title="",
         description="**:floppy_disk:  Generated user data.**",
-        color=discord.Color.blue,
+        color=discord.Color.blue(),
     ),
     "DB_ADDED": lambda **kwargs: discord.Embed(
         title="",
@@ -365,7 +378,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
 
 
 async def send_response(
-    ctx: discord.ApplicationContext | discord.TextChannel,
+    ctx: discord.Interaction | discord.TextChannel,
     response_code: str,
     respond: bool = True,
     ephemeral: bool = True,
@@ -376,7 +389,7 @@ async def send_response(
 
     Parameters
     ----------
-    ctx: :class:`discord.ApplicationContext`
+    ctx: :class:`discord.Interaction`
         The context of the command.
     response_code: :class:`str`
         The response code to determine the type of response.
@@ -401,9 +414,69 @@ async def send_response(
     if callable(response):
         response = response(**kwargs)
 
-    if respond:
-        await ctx.respond(
-            embed=response, ephemeral=ephemeral, delete_after=delete_after
+    if respond and isinstance(ctx, discord.Interaction):
+        await send_interaction(
+            ctx,
+            embed=response,
+            ephemeral=ephemeral,
+            delete_after=delete_after,
         )
+        return
+
+    if isinstance(ctx, discord.Interaction):
+        await send_interaction(ctx, embed=response, delete_after=delete_after)
     else:
         await ctx.send(embed=response, delete_after=delete_after)
+
+
+async def defer_interaction(
+    interaction: discord.Interaction, ephemeral: bool = False
+) -> None:
+    if interaction.response.is_done():
+        return
+    await interaction.response.defer(ephemeral=ephemeral)
+
+
+async def send_interaction(
+    interaction: discord.Interaction,
+    content: str | None = None,
+    *,
+    embed: discord.Embed | None = None,
+    embeds: list[discord.Embed] | None = None,
+    view: discord.ui.View | None = None,
+    files: list[discord.File] | None = None,
+    delete_after: float | None = None,
+    suppress: bool | None = None,
+    ephemeral: bool = False,
+) -> discord.Message | None:
+    payload: dict[str, Any] = {"ephemeral": ephemeral}
+
+    if content is not None:
+        payload["content"] = content
+    if view is not None:
+        payload["view"] = view
+
+    # discord.py rejects sending both "embed" and "embeds" together.
+    if embeds is not None:
+        payload["embeds"] = embeds
+    elif embed is not None:
+        payload["embed"] = embed
+
+    if files is not None:
+        payload["files"] = files
+    if suppress is not None:
+        payload["suppress_embeds"] = suppress
+
+    message: discord.Message | None = None
+    if interaction.response.is_done():
+        message = await interaction.followup.send(**payload, wait=True)
+    else:
+        await interaction.response.send_message(**payload)
+        try:
+            message = await interaction.original_response()
+        except discord.NotFound:
+            message = None
+
+    if message and delete_after:
+        await message.delete(delay=delete_after)
+    return message

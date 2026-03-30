@@ -1,16 +1,19 @@
+from __future__ import annotations
+
 import datetime
 import logging
 import os
 import random
 import sys
 import time
+from typing import Optional
 from urllib.parse import urlparse
 
 import asyncpraw.models
 import discord
 import httpx
-import wavelink
-from discord.commands import guild_only, option, slash_command
+import relink
+from discord import app_commands
 from discord.ext import commands
 from pymongo import AsyncMongoClient
 
@@ -24,7 +27,7 @@ from app.constants import (
     SFD_TIMEZONE_CHOICE,
     SHITPOST_SUBREDDITS_ALL,
 )
-from app.response_handler import send_response
+from app.response_handler import defer_interaction, send_interaction, send_response
 from app.utils import (
     QueuePaginator,
     check_node_status,
@@ -36,6 +39,10 @@ from app.utils import (
 )
 
 host_authors = []
+
+
+async def is_owner(interaction: discord.Interaction) -> bool:
+    return await interaction.client.is_owner(interaction.user)
 
 
 class CommandCog(commands.Cog):
@@ -70,33 +77,37 @@ class CommandCog(commands.Cog):
         self._graphs_dir = os.path.join(os.getcwd(), "graphs")
         self._sfd_servers = SFDServers(self._bot_config, self._bot.session)
 
-    slash_bot_config = discord.SlashCommandGroup(
-        "bot_config", "Update Bot Configuration"
+    slash_bot_config = app_commands.Group(
+        name="bot_config",
+        description="Update Bot Configuration",
+        guild_ids=[CHANNEL_ID_KEXO_SERVER],
     )
-    slash_node = discord.SlashCommandGroup("node", "Commands for managing nodes")
-    slash_reddit = discord.SlashCommandGroup("reddit", "Commands for reddit posts")
-    slash_sfd = discord.SlashCommandGroup(
-        "sfd", "Show Superfighters Deluxe stats and servers"
+    slash_node = app_commands.Group(
+        name="node", description="Commands for managing nodes"
+    )
+    slash_reddit = app_commands.Group(
+        name="reddit", description="Commands for reddit posts"
+    )
+    slash_sfd = app_commands.Group(
+        name="sfd", description="Show Superfighters Deluxe stats and servers"
     )
 
     # -------------------- Node Managment -------------------- #
     @slash_node.command(
         name="manual_connect", description="Manually input Lavalink address"
     )
-    @guild_only()
-    @option(
-        "uri",
-        description="Lavalink server full URL",
-        required=True,
+    @app_commands.describe(
+        uri="Node hostname or IP address.",
+        port="Lavalink port (1-65535).",
+        password="Lavalink password.",
     )
-    @option("port", description="Lavalink server port.", required=True)
-    @option("password", description="Lavalink server password.", required=True)
-    @commands.cooldown(1, 3, commands.BucketType.user)
+    @app_commands.guild_only()
+    @app_commands.checks.cooldown(1, 3, key=lambda i: i.user.id)
     async def manual_connect(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: discord.Interaction,
         uri: str,
-        port: int,
+        port: app_commands.Range[int, 1, 65535],
         password: str,
     ) -> None:
         """Method to manually connect to a Lavalink server.
@@ -108,7 +119,7 @@ class CommandCog(commands.Cog):
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         uri: str
             The URI of the Lavalink server.
@@ -117,12 +128,8 @@ class CommandCog(commands.Cog):
         password: str
             The password for the Lavalink server.
         """
-        return await ctx.respond(
-            "This command is currently unavailable due to technical issues with the Wavelink library."
-        )
-
-        await ctx.defer()
-        node: wavelink.Node = await check_node_status(
+        await defer_interaction(ctx)
+        node: relink.Node = await check_node_status(
             self._bot, f"{uri}:{str(port)}", password
         )
 
@@ -131,17 +138,15 @@ class CommandCog(commands.Cog):
             return
 
         self._bot.node = node
-        await send_response(
-            ctx, "NODE_CONNECT_SUCCESS", ephemeral=False, uri=node[0].uri
-        )
+        await send_response(ctx, "NODE_CONNECT_SUCCESS", ephemeral=False, uri=node.uri)
 
     @slash_node.command(
         name="reconnect",
         description="Automatically reconnect to available node",
     )
-    @guild_only()
-    @commands.cooldown(1, 3, commands.BucketType.user)
-    async def reconnect_node(self, ctx: discord.ApplicationContext) -> None:
+    @app_commands.guild_only()
+    @app_commands.checks.cooldown(1, 3, key=lambda i: i.user.id)
+    async def reconnect_node(self, ctx: discord.Interaction) -> None:
         """Method to reconnect to an available Lavalink node.
 
         This method checks if the bot is connected to a voice channel and if so,
@@ -150,20 +155,20 @@ class CommandCog(commands.Cog):
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        return await ctx.respond(
-            "This command is currently unavailable due to technical issues with the Wavelink library."
-        )
-
-        await ctx.defer()
-        player: wavelink.Player = ctx.voice_client
+        await defer_interaction(ctx)
+        player: relink.Player = ctx.guild.voice_client
 
         if player:
-            node: wavelink.Node = await switch_node(
+            node: relink.Node | None = await switch_node(
                 self._bot, player=player, play_after=False, send_success_message=False
             )
+            if not node:
+                await send_response(ctx, "NODE_CONNECT_FAILURE", uri="best available")
+                return
+
             self._bot.node = node
             await send_response(
                 ctx,
@@ -171,31 +176,33 @@ class CommandCog(commands.Cog):
                 ephemeral=False,
                 uri=self._bot.node.uri,
             )
-        else:
-            node: wavelink.Node = await self._bot.connect_node(guild_id=ctx.guild_id)
-            self._bot.node = node
-            await send_response(
-                ctx,
-                "NODE_RECONNECT_SUCCESS",
-                ephemeral=False,
-                uri=self._bot.node.uri,
-            )
+            return
+
+        node: relink.Node | None = await self._bot.connect_node(guild_id=ctx.guild.id)
+        if not node:
+            await send_response(ctx, "NODE_CONNECT_FAILURE", uri="best available")
+            return
+
+        self._bot.node = node
+        await send_response(
+            ctx,
+            "NODE_RECONNECT_SUCCESS",
+            ephemeral=False,
+            uri=self._bot.node.uri,
+        )
 
     @slash_node.command(name="info", description="Information about connected node")
-    async def node_info(self, ctx: discord.ApplicationContext) -> None:
+    async def node_info(self, ctx: discord.Interaction) -> None:
         """Method to fetch and display information about the connected Lavalink node.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        return await ctx.respond(
-            "This command is currently unavailable due to technical issues with the Wavelink library."
-        )
-        node: wavelink.Node = self._bot.node
+        node: relink.Node = self._bot.node
         try:
-            node_info: wavelink.InfoResponsePayload = await node.fetch_info()
+            node_info: relink.InfoResponsePayload = await node.fetch_info()
         except Exception:
             await send_response(ctx, "NO_NODE_INFO")
             return
@@ -204,7 +211,7 @@ class CommandCog(commands.Cog):
             title=urlparse(node.uri).netloc,
             color=discord.Color.blue(),
         )
-        plugins: wavelink.PluginResponsePayload = node_info.plugins
+        plugins: relink.PluginResponsePayload = node_info.plugins
         unix_timestamp = int(iso_to_timestamp(str(node_info.build_time)).timestamp())
 
         embed.add_field(
@@ -217,32 +224,29 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Build time:", value=f"<t:{unix_timestamp}:D>")
         embed.add_field(name="Filters:", value=", ".join(node_info.filters))
 
-        await ctx.respond(embed=embed)
+        await send_interaction(ctx, embed=embed)
 
     @slash_node.command(
         name="supported_platforms",
         description="Supported music platforms in the current node",
     )
-    async def node_supported_platforms(self, ctx: discord.ApplicationContext) -> None:
+    async def node_supported_platforms(self, ctx: discord.Interaction) -> None:
         """Method to fetch and display supported platforms of the connected Lavalink node.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        return await ctx.respond(
-            "This command is currently unavailable due to technical issues with the Wavelink library."
-        )
-        node: wavelink.Node = self._bot.node
+        node: relink.Node = self._bot.node
 
         try:
-            node_info: wavelink.InfoResponsePayload = await node.fetch_info()
+            node_info: relink.InfoResponsePayload = await node.fetch_info()
         except Exception:
             await send_response(ctx, "NO_NODE_INFO")
             return
 
-        plugins: wavelink.PluginResponsePayload = node_info.plugins
+        plugins: relink.PluginResponsePayload = node_info.plugins
         youtube_plugin, lavasrc_plugin, lavasearch_plugin = False, False, False
         for plugin in plugins:
             if "lavasrc" in plugin.name:
@@ -286,22 +290,18 @@ class CommandCog(commands.Cog):
                 )
             )
 
-        await ctx.respond(embed=embed)
+        await send_interaction(ctx, embed=embed)
 
     @slash_node.command(name="players", description="Information about node players.")
-    async def node_players(self, ctx: discord.ApplicationContext) -> None:
+    async def node_players(self, ctx: discord.Interaction) -> None:
         """Method to fetch and display information about players connected to the Lavalink node.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        return await ctx.respond(
-            "This command is currently unavailable due to technical issues with the Wavelink library."
-        )
-
-        nodes: dict[str, wavelink.Node] = wavelink.Pool.nodes.values()
+        nodes: list[relink.Node] = list(self._bot.relink_client.nodes)
 
         if not nodes:
             await send_response(ctx, "NO_NODES_CONNECTED")
@@ -313,7 +313,7 @@ class CommandCog(commands.Cog):
 
         for node in nodes:
             try:
-                players: wavelink.PlayerResponsePayload = await node.fetch_players()
+                players: relink.PlayerResponsePayload = await node.fetch_players()
             except Exception:
                 continue
 
@@ -340,19 +340,19 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Node:", value="\n".join(node_uri))
 
         embed.set_footer(text=f"Total players: {len(players)}")
-        await ctx.respond(embed=embed)
+        await send_interaction(ctx, embed=embed)
 
     # -------------------- SFD Servers -------------------- #
     @slash_sfd.command(
         name="servers", description="Fetches Superfighters Deluxe servers."
     )
-    @commands.cooldown(1, 10, commands.BucketType.user)
-    async def get_sfd_servers(self, ctx: discord.ApplicationContext) -> None:
+    @app_commands.checks.cooldown(1, 10, key=lambda i: i.user.id)
+    async def get_sfd_servers(self, ctx: discord.Interaction) -> None:
         """Method to fetch and display information about available SFD servers.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
         servers_dict, all_players = await self._sfd_servers.get_servers_info()
@@ -398,22 +398,24 @@ class CommandCog(commands.Cog):
                 pages.append(embed)
 
         if len(pages) == 1:
-            await ctx.respond(embed=embed)
+            await send_interaction(ctx, embed=embed)
         else:
             view = QueuePaginator(pages)
-            await ctx.respond(embed=pages[0], view=view)
+            await send_interaction(ctx, embed=pages[0], view=view)
 
     @slash_sfd.command(name="server_info", description="Find searched server.")
-    @option("server", description="Server name.")
-    @commands.cooldown(1, 5, commands.BucketType.user)
+    @app_commands.describe(search="Server name to search for.")
+    @app_commands.checks.cooldown(1, 5, key=lambda i: i.user.id)
     async def get_sfd_server_info(
-        self, ctx: discord.ApplicationContext, search: str
+        self,
+        ctx: discord.Interaction,
+        search: app_commands.Range[str, 1, 80],
     ) -> None:
         """Method to fetch and display information about a specific SFD server.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         search: str
             The name of the server to search for.
@@ -435,28 +437,30 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Map Name:ㅤㅤ", value=server.map_name)
         embed.add_field(name="Has Password:ㅤㅤ", value=server.has_password)
         embed.add_field(name="Game Mode:ㅤㅤ", value=server.game_mode)
-        await ctx.respond(embed=embed)
+        await send_interaction(ctx, embed=embed)
 
     @slash_sfd.command(
         name="activity",
         description="Shows graph of SFD servers activity.",
     )
-    @option(
-        "graph_range",
-        description="Range of Graph.",
-        required=True,
-        choices=["Day", "Week"],
+    @app_commands.describe(
+        graph_range="Time span for the graph.",
+        timezone="Timezone used for graph labels.",
     )
-    @option(
-        "timezone",
-        description="Timezone to properly adjust time-based data on graph, default is New York",
-        required=False,
-        choices=SFD_TIMEZONE_CHOICE,
+    @app_commands.choices(
+        graph_range=[
+            app_commands.Choice(name="Day", value="Day"),
+            app_commands.Choice(name="Week", value="Week"),
+        ],
+        timezone=[
+            app_commands.Choice(name=timezone, value=timezone)
+            for timezone in SFD_TIMEZONE_CHOICE
+        ],
     )
-    @commands.cooldown(1, 60, commands.BucketType.user)
+    @app_commands.checks.cooldown(1, 60, key=lambda i: i.user.id)
     async def get_sfd_graph(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: discord.Interaction,
         graph_range: str,
         timezone: str = "New_York",
     ) -> None:
@@ -464,14 +468,14 @@ class CommandCog(commands.Cog):
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         graph_range: str
             The range of the graph (Day or Week).
         timezone: str
             The timezone to adjust time-based data on the graph.
         """
-        await ctx.defer()
+        await defer_interaction(ctx)
 
         if graph_range == "Day":
             filename = f"sfd_activity_day_{timezone}.png"
@@ -486,74 +490,56 @@ class CommandCog(commands.Cog):
             await generator(timezone)
 
         file = discord.File(image_location, filename=filename)
-        await ctx.respond(files=[file], embed=None)
+        await send_interaction(ctx, files=[file], embed=None)
 
     # -------------------- SFD Hosting -------------------- #
     @slash_sfd.command(
         name="host",
         description="Creates hosting embed, you can also choose some optional info.",
     )
-    @option("server_name", description="Your server name.")
-    @option(
-        "duration",
-        description="How long are you going to be hosting.",
-        choices=[
-            "As long as I want",
-            "15 minutes",
-            "30 minutes",
-            "1 hour",
-            "1–2 hours",
-            "2–4 hours",
-            "4+ hours",
-            "24/7",
+    @app_commands.describe(
+        server_name="Hosting title shown in the embed.",
+        duration="How long the session should run.",
+        ping_role="Role to ping for the hosting announcement.",
+        branch="Game branch/version stream.",
+        version="Version suffix (optional).",
+        password="Server password (optional).",
+        region="Server region (optional).",
+        scripts="Enabled scripts/mods (optional).",
+        slots="Player slot count.",
+        image="Optional thumbnail image URL.",
+    )
+    @app_commands.choices(
+        duration=[
+            app_commands.Choice(name="As long as I want", value="As long as I want"),
+            app_commands.Choice(name="15 minutes", value="15 minutes"),
+            app_commands.Choice(name="30 minutes", value="30 minutes"),
+            app_commands.Choice(name="1 hour", value="1 hour"),
+            app_commands.Choice(name="1-2 hours", value="1-2 hours"),
+            app_commands.Choice(name="2-4 hours", value="2-4 hours"),
+            app_commands.Choice(name="4+ hours", value="4+ hours"),
+            app_commands.Choice(name="24/7", value="24/7"),
+        ],
+        branch=[
+            app_commands.Choice(name="Stable", value="Stable"),
+            app_commands.Choice(name="Beta", value="Beta"),
+            app_commands.Choice(name="Redux", value="Redux"),
         ],
     )
-    @option(
-        "ping_role",
-        description="Which role to ping when you start hosting.",
-    )
-    @option(
-        "branch",
-        description="If you're hosting on stable, beta, redux, default is stable.",
-        choices=[
-            "Stable",
-            "Beta",
-            "Redux",
-        ],
-        required=False,
-    )
-    @option(
-        "version",
-        description="Which version are you hosting on.",
-        required=False,
-    )
-    @option("password", description="Server password.", required=False)
-    @option("region", description="Server region.", required=False)
-    @option("scripts", description="Which scripts are enabled.", required=False)
-    @option(
-        "slots",
-        description="How many server slots, default is 8",
-        required=False,
-    )
-    @option(
-        "image",
-        description="Add custom image url for embed, needs to end with .png, .gif and etc.",
-        required=False,
-    )
-    @commands.cooldown(1, 300, commands.BucketType.user)
+    @app_commands.checks.cooldown(1, 300, key=lambda i: i.user.id)
     async def host(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: discord.Interaction,
         server_name: str,
         duration: str,
         ping_role: discord.Role,
-        branch: str,
-        version: str,
-        password: str,
-        region: str,
-        scripts: str,
-        slots: int = 8,
-        image: str = None,
+        branch: Optional[str] = None,
+        version: Optional[str] = None,
+        password: Optional[str] = None,
+        region: Optional[str] = None,
+        scripts: Optional[str] = None,
+        slots: app_commands.Range[int, 1, 16] = 8,
+        image: Optional[str] = None,
     ) -> None:
         """Method to create a hosting embed for SFD servers.
 
@@ -562,7 +548,7 @@ class CommandCog(commands.Cog):
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         server_name: str
             The name of the server being hosted.
@@ -585,7 +571,7 @@ class CommandCog(commands.Cog):
         image: str
             The URL of the image to be used in the embed.
         """
-        author = ctx.author
+        author = ctx.user
 
         if author in host_authors:
             await send_response(ctx, "ALREADY_HOSTING")
@@ -638,26 +624,26 @@ class CommandCog(commands.Cog):
 
         if ping_role:
             try:
-                await ctx.send(ping_role.mention)
+                await send_interaction(ctx, ping_role.mention)
             except AttributeError:
                 await send_response(ctx, "CANT_PING_ROLE")
                 return None
 
         view = HostView(author=author)
-        response = await ctx.respond(embed=embed, view=view)
-        view.message = await ctx.channel.fetch_message(
-            (await response.original_response()).id
-        )
+        response = await send_interaction(ctx, embed=embed, view=view)
+        if response is None:
+            response = await ctx.original_response()
+        view.message = response
         return None
 
     # -------------------- Discord functions -------------------- #
-    @slash_command(name="info", description="Shows bot info.")
-    async def info(self, ctx: discord.ApplicationContext) -> None:
+    @app_commands.command(name="info", description="Shows bot info.")
+    async def info(self, ctx: discord.Interaction) -> None:
         """Method to fetch and display information about the bot.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
         embed = discord.Embed(title="KexoBOT Info", color=discord.Color.blue())
@@ -667,27 +653,33 @@ class CommandCog(commands.Cog):
         )
         embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self._bot.latency * 1000)} ms")
         embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
-        # embed.add_field(name="Online nodes:ㅤ", value=self._bot.get_online_nodes())
-        # embed.add_field(name="Available nodes:ㅤ", value=self._bot.get_available_nodes())
+        embed.add_field(name="Online nodes:ㅤ", value=self._bot.get_online_nodes())
+        embed.add_field(name="Available nodes:ㅤ", value=self._bot.get_available_nodes())
         embed.add_field(name="Joined servers:ㅤ", value=len(self._bot.guilds))
         embed.add_field(name="Bot version:", value=__version__)
-        embed.add_field(name="Py-cord version:ㅤㅤ", value=discord.__version__)
+        embed.add_field(name="Discord.py version:ㅤㅤ", value=discord.__version__)
         embed.add_field(
             name="Python version:",
             value=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         )
         embed.set_footer(text="Bot owner: _kexo")
-        await ctx.respond(embed=embed)
+        await send_interaction(ctx, embed=embed)
 
-    @slash_command(name="random_number", description="Choose number between intervals.")
+    @app_commands.command(
+        name="random_number", description="Choose number between intervals."
+    )
+    @app_commands.describe(
+        integer1="First number in range.",
+        integer2="Second number in range.",
+    )
     async def random_number(
-        self, ctx: discord.ApplicationContext, integer1: int, integer2: int
+        self, ctx: discord.Interaction, integer1: int, integer2: int
     ) -> None:
         """Method to generate a random number between two integers.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         integer1: int
             The first integer of the range.
@@ -696,63 +688,111 @@ class CommandCog(commands.Cog):
         """
         if integer1 > integer2:
             integer2, integer1 = integer1, integer2
-        await ctx.respond(f"I chose `{random.randint(integer1, integer2)}`")
+        await send_interaction(ctx, f"I chose `{random.randint(integer1, integer2)}`")
 
-    @slash_command(
+    @app_commands.command(
         name="pick",
         description="Selects one word, words needs to be separated by space.",
     )
-    @option("words", description="Separate words by space.")
-    async def pick(self, ctx: discord.ApplicationContext, words: str) -> None:
+    @app_commands.describe(words="Space-separated words to choose from.")
+    async def pick(self, ctx: discord.Interaction, words: str) -> None:
         """Method to pick a random word from a list of words.
         Parameter is a string of words separated by spaces,
         but it is split into a list.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         words: str
             The list of words separated by spaces.
         """
         words = words.split()
-        await ctx.respond("I chose " + "`" + str(random.choice(words)) + "`")
+        await send_interaction(ctx, "I chose " + "`" + str(random.choice(words)) + "`")
 
-    @slash_command(name="clear-messages", description="Clears messages, max 50 (Admin)")
-    @discord.default_permissions(administrator=True)
-    @option("integer", description="Max is 50.", min_value=1, max_value=50)
-    async def clear(self, ctx: discord.ApplicationContext, integer: int) -> None:
+    @app_commands.command(
+        name="clear-messages", description="Clears messages, max 50 (Admin)"
+    )
+    @app_commands.describe(integer="How many messages to delete (1-50).")
+    @app_commands.default_permissions(administrator=True)
+    async def clear(
+        self,
+        ctx: discord.Interaction,
+        integer: app_commands.Range[int, 1, 50],
+    ) -> None:
         """Method to clear messages in a channel.
         This method is only available to administrators.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         integer: int
             The number of messages to clear (max 50).
         """
-        await ctx.respond(
-            f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=True
+        await send_interaction(
+            ctx, f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=True
         )
         await ctx.channel.purge(limit=integer)
+
+    @app_commands.command(
+        name="spam", description="Spams a word (bot owner only, max 50)."
+    )
+    @app_commands.describe(
+        word="Word to spam.",
+        integer="How many times to send it (1-50).",
+        channel="Optional text channel.",
+    )
+    @app_commands.checks.check(is_owner)
+    async def spam(
+        self,
+        ctx: discord.Interaction,
+        word: str,
+        integer: app_commands.Range[int, 1, 50],
+        channel: Optional[discord.TextChannel] = None,
+    ) -> None:
+        """Spam a word in the current channel or a selected text channel."""
+        target_channel: discord.abc.Messageable = channel or ctx.channel
+
+        if channel is not None:
+            await send_interaction(
+                ctx,
+                f"Spamming `{word}` in {channel.mention}",
+                ephemeral=True,
+            )
+            repeat_count = integer
+        else:
+            await send_interaction(ctx, word)
+            repeat_count = integer - 1
+
+        for _ in range(repeat_count):
+            await target_channel.send(word)
 
     # -------------------- Database Managment -------------------- #
     @slash_bot_config.command(
         name="add",
         description="Adds string to selected list.",
-        guild_ids=[CHANNEL_ID_KEXO_SERVER],
     )
-    @discord.ext.commands.is_owner()
-    @option("collection", description="Choose database", choices=DB_CHOICES.keys())
-    @option("to_upload", description="String to upload.")
-    async def bot_config_add(self, ctx, collection: str, to_upload: str) -> None:
+    @app_commands.describe(
+        collection="Target bot config list.",
+        to_upload="Value to add to selected list.",
+    )
+    @app_commands.choices(
+        collection=[app_commands.Choice(name=name, value=name) for name in DB_CHOICES]
+    )
+    @app_commands.checks.check(is_owner)
+    async def bot_config_add(
+        self,
+        ctx: discord.Interaction,
+        collection: str,
+        to_upload: str,
+    ) -> None:
         """Method to add a string to a selected database collection.
         This method is only available to the bot owner.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         collection: str
             The name of the database collection to add the string to.
@@ -764,18 +804,27 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="remove",
         description="Removes string from selected list.",
-        guild_ids=[CHANNEL_ID_KEXO_SERVER],
     )
-    @discord.ext.commands.is_owner()
-    @option("collection", description="Choose database", choices=DB_CHOICES.keys())
-    @option("to_remove", description="String to remove.")
-    async def bot_config_remove(self, ctx, collection: str, to_remove: str) -> None:
+    @app_commands.describe(
+        collection="Target bot config list.",
+        to_remove="Value to remove from selected list.",
+    )
+    @app_commands.choices(
+        collection=[app_commands.Choice(name=name, value=name) for name in DB_CHOICES]
+    )
+    @app_commands.checks.check(is_owner)
+    async def bot_config_remove(
+        self,
+        ctx: discord.Interaction,
+        collection: str,
+        to_remove: str,
+    ) -> None:
         """Method to remove a string from a selected database collection.
         This method is only available to the bot owner.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         collection: str
             The name of the database collection to remove the string from.
@@ -787,17 +836,23 @@ class CommandCog(commands.Cog):
     @slash_bot_config.command(
         name="show",
         description="Shows data from selected lists.",
-        guild_ids=[CHANNEL_ID_KEXO_SERVER],
     )
-    @discord.ext.commands.is_owner()
-    @option("collection", description="Choose database", choices=DB_CHOICES.keys())
-    async def bot_config_show(self, ctx, collection: str) -> None:
+    @app_commands.describe(collection="Target bot config list.")
+    @app_commands.choices(
+        collection=[app_commands.Choice(name=name, value=name) for name in DB_CHOICES]
+    )
+    @app_commands.checks.check(is_owner)
+    async def bot_config_show(
+        self,
+        ctx: discord.Interaction,
+        collection: str,
+    ) -> None:
         """Method to show data from a selected database collection.
         This method is only available to the bot owner.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         collection: str
             The name of the database collection to show data from.
@@ -808,7 +863,7 @@ class CommandCog(commands.Cog):
         name="settings",
         description="Change your list of subreddits.",
     )
-    async def edit_subreddit(self, ctx: discord.ApplicationContext) -> None:
+    async def edit_subreddit(self, ctx: discord.Interaction) -> None:
         """Method to edit the list of subreddits for the user.
 
         This method creates a view with a select menu for the user to choose
@@ -816,10 +871,10 @@ class CommandCog(commands.Cog):
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        user_id = ctx.author.id
+        user_id = ctx.user.id
         user_data, _ = await get_user_data(self._bot, ctx)
         current_subreddits = user_data["reddit"]["subreddits"]
         # Create a view with select menu for all available subreddits
@@ -832,7 +887,7 @@ class CommandCog(commands.Cog):
             color=discord.Color.blue(),
         )
 
-        await ctx.respond(embed=embed, view=view, ephemeral=True)
+        await send_interaction(ctx, embed=embed, view=view, ephemeral=True)
 
     async def _show_bot_config(self, ctx, collection: str) -> None:
         bot_config: dict = await self._bot_config.find_one(DB_LISTS)
@@ -846,7 +901,7 @@ class CommandCog(commands.Cog):
                 f"{i + 1}. {collection[i]}" for i in range(len(collection))
             ),
         )
-        await ctx.respond(embed=embed)
+        await send_interaction(ctx, embed=embed)
 
     async def _add_to_bot_config(self, ctx, collection: str, to_upload: str) -> None:
         bot_config: dict = await self._bot_config.find_one(DB_LISTS)
@@ -908,7 +963,7 @@ class HostView(discord.ui.View):
     """
 
     def __init__(self, author: discord.Member):
-        super().__init__(timeout=43200, disable_on_timeout=True)
+        super().__init__(timeout=43200)
         self._author = author
 
     # noinspection PyUnusedLocal
@@ -916,7 +971,7 @@ class HostView(discord.ui.View):
         style=discord.ButtonStyle.gray, label="I stopped hosting.", emoji="📣"
     )
     async def button_callback(
-        self, button: discord.Button, interaction: discord.Interaction
+        self, interaction: discord.Interaction, button: discord.Button
     ) -> None:
         """Callback for the button in the hosting embed.
 
@@ -990,7 +1045,9 @@ class SubredditSelectorView(discord.ui.View):
         The ID of the user who is editing the subreddits.
     """
 
-    def __init__(self, current_subreddits: set, bot: discord.Bot, user_id: int) -> None:
+    def __init__(
+        self, current_subreddits: set, bot: commands.Bot, user_id: int
+    ) -> None:
         super().__init__(timeout=600)
         self._current_subreddits = current_subreddits
         self.selected_subreddits = set()
@@ -1158,6 +1215,6 @@ class SubredditSelect(discord.ui.Select):
         await interaction.response.defer()
 
 
-def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot):
     """Setup function to add the CommandCog to the bot."""
-    bot.add_cog(CommandCog(bot))
+    await bot.add_cog(CommandCog(bot))

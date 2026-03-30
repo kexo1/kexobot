@@ -1,8 +1,8 @@
 import copy
 import logging
 
-import discord
 import httpx
+from discord.ext import commands
 
 from app.constants import API_LAVALIST, DB_CACHE
 from app.utils import make_http_request
@@ -29,7 +29,7 @@ class LavalinkServerManager:
         List of offline lavalink servers.
     """
 
-    def __init__(self, bot: discord.Bot, session: httpx.AsyncClient) -> None:
+    def __init__(self, bot: commands.Bot, session: httpx.AsyncClient) -> None:
         self._bot = bot
         self._session = session
         self._cached_lavalink_servers = self._bot.cached_lavalink_servers

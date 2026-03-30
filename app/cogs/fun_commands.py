@@ -11,22 +11,11 @@ from asyncprawcore.exceptions import (
     RequestException,
     ResponseException,
 )
-from discord import option
-from discord.commands import slash_command
+from discord import app_commands
 from discord.ext import commands
-from discord.utils import escape_markdown
-from pycord.multicog import subcommand
 
-from app.constants import (
-    API_DAD_JOKE,
-    API_HUMORAPI,
-    API_JOKEAPI,
-    CHANNEL_ID_KEXO_SERVER,
-    CHANNEL_ID_SISKA_GANG_SERVER,
-    JOKE_EXCLUDED_WORDS,
-    USER_ID_KEXO,
-)
-from app.response_handler import send_response
+from app.constants import API_DAD_JOKE, API_HUMORAPI, API_JOKEAPI, JOKE_EXCLUDED_WORDS
+from app.response_handler import defer_interaction, send_interaction, send_response
 from app.utils import get_guild_data, get_user_data, load_text_file, make_http_request
 
 
@@ -50,15 +39,15 @@ async def is_valid_submission(
 
 
 async def send_multiple_images(
-    ctx: discord.ApplicationContext, submission: asyncpraw.reddit.Submission
+    ctx: discord.Interaction, submission: asyncpraw.reddit.Submission
 ) -> None:
     for image in submission.gallery_data["items"]:
-        await ctx.send(f"https://i.redd.it/{image['media_id']}.jpg")
+        await send_interaction(ctx, f"https://i.redd.it/{image['media_id']}.jpg")
 
 
-async def post_video(ctx: discord.ApplicationContext, submission_url: str) -> None:
+async def post_video(ctx: discord.Interaction, submission_url: str) -> None:
     video_url = submission_url.split("/")[4]
-    await ctx.send(f"https://rxddit.com/{video_url}/", suppress=False)
+    await send_interaction(ctx, f"https://rxddit.com/{video_url}/", suppress=False)
 
 
 class FunCommands(commands.Cog):
@@ -93,59 +82,57 @@ class FunCommands(commands.Cog):
         self._topstropscreenshot = load_text_file("topstropscreenshot")
         self._kotrmelce = load_text_file("kotrmelec")
 
-    @slash_command(
+    @app_commands.command(
         name="kotrmelec",
         description="Legendárne školské kotrmelce",
-        guild_ids=[CHANNEL_ID_KEXO_SERVER, CHANNEL_ID_SISKA_GANG_SERVER],
     )
-    async def kotrmelec(self, ctx: discord.ApplicationContext) -> None:
+    async def kotrmelec(self, ctx: discord.Interaction) -> None:
         """This command sends a random "kotrmelec" message from a file.
 
         This command is restricted to specific guilds because it's private.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        await ctx.respond(random.choice(self._kotrmelce))
+        await send_interaction(ctx, random.choice(self._kotrmelce))
 
-    @slash_command(
+    @app_commands.command(
         name="topstropscreenshot",
         description="Topové fotečky z online hodín",
-        guild_ids=[CHANNEL_ID_KEXO_SERVER, CHANNEL_ID_SISKA_GANG_SERVER],
     )
-    async def top_strop_screenshot(self, ctx: discord.ApplicationContext) -> None:
+    async def top_strop_screenshot(self, ctx: discord.Interaction) -> None:
         """This command sends a random screenshot from a file.
 
         This command is restricted to specific guilds because it's private.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        await ctx.respond(random.choice(self._topstropscreenshot))
+        await send_interaction(ctx, random.choice(self._topstropscreenshot))
 
     # -------------------- Joke commands -------------------- #
-    @slash_command(name="joke", description="Fetches random joke.")
-    @commands.cooldown(1, 3, commands.BucketType.user)
-    async def joke(self, ctx: discord.ApplicationContext) -> None:
+    @app_commands.command(name="joke", description="Fetches random joke.")
+    @app_commands.checks.cooldown(1, 3, key=lambda i: i.user.id)
+    async def joke(self, ctx: discord.Interaction) -> None:
         """This command fetches a random joke from the loaded jokes.
 
         If all jokes have been viewed, it fetches new jokes from the API.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild_id)
+        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild.id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_jokes"])
         loaded_count = len(self._loaded_jokes)
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
-            await ctx.defer()
+            await defer_interaction(ctx)
             jokes = await self._get_jokes()
             if not jokes:
                 await send_response(ctx, "JOKE_TIMEOUT")
@@ -165,29 +152,29 @@ class FunCommands(commands.Cog):
             return
 
         temp_guild_data["jokes"]["viewed_jokes"].append(joke)
-        self._temp_guild_data[ctx.guild_id] = temp_guild_data
+        self._temp_guild_data[ctx.guild.id] = temp_guild_data
 
-        joke = escape_markdown(joke)
-        await ctx.respond(joke)
+        joke = discord.utils.escape_markdown(joke)
+        await send_interaction(ctx, joke)
 
-    @slash_command(name="dad_joke", description="Fetches random dad joke.")
-    @commands.cooldown(1, 3, commands.BucketType.user)
-    async def dad_joke(self, ctx: discord.ApplicationContext) -> None:
+    @app_commands.command(name="dad_joke", description="Fetches random dad joke.")
+    @app_commands.checks.cooldown(1, 3, key=lambda i: i.user.id)
+    async def dad_joke(self, ctx: discord.Interaction) -> None:
         """This command fetches a random dad joke from the loaded dad jokes.
 
         If all dad jokes have been viewed, it fetches new dad jokes from the API.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild_id)
+        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild.id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_dad_jokes"])
         loaded_count = len(self._loaded_dad_jokes)
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
-            await ctx.defer()
+            await defer_interaction(ctx)
             jokes = await self._get_dad_jokes()
             if not jokes:
                 await send_response(ctx, "JOKE_TIMEOUT")
@@ -207,37 +194,33 @@ class FunCommands(commands.Cog):
             return
 
         temp_guild_data["jokes"]["viewed_dad_jokes"].append(joke)
-        self._temp_guild_data[ctx.guild_id] = temp_guild_data
+        self._temp_guild_data[ctx.guild.id] = temp_guild_data
 
-        joke = escape_markdown(joke)
-        await ctx.respond(joke)
+        joke = discord.utils.escape_markdown(joke)
+        await send_interaction(ctx, joke)
 
-    @slash_command(
+    @app_commands.command(
         name="yo_mama",
         description="Yo mama joke on a discord member.",
     )
-    @commands.cooldown(1, 3, commands.BucketType.user)
-    @option("member", description="Discord member.")
-    async def yo_mama(
-        self, ctx: discord.ApplicationContext, member: discord.Member
-    ) -> None:
-        """This command fetches a random yo mama joke from the loaded yo mama jokes.
-
-        If all yo mama jokes have been viewed, it fetches new yo mama jokes from the API.
+    @app_commands.describe(member="Discord member to roast.")
+    @app_commands.checks.cooldown(1, 3, key=lambda i: i.user.id)
+    async def yo_mama(self, ctx: discord.Interaction, member: discord.Member) -> None:
+        """This command fetches a random yo mama joke and targets a member.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command.
         member: :class:`discord.Member`
-            member to roast.
+            The member to roast.
         """
-        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild_id)
+        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild.id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_yo_mama_jokes"])
         loaded_count = len(self._loaded_yo_mama_jokes)
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
-            await ctx.defer()
+            await defer_interaction(ctx)
             jokes = await self._get_yo_mama_jokes()
             if not jokes:
                 await send_response(ctx, "JOKE_TIMEOUT")
@@ -257,91 +240,36 @@ class FunCommands(commands.Cog):
             return
 
         temp_guild_data["jokes"]["viewed_yo_mama_jokes"].append(joke)
-        self._temp_guild_data[ctx.guild_id] = temp_guild_data
+        self._temp_guild_data[ctx.guild.id] = temp_guild_data
 
-        joke = joke[0].lower() + joke[1:]
-        joke = escape_markdown(joke)
-        if member.name == "KexoBOT":
-            await ctx.respond(ctx.author.mention + " " + joke)
-        else:
-            await ctx.respond(member.mention + " " + joke)
+        joke = joke[0].lower() + joke[1:] if joke else ""
+        joke = discord.utils.escape_markdown(joke)
 
-    @slash_command(name="spam", description="Spams words, max is 50.  (Bot owner only)")
-    @option("word", description="Word to spam.")
-    @option("integer", description="Max is 50.", min_value=1, max_value=50)
-    @option("channel_id", description="Channel to spam in.")
-    async def spam(
-        self,
-        ctx: discord.ApplicationContext,
-        word: str,
-        integer: int,
-        channel_id: str = None,
-    ) -> None:
-        """This command spams a word a specified number of times.
+        target = member
+        if self._bot.user and member.id == self._bot.user.id:
+            target = ctx.user
 
-        Parameters
-        ----------
-        ctx: :class:`discord.ApplicationContext`
-            The context of the command.
-        word: str
-            The word to spam.
-        integer: int
-            The number of times to spam the word.
-        channel_id: str, optional
-        """
+        await send_interaction(ctx, f"{target.mention} {joke}")
 
-        if ctx.author.id != USER_ID_KEXO:
-            await send_response(ctx, "NOT_OWNER")
-            return
-
-        try:
-            if channel_id and channel_id.isdigit():
-                channel = await self._bot.fetch_channel(channel_id)
-                if not channel or not isinstance(channel, discord.TextChannel):
-                    await ctx.respond("Invalid channel ID.")
-                    return
-
-                await ctx.respond(f"Spamming `{word}` in <#{channel_id}>")
-                for _ in range(integer):
-                    await channel.send(word)
-                return
-
-        except discord.NotFound:
-            await ctx.respond("Invalid channel ID.")
-            return
-
-        await ctx.respond(word)
-        for _ in range(integer - 1):
-            await ctx.send(word)
-
-    @subcommand("reddit")
-    @slash_command(
+    @app_commands.command(
         name="shitpost",
-        description="Random post from various shitposting subreddits.",
+        description="Random post from configured shitposting subreddits.",
     )
-    @commands.cooldown(1, 5, commands.BucketType.user)
-    async def shitpost(self, ctx: discord.ApplicationContext) -> None:
-        """This command calls a method which fetches
-        a random post from various shitposting subreddits.
-
-        Parameters
-        ----------
-        ctx: :class:`discord.ApplicationContext`
-            The context of the command.
-        """
+    @app_commands.checks.cooldown(1, 5, key=lambda i: i.user.id)
+    async def shitpost(self, ctx: discord.Interaction) -> None:
         await self.process_shitpost(ctx)
 
-    async def process_shitpost(self, ctx: discord.ApplicationContext) -> None:
+    async def process_shitpost(self, ctx: discord.Interaction) -> None:
         """This command fetches a random post from various shitposting subreddits.
         It checks if the post is valid and not already viewed. If the post is NSFW,
         it checks if the channel is NSFW. If the post is valid, it sends the post
         as an embed and updates the viewed posts in the user data.
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        user_id = ctx.author.id
+        user_id = ctx.user.id
         user_data, temp_user_data = await self._load_user_data(ctx)
 
         multireddit: asyncpraw.models.Multireddit = temp_user_data["multireddit"]
@@ -363,15 +291,15 @@ class FunCommands(commands.Cog):
                 embed = await self._create_reddit_embed(submission)
 
                 if submission.media:
-                    await ctx.respond(embed=embed)
+                    await send_interaction(ctx, embed=embed)
                     await post_video(ctx, submission.permalink)
                 # If it has multiple images
                 elif hasattr(submission, "gallery_data"):
-                    await ctx.respond(embed=embed)
+                    await send_interaction(ctx, embed=embed)
                     await send_multiple_images(ctx, submission)
                 else:
                     embed.set_image(url=submission.url)
-                    await ctx.respond(embed=embed)
+                    await send_interaction(ctx, embed=embed)
 
                 self._update_temp_user_data(user_id, submission.permalink)
                 break
@@ -388,9 +316,7 @@ class FunCommands(commands.Cog):
         self._temp_user_data[user_id]["reddit"]["last_used"] = datetime.now()
         self._temp_user_data[user_id]["reddit"]["search_limit"] += 1
 
-    async def _load_user_data(
-        self, ctx: discord.ApplicationContext
-    ) -> tuple[dict, dict]:
+    async def _load_user_data(self, ctx: discord.Interaction) -> tuple[dict, dict]:
         user_data, temp_user_data = await get_user_data(
             self._bot,
             ctx,
@@ -573,6 +499,6 @@ class FunCommands(commands.Cog):
         return token
 
 
-def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot):
     """This function sets up the FunCommands cog."""
-    bot.add_cog(FunCommands(bot))
+    await bot.add_cog(FunCommands(bot))

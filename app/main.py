@@ -13,15 +13,14 @@ import asyncprawcore.exceptions
 import cloudscraper
 import discord
 import httpx
-import wavelink
+import relink
+from discord import app_commands
 from discord.ext import commands, tasks
-from pycord.multicog import Bot
 from pymongo import AsyncMongoClient
-from wavelink.enums import NodeStatus
+from relink.models import CacheSettings, InactivitySettings
 
 from app.classes.content_monitor import ContentMonitor
-
-# from app.classes.lavalink_server import LavalinkServerManager
+from app.classes.lavalink_server import LavalinkServerManager
 from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
 from app.constants import (
@@ -45,6 +44,7 @@ from app.constants import (
     SHITPOST_SUBREDDITS_ALL,
     USER_AGENT,
 )
+from app.response_handler import send_interaction
 from app.utils import (
     generate_temp_guild_data,
     get_guild_data,
@@ -93,8 +93,9 @@ class TempGuildData(TypedDict):
     jokes: GuildJokesData
 
 
-class KexoBotClient(Bot):
-    node: wavelink.Node | None
+class KexoBotClient(commands.Bot):
+    node: relink.Node | None
+    relink_client: relink.Client
     user_data: dict[int, UserData]
     temp_user_data: dict[int, TempUserData]
     guild_data: dict[int, GuildData]
@@ -106,13 +107,18 @@ class KexoBotClient(Bot):
     guild_data_db: AsyncMongoClient
     reddit_agent: asyncpraw.Reddit
     humor_api_tokens: dict[str, dict[str, bool]]
+    track_requesters: dict[str, dict[str, str]]
     loaded_jokes: list[str]
     loaded_dad_jokes: list[str]
     loaded_yo_mama_jokes: list[str]
     session: httpx.AsyncClient | None
 
 
-bot = KexoBotClient()
+intents = discord.Intents.default()
+intents.message_content = False
+intents.members = False
+
+bot = KexoBotClient(command_prefix=commands.when_mentioned, intents=intents)
 
 
 async def get_guild_node(guild_id: int) -> tuple[str, dict]:
@@ -146,13 +152,13 @@ async def get_guild_node(guild_id: int) -> tuple[str, dict]:
     )
 
 
-async def check_node_status(node: wavelink.Node) -> bool:
+async def check_node_status(node: relink.Node) -> bool:
     """Check the status of a lavalink node.
     This function will try to connect to the lavalink node
 
     Parameters
     ----------
-    node: wavelink.Node
+    node: relink.Node
         The lavalink node to check the status of.
     Returns
     -------
@@ -160,9 +166,10 @@ async def check_node_status(node: wavelink.Node) -> bool:
         True if the node is connected, False otherwise.
     """
     try:
-        await asyncio.wait_for(
-            wavelink.Pool.connect(nodes=[node], client=bot), timeout=2
-        )
+        await asyncio.wait_for(node.connect(), timeout=2)
+        wait_session = getattr(node, "_wait_session", None)
+        if callable(wait_session):
+            await wait_session()
         # Some fucking nodes secretly don't respond,
         # I've played these games before!!!
         await node.fetch_info()
@@ -184,55 +191,41 @@ async def close_unused_nodes() -> None:
     This function will check if there are any lavalink nodes
     that are not being used and will close them.
     """
-    nodes = list(wavelink.Pool.nodes.values())
+    nodes = list(bot.relink_client.nodes)
+    relink_nodes = getattr(bot.relink_client, "_nodes", None)
     for node in nodes:
-        if len(wavelink.Pool.nodes) == 1:
+        if len(bot.relink_client.nodes) == 1:
             break
 
-        if len(node.players) == 0:
+        if not node.is_connected:
+            logging.info(f"[Lavalink] Node is disconnected, removing. ({node.uri})")
+            if isinstance(relink_nodes, dict):
+                relink_nodes.pop(node.id, None)
+            continue
+
+        try:
+            players = await node.fetch_players()
+        except RuntimeError as e:
+            logging.warning(
+                f"[Lavalink] Skipping node without session. ({node.uri}) - {e}"
+            )
+            continue
+        if len(players) == 0:
             logging.info(f"[Lavalink] Node is empty, removing. ({node.uri})")
-            await node._pool_closer()  # Node is not properly closed
             try:
-                await node.close(eject=True)
-            except Exception:
                 await node.close()
-
-
-async def fetch_channel(channel_id: int) -> discord.TextChannel:
-    """Helper to fetch a channel by ID, returns :class:`discord.TextChannel`.
-
-    Parameters
-    ----------
-    channel_id: int
-        The ID of the channel to fetch.
-    """
-    return await bot.fetch_channel(channel_id)
-
-
-def initialize_class(cls, *args) -> object:
-    """Helper to initialize a class with arguments.
-
-    Parameters
-    ----------
-    cls: type
-        The class to initialize.
-    *args: tuple
-        The arguments to pass to the class.
-    """
-    return cls(*args)
+            except RuntimeError:
+                pass
+            finally:
+                if isinstance(relink_nodes, dict):
+                    relink_nodes.pop(node.id, None)
 
 
 def get_online_nodes() -> int:
     """Get the number of online lavalink nodes,
     returns ``int`` of online nodes.
     """
-    return len(
-        [
-            node
-            for node in wavelink.Pool.nodes.values()
-            if node.status == NodeStatus.CONNECTED
-        ]
-    )
+    return len([node for node in bot.relink_client.nodes if node.is_connected])
 
 
 def get_available_nodes() -> int:
@@ -273,12 +266,20 @@ def clear_cached_jokes() -> None:
     bot.loaded_yo_mama_jokes = []
 
 
-def build_node(uri: str, password: str) -> wavelink.Node:
-    return wavelink.Node(
+def build_node(uri: str, password: str) -> relink.Node:
+    return bot.relink_client.create_node(
         uri=uri,
         password=password,
         retries=1,
-        inactive_player_timeout=600,
+        resume_timeout=60,
+        inactivity_settings=InactivitySettings(
+            timeout=300,
+            mode=relink.InactivityMode.ALL_BOTS,
+        ),
+        cache_settings=CacheSettings(
+            enabled=True,
+            max_items=1000,
+        ),
     )
 
 
@@ -307,17 +308,11 @@ class KexoBot:
         self._user_data_db = database["UserData"]
         self._guild_data_db = database["GuildData"]
 
-        self._reddit_agent = asyncpraw.Reddit(
-            client_id=ENV_REDDIT_CLIENT_ID,
-            client_secret=ENV_REDDIT_SECRET,
-            user_agent=ENV_REDDIT_USER_AGENT,
-            username=ENV_REDDIT_USERNAME,
-            password=ENV_REDDIT_PASSWORD,
-        )
+        self._reddit_agent: asyncpraw.Reddit | None = None
 
         self._reddit_fetcher: RedditFetcher | None = None
         self._content_monitor: ContentMonitor | None = None
-        # self._lavalink_server_manager: LavalinkServerManager | None = None
+        self._lavalink_server_manager: LavalinkServerManager | None = None
         self._sfd_servers: SFDServers | None = None
 
         self._channel_game_updates: discord.TextChannel | None = None
@@ -326,46 +321,61 @@ class KexoBot:
 
         # Attach to bot, so we can use it in cogs
         bot.node = None
-
         bot.user_data = {}
         bot.temp_user_data = {}
         bot.guild_data = {}
         bot.temp_guild_data = {}
-        # bot.track_exceptions = {}
-        # bot.cached_lavalink_servers = []
+        bot.cached_lavalink_servers = {}
 
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
         bot.guild_data_db = self._guild_data_db
 
-        bot.reddit_agent = self._reddit_agent
-        # bot.connect_node = self.connect_node
-        # bot.close_unused_nodes = close_unused_nodes
-        # bot.get_online_nodes = get_online_nodes
-        # bot.get_available_nodes = get_available_nodes
+        bot.relink_client = relink.Client(bot)
+        bot.connect_node = self.connect_node
+        bot.close_unused_nodes = close_unused_nodes
+        bot.get_online_nodes = get_online_nodes
+        bot.get_available_nodes = get_available_nodes
 
         bot.humor_api_tokens = {}
+        bot.track_requesters = {}
         bot.loaded_jokes = []
         bot.loaded_dad_jokes = []
         bot.loaded_yo_mama_jokes = []
 
     async def initialize(self) -> None:
         """Initialize the _bot and fetch all channels and users."""
+        self._create_reddit_agent()
         await self._fetch_users()
         await self._fetch_channels()
         await self._fetch_subreddit_icons()
-        # await self._fetch_cached_lavalink_servers()
+        await self._fetch_cached_lavalink_servers()
         load_humor_api_tokens()
         self._create_http_sessions()
         self._define_classes()
 
+    def _create_reddit_agent(self) -> None:
+        """Create Reddit API client in runtime initialization context."""
+        self._reddit_agent = asyncpraw.Reddit(
+            client_id=ENV_REDDIT_CLIENT_ID,
+            client_secret=ENV_REDDIT_SECRET,
+            user_agent=ENV_REDDIT_USER_AGENT,
+            username=ENV_REDDIT_USERNAME,
+            password=ENV_REDDIT_PASSWORD,
+        )
+        bot.reddit_agent = self._reddit_agent
+
     async def _fetch_channels(self) -> None:
         """Fetch all channels for the bot."""
-        self._channel_game_updates = await fetch_channel(
+        self._channel_game_updates = await bot.fetch_channel(
             CHANNEL_ID_GAME_UPDATES_CHANNEL
         )
-        self._channel_game_cracks = await fetch_channel(CHANNEL_ID_GAME_CRACKS_CHANNEL)
-        self._channel_free_stuff = await fetch_channel(CHANNEL_ID_FREE_STUFF_CHANNEL)
+        self._channel_game_cracks = await bot.fetch_channel(
+            CHANNEL_ID_GAME_CRACKS_CHANNEL
+        )
+        self._channel_free_stuff = await bot.fetch_channel(
+            CHANNEL_ID_FREE_STUFF_CHANNEL
+        )
         logging.info("[Starter] Channels fetched.")
 
     async def _fetch_cached_lavalink_servers(self) -> None:
@@ -383,8 +393,10 @@ class KexoBot:
 
     def _define_classes(self) -> None:
         """Define classes for the bot."""
-        self._content_monitor = initialize_class(
-            ContentMonitor,
+        if self._reddit_agent is None:
+            raise RuntimeError("Reddit client is not initialized")
+
+        self._content_monitor = ContentMonitor(
             self._bot_config,
             self.session,
             self.cloudscraper_session,
@@ -393,18 +405,15 @@ class KexoBot:
             self._user_kexo,
         )
 
-        self._reddit_fetcher = initialize_class(
-            RedditFetcher,
+        self._reddit_fetcher = RedditFetcher(
             self._bot_config,
             self.session,
             self._reddit_agent,
             self._channel_free_stuff,
             self._channel_game_cracks,
         )
-        self._sfd_servers = initialize_class(SFDServers, self._bot_config, self.session)
-        # self._lavalink_server_manager = initialize_class(
-        #     LavalinkServerManager, bot, self.session
-        # )
+        self._sfd_servers = SFDServers(self._bot_config, self.session)
+        self._lavalink_server_manager = LavalinkServerManager(bot, self.session)
 
     async def main_loop(self) -> None:
         """Main loop for the bot.
@@ -461,15 +470,15 @@ class KexoBot:
 
         if now.hour == 0:
             load_humor_api_tokens()
-            # await self._upload_cached_lavalink_servers()
-            # await self._lavalink_server_manager.fetch()
+            await self._upload_cached_lavalink_servers()
+            await self._lavalink_server_manager.fetch()
 
         if now.hour == 4:
             await self.wordnik_presence()
 
     async def connect_node(
         self, guild_id: int | None = None, switch_node: bool = True
-    ) -> wavelink.Node | None:
+    ) -> relink.Node | None:
         """Connect to lavalink node.
 
         This function will try to connect to the lavalink node
@@ -482,7 +491,7 @@ class KexoBot:
             The guild ID to connect to.
         Returns
         -------
-        wavelink.Node | None
+        relink.Node | None
             The lavalink node that was connected to.
         """
 
@@ -614,24 +623,23 @@ def initialize_cog_http_session() -> None:
     bot.session.headers = httpx.Headers({"User-Agent": USER_AGENT})
 
 
-def setup_cogs() -> None:
+async def setup_cogs() -> None:
     """Load all cogs for the bot."""
+
     cogs_list = [
-        "commands",
-        # "music_commands",
-        # "listeners",
-        # "queue_commands",
-        # "audio_commands",
         "fun_commands",
+        "commands",
+        "music_commands",
+        "listeners",
     ]
 
     initialize_cog_http_session()
     for cog in cogs_list:
-        bot.load_extension(f"app.cogs.{cog}")
+        await bot.load_extension(f"app.cogs.{cog}")
+
+    await bot.tree.sync()
+
     logging.info("[Starter] Cogs loaded.")
-
-
-setup_cogs()
 
 
 @tasks.loop(minutes=1)
@@ -670,10 +678,22 @@ async def bot_loader(main: KexoBot) -> None:
     """
 
     await main.initialize()
+
+    node = await main.connect_node(switch_node=False)
+    if not node:
+        logging.warning("[Lavalink] Startup connect failed, refreshing node cache.")
+        await main._lavalink_server_manager.fetch()
+        node = await main.connect_node(switch_node=False)
+
+    if node:
+        logging.info(f"[Lavalink] Connected to node: {node.uri}")
+    else:
+        logging.error("[Lavalink] Node is not connected after startup attempts.")
+
+    await setup_cogs()
+
     main_loop_task.start()
     hourly_loop_task.start()
-
-    # await main.connect_node(switch_node=False)
 
     while not main.session:
         await asyncio.sleep(1)
@@ -693,17 +713,17 @@ async def on_ready() -> None:
 
 
 @bot.event
-async def on_application_command_error(ctx: discord.ApplicationContext, error) -> None:
+async def on_application_command_error(ctx: discord.Interaction, error) -> None:
     """This event is called when an error occurs in an application command.
 
     Parameters
     ----------
-    ctx: discord.ApplicationContext
+    ctx: discord.Interaction
         The context of the command that caused the error.
     error: Exception
         The error that occurred.
     """
-    if isinstance(error, commands.CommandOnCooldown):
+    if isinstance(error, (commands.CommandOnCooldown, app_commands.CommandOnCooldown)):
         embed = discord.Embed(
             title="",
             description=f"🚫 You're sending too much!,"
@@ -711,7 +731,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
-        await ctx.respond(embed=embed, ephemeral=True, delete_after=20)
+        await send_interaction(ctx, embed=embed, ephemeral=True, delete_after=20)
         return
 
     if isinstance(error, commands.MissingPermissions):
@@ -721,7 +741,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
-        await ctx.respond(embed=embed, ephemeral=True)
+        await send_interaction(ctx, embed=embed, ephemeral=True)
         return
 
     if isinstance(error, commands.BotMissingPermissions):
@@ -731,7 +751,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
-        await ctx.send(embed=embed)
+        await send_interaction(ctx, embed=embed)
         return
 
     if isinstance(error, commands.BotMissingRole):
@@ -741,7 +761,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             f"\nRequired role: `{error.missing_role}`",
             color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
-        await ctx.respond(embed=embed, ephemeral=True)
+        await send_interaction(ctx, embed=embed, ephemeral=True)
         return
 
     if isinstance(error, discord.errors.NotFound) and "Unknown interaction" in str(
@@ -764,10 +784,15 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error) -
             description="🚫 This command is available only to owner of this bot.",
             color=discord.Color.from_rgb(r=220, g=0, b=0),
         )
-        await ctx.respond(embed=embed, ephemeral=True)
+        await send_interaction(ctx, embed=embed, ephemeral=True)
         return
 
     raise error
+
+
+@bot.tree.error
+async def on_tree_error(interaction: discord.Interaction, error) -> None:
+    await on_application_command_error(interaction, error)
 
 
 @bot.event

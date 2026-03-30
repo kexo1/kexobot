@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
@@ -12,7 +14,9 @@ import asyncprawcore
 import discord
 import httpx
 import psutil
-import wavelink
+import relink
+from discord.ext import commands
+from relink.models import CacheSettings, InactivitySettings
 
 from app.constants import (
     ICON_DISCORD,
@@ -20,6 +24,7 @@ from app.constants import (
     MUSIC_TO_REMOVE,
     SHITPOST_SUBREDDITS_DEFAULT,
 )
+from app.response_handler import defer_interaction
 
 
 def load_text_file(name: str) -> list[str]:
@@ -143,8 +148,8 @@ async def download_video(
 
 
 async def check_node_status(
-    bot: discord.Bot, uri: str, password: str
-) -> wavelink.Node | None:
+    bot: commands.Bot, uri: str, password: str
+) -> relink.Node | None:
     """Check the status of a Lavalink node and return it if it's online.
 
     Parameters
@@ -158,28 +163,35 @@ async def check_node_status(
 
     Returns
     -------
-    :class:`wavelink.Node`
+    :class:`relink.Node`
         The Lavalink node if it's online, None otherwise.
     """
-    node = wavelink.Node(
+    node: relink.Node = bot.relink_client.create_node(
         uri=uri,
         password=password,
         retries=1,
         resume_timeout=0,
+        inactivity_settings=InactivitySettings(
+            timeout=300,
+            mode=relink.InactivityMode.ALL_BOTS,
+        ),
+        cache_settings=CacheSettings(enabled=True, max_items=1000),
     )
     try:
-        await asyncio.wait_for(
-            wavelink.Pool.connect(nodes=[node], client=bot), timeout=3
-        )
+        await asyncio.wait_for(node.connect(), timeout=3)
         await node.fetch_info()
     except (
         asyncio.TimeoutError,
-        wavelink.exceptions.NodeException,
-        wavelink.LavalinkException,
         aiohttp.NonHttpUrlClientError,
     ):
-        # Test
-        await node.close(eject=True)
+        try:
+            await node.close()
+        except RuntimeError:
+            pass
+
+        relink_nodes = getattr(bot.relink_client, "_nodes", None)
+        if isinstance(relink_nodes, dict):
+            relink_nodes.pop(node.id, None)
         return None
     return node
 
@@ -204,12 +216,12 @@ def strip_text(text: str, to_strip: tuple[str, ...]) -> str:
     return text.strip()
 
 
-def fix_audio_title(track: wavelink.Playable) -> str:
+def fix_audio_title(track: relink.Playable) -> str:
     """Fix the title of an audio track by removing unwanted characters.
 
     Parameters
     ----------
-    track: :class:`wavelink.Playable`
+    track: :class:`relink.Playable`
         The audio track to fix.
 
     Returns
@@ -269,13 +281,13 @@ def get_search_prefix(query: str) -> str | None:
     return None
 
 
-def find_track(player: wavelink.Player, to_find: str) -> int | None:
+def find_track(player: relink.Player, to_find: str) -> int | None:
     """Find a track in the player's queue by title or index.
 
     Parameters
     ----------
-    player: :class:`wavelink.Player`
-        The wavelink Player instance.
+    player: :class:`relink.Player`
+        The relink Player instance.
     to_find: str
         The title or index of the track to find.
 
@@ -323,12 +335,12 @@ def has_pfp(member: discord.Member) -> str:
 
 
 async def switch_node(
-    bot: discord.Bot,
-    player: wavelink.Player,
+    bot: commands.Bot,
+    player: relink.Player,
     play_after: bool = True,
     send_success_message: bool = True,
     send_failure_message: bool = True,
-) -> wavelink.Node | None:
+) -> relink.Node | None:
     """
     Attempt to switch to a new node for audio playback.
 
@@ -336,8 +348,8 @@ async def switch_node(
     ----------
     bot: :class:`discord.Bot`
         The discord bot instance.
-    player: :class:`wavelink.Player`
-        The wavelink Player instance to switch the node for.
+    player: :class:`relink.Player`
+        The relink Player instance to switch the node for.
     play_after: bool
         Whether to play the current track after switching nodes.
     send_success_message: bool
@@ -347,38 +359,43 @@ async def switch_node(
 
     Returns
     -------
-    :class:`wavelink.Node` | None
-        The new wavelink.Node instance if successful, None otherwise.
+    :class:`relink.Node` | None
+        The new relink.Node instance if successful, None otherwise.
     """
     bot.cached_lavalink_servers[player.node.uri]["score"] = -1
+    player.node_is_switching = True
+
     for i in range(10):
         player_autoplay_mode = player.autoplay
-        player.autoplay = wavelink.AutoPlayMode.disabled
-        player.node_is_switching = True
-        node: wavelink.Node = await bot.connect_node()
+        player.autoplay = relink.AutoPlayMode.DISABLED
+        node: relink.Node | None = await bot.connect_node()
+        if not node:
+            continue
 
         try:
-            await player.switch_node(node)
-            if play_after:
+            await player.move_to(node)
+            if play_after and getattr(player, "temp_current", None):
                 await player.play(player.temp_current)
         except Exception:
             bot.cached_lavalink_servers[node.uri]["score"] -= 1
             continue
 
         player.autoplay = player_autoplay_mode
-        if play_after:
-            track_failed_event = asyncio.Event()
-            bot.track_exceptions[player.guild.id] = (
-                player.temp_current,
-                track_failed_event,
-            )
 
-            try:
-                await asyncio.wait_for(track_failed_event.wait(), timeout=3)
-                bot.cached_lavalink_servers[node.uri]["score"] -= 1
-                continue
-            except asyncio.TimeoutError:
-                bot.track_exceptions.pop(player.guild.id, None)
+        # Legacy track failure synchronization from Wavelink migration.
+        # if play_after:
+        #     track_failed_event = asyncio.Event()
+        #     bot.track_exceptions[player.guild.id] = (
+        #         player.temp_current,
+        #         track_failed_event,
+        #     )
+        #
+        #     try:
+        #         await asyncio.wait_for(track_failed_event.wait(), timeout=3)
+        #         bot.cached_lavalink_servers[node.uri]["score"] -= 1
+        #         continue
+        #     except asyncio.TimeoutError:
+        #         bot.track_exceptions.pop(player.guild.id, None)
 
         logging.info(f"[Lavalink] {i + 1}. Node switched ({node.uri})")
         if send_success_message:
@@ -387,7 +404,6 @@ async def switch_node(
                 description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
                 color=discord.Color.green(),
             )
-
             await player.text_channel.send(embed=embed)
 
         player.node_is_switching = False
@@ -439,7 +455,7 @@ def generate_guild_data() -> dict:
     }
 
 
-async def generate_temp_user_data(bot: discord.Bot, user_id: int) -> dict:
+async def generate_temp_user_data(bot: commands.Bot, user_id: int) -> dict:
     """Generate temporary user data for the bot.
 
     Parameters
@@ -567,7 +583,7 @@ def fix_data(
 
 
 async def get_user_data(
-    bot: discord.Bot, ctx: discord.ApplicationContext
+    bot: commands.Bot, ctx: discord.Interaction
 ) -> tuple[dict, dict]:
     """Get user data for the given user.
 
@@ -575,7 +591,7 @@ async def get_user_data(
     ----------
     bot: :class:`discord.Bot`
         The discord bot instance.
-    ctx: :class:`discord.ApplicationContext`
+    ctx: :class:`discord.Interaction`
         The context of the command invocation.
 
     Returns
@@ -583,13 +599,13 @@ async def get_user_data(
     tuple
         A tuple containing the user data and temporary user data.
     """
-    user_id = ctx.author.id
+    user_id = ctx.user.id
     user_data: dict = bot.user_data.get(user_id)
 
     if user_data:
         return user_data, bot.temp_user_data[user_id]
 
-    await ctx.defer()
+    await defer_interaction(ctx)
 
     user_data = await bot.user_data_db.find_one({"_id": user_id})  # Load from DB
     if user_data:
@@ -609,7 +625,7 @@ async def get_user_data(
     return user_data, temp_user_data
 
 
-async def get_guild_data(bot: discord.Bot, guild_id: int) -> tuple[dict, dict]:
+async def get_guild_data(bot: commands.Bot, guild_id: int) -> tuple[dict, dict]:
     """Get guild data for the given guild.
 
     Parameters

@@ -21,14 +21,14 @@ Discord Python bot used for:
 
 
 ## Built With
-- [py-cord](https://docs.pycord.dev/en/stable/) — Modern, async-ready Discord API wrapper for Python
+- [discord.py](https://discordpy.readthedocs.io/en/stable/) — Modern, async-ready Discord API wrapper for Python
 - [asyncpraw](https://asyncpraw.readthedocs.io/en/stable/) — Asynchronous Reddit API wrapper
 - [wavelink](https://wavelink.dev/en/latest/) — Fully async Python Lavalink wrapper
 - [pymongo](https://www.mongodb.com/docs/languages/python/pymongo-driver/current/) — MongoDB driver for Python
 - [matplotlib](https://matplotlib.org/) — Library for static and interactive visualizations
 
 ## Acknowledgments
-- **the.om** — Help with embed timeouts and fixing py-cord / wavelink compatibility issues in Docker
+- **the.om** — Help with embed timeouts and fixing Discord wrapper / wavelink compatibility issues in Docker
 - **dsafxP** — SFDServerBrowser project inspiration
 - **chillymosh** — Help fixing wavelink errors
 

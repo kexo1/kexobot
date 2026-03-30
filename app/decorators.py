@@ -16,13 +16,18 @@ def is_joined() -> Callable[[CommandFunc], CommandFunc]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             # args[0] is self and args[1] is ctx.
             ctx = args[1]
-            if not ctx.author.voice or not ctx.author.voice.channel:
+            if not ctx.user.voice or not ctx.user.voice.channel:
                 await send_response(ctx, "NO_VOICE_CHANNEL")
                 return None
 
-            vc = ctx.voice_client
-            if not vc or not getattr(vc, "_connected", False):
+            vc = ctx.guild.voice_client
+            player_channel = getattr(vc, "channel", None) if vc else None
+            if not vc or not player_channel:
                 await send_response(ctx, "NOT_IN_VOICE_CHANNEL")
+                return None
+
+            if player_channel.id != ctx.user.voice.channel.id:
+                await send_response(ctx, "NOT_IN_SAME_VOICE_CHANNEL")
                 return None
 
             return await func(*args, **kwargs)
@@ -39,12 +44,12 @@ def is_playing() -> Callable[[CommandFunc], CommandFunc]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             ctx = args[1]
-            vc = ctx.voice_client
-            if not vc or not vc.playing or not vc.current:
+            vc = ctx.guild.voice_client
+            if not vc or not vc.current:
                 await send_response(ctx, "NOT_PLAYING")
                 return None
 
-            if ctx.voice_client.channel.id != ctx.author.voice.channel.id:
+            if ctx.guild.voice_client.channel.id != ctx.user.voice.channel.id:
                 await send_response(ctx, "NOT_IN_SAME_VOICE_CHANNEL")
                 return None
 
@@ -62,7 +67,7 @@ def is_queue_empty() -> Callable[[CommandFunc], CommandFunc]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             ctx = args[1]
-            vc = ctx.voice_client
+            vc = ctx.guild.voice_client
             if not vc or not vc.queue:
                 await send_response(ctx, "NO_TRACKS_IN_QUEUE")
                 return None

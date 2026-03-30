@@ -2,35 +2,55 @@ import logging
 import random
 
 import discord
-import wavelink
+import relink
 from discord.ext import commands
-from wavelink import (
-    NodeDisconnectedEventPayload,
-    NodeReadyEventPayload,
-    TrackExceptionEventPayload,
-    TrackStartEventPayload,
-    TrackStuckEventPayload,
+from relink import models as rl_models
+from relink.gateway import (
+    ReadyEvent,
+    TrackExceptionEvent,
+    TrackStartEvent,
+    TrackStuckEvent,
 )
 
 from app.constants import ICON_YOUTUBE
 from app.response_handler import send_response
-from app.utils import fix_audio_title, has_pfp, switch_node
+from app.utils import fix_audio_title, switch_node
 
 
 def is_bot_node_connected(bot: commands.Bot) -> bool:
     return bool(getattr(bot, "node", None))
 
 
-def playing_embed(payload: TrackStartEventPayload) -> discord.Embed:
+def resolve_requester(
+    bot: commands.Bot, track: rl_models.Playable
+) -> tuple[str | None, str | None]:
+    name = track.extras.get("requester_name")
+    avatar = track.extras.get("requester_avatar")
+    if name:
+        return name, avatar
+
+    cached = bot.track_requesters.get(track.encoded)
+    if cached:
+        cached_avatar = cached.get("avatar") or None
+        return cached.get("name"), cached_avatar
+
+    return None, None
+
+
+def playing_embed(
+    bot: commands.Bot, player: relink.Player, payload: TrackStartEvent
+) -> discord.Embed:
     embed = discord.Embed(
         color=discord.Colour.green(),
         title="Now playing",
         description=f"[**{fix_audio_title(payload.track)}**]({payload.track.uri})",
     )
-    if hasattr(payload.player.current, "requester"):
+    track = payload.track
+    requester_name, requester_avatar = resolve_requester(bot, track)
+    if requester_name:
         embed.set_footer(
-            text=f"Requested by {payload.player.current.requester.name}",
-            icon_url=has_pfp(payload.player.current.requester),
+            text=f"Requested by {requester_name}",
+            icon_url=requester_avatar,
         )
     else:
         embed.set_footer(
@@ -42,7 +62,7 @@ def playing_embed(payload: TrackStartEventPayload) -> discord.Embed:
 
 
 class Listeners(commands.Cog):
-    """Handles various events from the Wavelink library.
+    """Handles various events from the relink library.
 
     This class listens for events such as track start, node ready, node disconnected,
     track exception, track stuck, and inactive player. It also handles voice state updates
@@ -58,8 +78,8 @@ class Listeners(commands.Cog):
         self._bot = bot
 
     @commands.Cog.listener()
-    async def on_wavelink_node_ready(self, payload: NodeReadyEventPayload) -> None:
-        """This event is triggered when a Wavelink node is ready.
+    async def on_relink_node_ready(self, payload: ReadyEvent) -> None:
+        """This event is triggered when a relink node is ready.
 
         It checks if the bot is connected to the node and closes any unused nodes if necessary.
 
@@ -68,34 +88,34 @@ class Listeners(commands.Cog):
         payload: :class:`NodeReadyEventPayload`
             The payload containing information about the node that is ready.
         """
-        logging.info(f"[Lavalink] Node ({payload.node.uri}) is ready!")
+        logging.info("[Lavalink] A node is ready.")
         if self._bot.get_online_nodes() > 1 and is_bot_node_connected(self._bot):
             await self._bot.close_unused_nodes()
 
     @commands.Cog.listener()
-    async def on_wavelink_node_disconnected(
-        self, payload: NodeDisconnectedEventPayload
-    ) -> None:
-        """This event is triggered when a Wavelink node is disconnected.
+    async def on_relink_node_close(self, node: relink.Node) -> None:
+        """This event is triggered when a relink node is closed.
 
         It checks if the bot is connected to the node and attempts to reconnect if necessary.
 
         Parameters
         ----------
-        payload: :class:`NodeDisconnectedEventPayload`
-            The payload containing information about the node that is disconnected.
+        node: :class:`relink.Node`
+            The node that was closed.
         """
         if self._bot.get_online_nodes() == 0 and is_bot_node_connected(self._bot):
             logging.warning(
-                f"[Lavalink] Node got disconnected, connecting new node. ({payload.node.uri})"
+                f"[Lavalink] Node got disconnected, connecting new node. ({node.uri})"
             )
-            node = self._bot.cached_lavalink_servers.get(payload.node.uri)
-            if node:
-                node["score"] -= 1
+            node_data = self._bot.cached_lavalink_servers.get(node.uri)
+            if node_data:
+                node_data["score"] -= 1
             await self._bot.connect_node()
 
     @commands.Cog.listener()  # noinspection PyUnusedLocal
-    async def on_wavelink_track_start(self, payload: TrackStartEventPayload) -> None:
+    async def on_relink_track_start(
+        self, player: relink.Player, payload: TrackStartEvent
+    ) -> None:
         """This event is triggered when a track starts playing.
 
         It sends a message to the text channel with the track information.
@@ -106,20 +126,23 @@ class Listeners(commands.Cog):
             The payload containing information about the track that started playing.
         """
 
-        if not hasattr(payload, "player"):
-            logging.warning("Player not found, skipping track start message.")
+        if getattr(player, "node_is_switching", False):
             return
 
-        if payload.player.node_is_switching:
-            return
+        current_track = player.current or payload.track
+        requester_name = None
+        if current_track:
+            requester_name, _ = resolve_requester(self._bot, current_track)
 
-        if not payload.player.should_respond or not hasattr(
-            payload.player.current, "requester"
-        ):
-            await payload.player.text_channel.send(embed=playing_embed(payload))
+        # Avoid noisy autoplay spam: announce only requested tracks or explicit response flow.
+        if player.should_respond or requester_name:
+            await player.text_channel.send(
+                embed=playing_embed(self._bot, player, payload)
+            )
+            player.should_respond = False
 
-        history_count = payload.player.queue.history.count
-        if payload.player.autoplay != wavelink.AutoPlayMode.enabled:
+        history_count = len(player.queue.history)
+        if player.autoplay != relink.AutoPlayMode.ENABLED:
             tips: dict[int, str] = {
                 3: (
                     "-# Not happy with the current node performance?\n"
@@ -139,11 +162,11 @@ class Listeners(commands.Cog):
 
             tip = tips.get(history_count)
             if tip and random.randint(0, 2) == 0:
-                await payload.player.text_channel.send(tip)
+                await player.text_channel.send(tip)
 
     @commands.Cog.listener()
-    async def on_wavelink_track_exception(
-        self, payload: TrackExceptionEventPayload
+    async def on_relink_track_exception(
+        self, player: relink.Player, payload: TrackExceptionEvent
     ) -> None:
         """This event is triggered when a track encounters an exception.
 
@@ -154,16 +177,17 @@ class Listeners(commands.Cog):
         payload: :class:`TrackExceptionEventPayload`
             The payload containing information about the track exception.
         """
+        # Temporarily disabled track_exceptions synchronization check.
+        # data = self._bot.track_exceptions.get(player.guild.id)
+        # if data:
+        #     track, track_failed_event = data
+        #     if track == payload.track:
+        #         track_failed_event.set()
+        #         return
+
         if not hasattr(payload, "player"):
             logging.warning("Player not found, skipping track exception message.")
             return
-
-        data = self._bot.track_exceptions.get(payload.player.guild.id)
-        if data:
-            track, track_failed_event = data
-            if track == payload.track:
-                track_failed_event.set()
-                return
 
         await send_response(
             payload.player.text_channel,
@@ -176,7 +200,9 @@ class Listeners(commands.Cog):
         payload.player.should_respond = False
 
     @commands.Cog.listener()
-    async def on_wavelink_track_stuck(self, payload: TrackStuckEventPayload) -> None:
+    async def on_relink_track_stuck(
+        self, player: relink.Player, payload: TrackStuckEvent
+    ) -> None:
         """This event is triggered when a track gets stuck.
 
         It sends a message to the text channel and attempts to switch nodes.
@@ -186,30 +212,33 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStuckEventPayload`
             The payload containing information about the track that got stuck.
         """
-        if not hasattr(payload, "player"):
-            logging.error("Player not found, skipping track stuck handling.")
-            return
+        # Temporarily disabled track_exceptions synchronization check.
+        # data = self._bot.track_exceptions.get(player.guild.id)
+        # if data:
+        #     track, track_failed_event = data
+        #     if track == payload.track:
+        #         track_failed_event.set()
+        #         return
 
-        data = self._bot.track_exceptions.get(payload.player.guild.id)
-        if data:
-            track, track_failed_event = data
-            if track == payload.track:
-                track_failed_event.set()
-                return
-
-        await send_response(payload.player.text_channel, "TRACK_STUCK", respond=False)
-        await switch_node(bot=self._bot, player=payload.player)
-        payload.player.should_respond = False
+        await send_response(player.text_channel, "TRACK_STUCK", respond=False)
+        await switch_node(
+            bot=self._bot,
+            player=player,
+            play_after=False,
+            send_success_message=False,
+            send_failure_message=False,
+        )
+        player.should_respond = False
 
     @commands.Cog.listener()
-    async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:
+    async def on_relink_inactive_player(self, player: relink.Player) -> None:
         """This event is triggered when a player becomes inactive.
 
         It sends a message to the text channel and disconnects the player.
 
         Parameters
         ----------
-        player: :class:`wavelink.Player`
+        player: :class:`relink.Player`
             The player that became inactive.
         """
         player.cleanup()
@@ -243,7 +272,7 @@ class Listeners(commands.Cog):
         after: :class:`discord.VoiceState`
             The voice state after the change.
         """
-        player: wavelink.Player = member.guild.voice_client
+        player: relink.Player = member.guild.voice_client
         if player is None:
             return
 
@@ -262,6 +291,6 @@ class Listeners(commands.Cog):
             return
 
 
-def setup(bot: commands.Bot) -> None:
+async def setup(bot: commands.Bot) -> None:
     """Adds the Listeners cog to the bot."""
-    bot.add_cog(Listeners(bot))
+    await bot.add_cog(Listeners(bot))

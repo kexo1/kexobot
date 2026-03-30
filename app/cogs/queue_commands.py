@@ -1,29 +1,28 @@
 import datetime
 
 import discord
-import wavelink
-from discord.commands import guild_only, option, slash_command
+import relink
+from discord import app_commands
 from discord.ext import commands
-from pycord.multicog import subcommand
 
 from app.constants import ICON_YOUTUBE
 from app.decorators import is_joined, is_playing, is_queue_empty
-from app.response_handler import send_response
+from app.response_handler import send_interaction, send_response
 from app.utils import QueuePaginator, find_track, fix_audio_title, has_pfp
 
 
-def get_queue_status(queue_mode: wavelink.QueueMode) -> tuple[str, str]:
-    if queue_mode == wavelink.QueueMode.loop_all:
+def get_queue_status(queue_mode: relink.QueueMode) -> tuple[str, str]:
+    if queue_mode == relink.QueueMode.LOOP_ALL:
         return "Looping queue", "🔁 "
 
-    if queue_mode == wavelink.QueueMode.loop:
+    if queue_mode == relink.QueueMode.LOOP:
         return "Looping currently playing song", "🔁 "
 
     return "Now Playing", ""
 
 
 def get_queue_embeds(
-    ctx: discord.ApplicationContext, player: wavelink.Player
+    ctx: discord.Interaction, player: relink.Player
 ) -> list[discord.Embed]:
     queue_status, footer = get_queue_status(player.queue.mode)
 
@@ -51,7 +50,7 @@ def get_queue_embeds(
                 description=current_description,
                 color=discord.Color.blue(),
             )
-            embed.set_footer(text=f"\n{footer}{player.queue.count} songs in queue")
+            embed.set_footer(text=f"\n{footer}{len(player.queue)} songs in queue")
             pages.append(embed)
             current_description = header + song_line
         else:
@@ -62,15 +61,15 @@ def get_queue_embeds(
         description=current_description,
         color=discord.Color.blue(),
     )
-    embed.set_footer(text=f"\n{footer}{player.queue.count} songs in queue")
+    embed.set_footer(text=f"\n{footer}{len(player.queue)} songs in queue")
     pages.append(embed)
     return pages
 
 
 def get_playing_embed(
-    ctx: discord.ApplicationContext,
+    ctx: discord.Interaction,
 ) -> discord.Embed:
-    player: wavelink.Player = ctx.voice_client
+    player: relink.Player = ctx.guild.voice_client
 
     embed = discord.Embed(
         title="Now playing",
@@ -129,62 +128,60 @@ class Queue(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self._bot = bot
 
-    @subcommand("music")
-    @slash_command(name="queue", description="Shows the current queue")
-    @guild_only()
+    @app_commands.command(name="queue", description="Shows the current queue")
+    @app_commands.guild_only()
     @is_joined()
     @is_queue_empty()
-    async def queue(self, ctx: discord.ApplicationContext) -> None:
+    async def queue(self, ctx: discord.Interaction) -> None:
         """This method displays the current music queue.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: wavelink.Player = ctx.voice_client
+        player: relink.Player = ctx.guild.voice_client
         pages = get_queue_embeds(ctx, player)
 
         if len(pages) == 1:
-            await ctx.respond(embed=pages[0])
+            await send_interaction(ctx, embed=pages[0])
         else:
             view = QueuePaginator(pages)
-            await ctx.respond(embed=pages[0], view=view)
+            await send_interaction(ctx, embed=pages[0], view=view)
 
-    @subcommand("music")
-    @slash_command(name="playing", description="What track is currently playing")
-    @guild_only()
+    @app_commands.command(name="playing", description="What track is currently playing")
+    @app_commands.guild_only()
     @is_playing()
-    async def playing_command(self, ctx: discord.ApplicationContext) -> None:
+    async def playing_command(self, ctx: discord.Interaction) -> None:
         """This method displays the currently playing track.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        await ctx.respond(embed=get_playing_embed(ctx))
+        await send_interaction(ctx, embed=get_playing_embed(ctx))
 
-    @subcommand("music")
-    @slash_command(name="remove", description="Removes a song from the queue")
-    @guild_only()
-    @option(
-        "to_find",
-        description="Both position in the queue and name of the song are accepted.",
-    )
+    @app_commands.command(name="remove", description="Removes a song from the queue")
+    @app_commands.describe(to_find="Song name or queue index to remove.")
+    @app_commands.guild_only()
     @is_joined()
     @is_queue_empty()
-    async def remove(self, ctx: discord.ApplicationContext, to_find: str):
+    async def remove(
+        self,
+        ctx: discord.Interaction,
+        to_find: app_commands.Range[str, 1, 120],
+    ):
         """This method removes a song from the queue.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         to_find: str
             The name of the song to be removed from the queue.
         """
-        player: wavelink.Player = ctx.voice_client
+        player: relink.Player = ctx.guild.voice_client
         track_pos = find_track(player, to_find)
         if track_pos is None:
             await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
@@ -200,23 +197,22 @@ class Queue(commands.Cog):
             uri=track.uri,
         )
 
-    @subcommand("music")
-    @slash_command(
+    @app_commands.command(
         name="shuffle",
         description="Shuffles the queue",
     )
-    @guild_only()
+    @app_commands.guild_only()
     @is_joined()
     @is_queue_empty()
-    async def shuffle(self, ctx: discord.ApplicationContext):
+    async def shuffle(self, ctx: discord.Interaction):
         """This method shuffles the current music queue.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: wavelink.Player = ctx.voice_client
+        player: relink.Player = ctx.guild.voice_client
 
         if len(player.queue) < 2:
             await send_response(ctx, "CANT_SHUFFLE")
@@ -225,60 +221,58 @@ class Queue(commands.Cog):
         player.queue.shuffle()
         await send_response(ctx, "QUEUE_SHUFFLED", ephemeral=False)
 
-    @subcommand("music")
-    @slash_command(
+    @app_commands.command(
         name="loop-queue",
         description="Loops queue, run command again to disable queue loop",
     )
-    @guild_only()
+    @app_commands.guild_only()
     @is_joined()
     @is_queue_empty()
-    async def loop_queue(self, ctx: discord.ApplicationContext) -> None:
+    async def loop_queue(self, ctx: discord.Interaction) -> None:
         """This method loops the current music queue.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: wavelink.Player = ctx.voice_client
+        player: relink.Player = ctx.guild.voice_client
 
-        if player.queue.mode == wavelink.QueueMode.loop_all:
-            player.queue.mode = wavelink.QueueMode.normal
+        if player.queue.mode == relink.QueueMode.LOOP_ALL:
+            player.queue.mode = relink.QueueMode.NORMAL
             await send_response(ctx, "QUEUE_LOOP_DISABLED")
             return
 
-        player.queue.mode = wavelink.QueueMode.loop_all
+        player.queue.mode = relink.QueueMode.LOOP_ALL
         await send_response(
             ctx,
             "QUEUE_LOOP_ENABLED",
             ephemeral=False,
-            count=player.queue.count,
+            count=len(player.queue),
         )
 
-    @subcommand("music")
-    @slash_command(
+    @app_commands.command(
         name="loop",
         description="Loops currently playing song, run command again to disable loop.",
     )
-    @guild_only()
+    @app_commands.guild_only()
     @is_playing()
-    async def loop(self, ctx: discord.ApplicationContext) -> None:
+    async def loop(self, ctx: discord.Interaction) -> None:
         """This method loops the currently playing song.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: wavelink.Player = ctx.voice_client
+        player: relink.Player = ctx.guild.voice_client
 
-        if player.queue.mode == wavelink.QueueMode.loop:
-            player.queue.mode = wavelink.QueueMode.normal
+        if player.queue.mode == relink.QueueMode.LOOP:
+            player.queue.mode = relink.QueueMode.NORMAL
             await send_response(ctx, "TRACK_LOOP_DISABLED")
             return
 
-        player.queue.mode = wavelink.QueueMode.loop
+        player.queue.mode = relink.QueueMode.LOOP
         await send_response(
             ctx,
             "TRACK_LOOP_ENABLED",
@@ -287,23 +281,22 @@ class Queue(commands.Cog):
             uri=player.current.uri,
         )
 
-    @subcommand("music")
-    @slash_command(name="clear", description="Clears queue")
-    @guild_only()
+    @app_commands.command(name="clear", description="Clears queue")
+    @app_commands.guild_only()
     @is_joined()
-    async def clear_queue(self, ctx: discord.ApplicationContext):
+    async def clear_queue(self, ctx: discord.Interaction):
         """This method clears the current music queue.
 
         Parameters
         ----------
-        ctx: :class:`discord.ApplicationContext`
+        ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: wavelink.Player = ctx.voice_client
+        player: relink.Player = ctx.guild.voice_client
         player.queue.clear()
         await send_response(ctx, "QUEUE_CLEARED", ephemeral=False)
 
 
-def setup(bot: commands.Bot) -> None:
+async def setup(bot: commands.Bot) -> None:
     """This function sets up the Queue cog."""
-    bot.add_cog(Queue(bot))
+    await bot.add_cog(Queue(bot))

@@ -34,11 +34,12 @@ logger.addHandler(console_handler)
 
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
-logging.getLogger("wavelink").setLevel(logging.CRITICAL)
-logging.getLogger("wavelink.node").setLevel(logging.CRITICAL)
-logging.getLogger("wavelink.pool").setLevel(logging.CRITICAL)
-logging.getLogger("wavelink.websocket").setLevel(logging.CRITICAL)
-logging.getLogger("wavelink.player").setLevel(logging.CRITICAL)
+logging.getLogger("relink").setLevel(logging.CRITICAL)
+"""
+logging.getLogger("relink.node").setLevel(logging.CRITICAL)
+logging.getLogger("relink.client").setLevel(logging.CRITICAL)
+logging.getLogger("relink.websocket").setLevel(logging.CRITICAL)
+logging.getLogger("relink.player").setLevel(logging.CRITICAL) """
 logging.getLogger("discord.client").setLevel(logging.WARNING)
 logging.getLogger("discord.gateway").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -256,7 +257,8 @@ TIMEZONES = {
 SFD_TIMEZONE_CHOICE = list(TIMEZONES.keys())
 
 ############################## Joke APIs Configuration ############################
-ENV_HUMOR_KEY = os.getenv("HUMOR_API_TOKENS").split(":")
+_humor_api_tokens = os.getenv("HUMOR_API_TOKENS", "")
+ENV_HUMOR_KEY = [token for token in _humor_api_tokens.split(":") if token]
 API_JOKEAPI = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark?amount=10"
 API_HUMORAPI = "https://api.humorapi.com/jokes/search?number=10&include-tags="
 API_DAD_JOKE = "https://icanhazdadjoke.com/search?limit=10"
