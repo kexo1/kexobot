@@ -18,3 +18,4 @@ python-dotenv
 PyNaCl
 cloudscraper
 davey
+lxml
