@@ -964,6 +964,10 @@ class MusicCommands(commands.Cog):
         if not node:
             raise RuntimeError("No connected node available")
 
+        wait_session = getattr(node, "_wait_session", None)
+        if callable(wait_session):
+            await wait_session()
+
         player_cls = self._build_player_class(node)
         await channel.connect(cls=player_cls, timeout=5)
 
@@ -992,7 +996,25 @@ class MusicCommands(commands.Cog):
         player.is_troll = False
 
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
-        await player.set_volume(guild_data["music"]["volume"])
+        volume = guild_data["music"]["volume"]
+        try:
+            await player.set_volume(volume)
+        except Exception as e:
+            if "Session not found" not in str(e):
+                raise
+
+            logging.warning(
+                "[Lavalink] Session not found while setting volume, retrying."
+            )
+            await player.node._wait_session()
+            
+            try:
+                await player.set_volume(volume)
+            except Exception as retry_error:
+                logging.warning(
+                    "[Lavalink] Volume sync skipped after retry failure: %s",
+                    retry_error,
+                )
 
         if guild_data["music"]["autoplay_mode"] == 1:
             player.autoplay = relink.AutoPlayMode.PARTIAL
