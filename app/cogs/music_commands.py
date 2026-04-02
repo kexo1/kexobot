@@ -29,6 +29,7 @@ from app.utils import (
     get_guild_data,
     get_search_prefix,
     make_http_request,
+    switch_node,
 )
 
 
@@ -1003,11 +1004,14 @@ class MusicCommands(commands.Cog):
             if "Session not found" not in str(e):
                 raise
 
-            logging.warning(
-                "[Lavalink] Session not found while setting volume, retrying."
+            await switch_node(
+                bot=self._bot,
+                player=player,
+                play_after=False,
+                send_success_message=False,
+                send_failure_message=False,
             )
-            await player.node._wait_session()
-            
+
             try:
                 await player.set_volume(volume)
             except Exception as retry_error:
@@ -1015,6 +1019,12 @@ class MusicCommands(commands.Cog):
                     "[Lavalink] Volume sync skipped after retry failure: %s",
                     retry_error,
                 )
+                await send_response(
+                    ctx,
+                    "NODE_UNRESPONSIVE",
+                    ephemeral=False,
+                )
+                return
 
         if guild_data["music"]["autoplay_mode"] == 1:
             player.autoplay = relink.AutoPlayMode.PARTIAL
