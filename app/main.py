@@ -205,7 +205,7 @@ async def close_unused_nodes() -> None:
 
         try:
             players = await node.fetch_players()
-        except RuntimeError as e:
+        except (RuntimeError, relink.rest.errors.HTTPException) as e:
             logging.warning(
                 f"[Lavalink] Skipping node without session. ({node.uri}) - {e}"
             )
