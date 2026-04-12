@@ -13,11 +13,11 @@ import asyncprawcore.exceptions
 import cloudscraper
 import discord
 import httpx
-import relink
+import sonolink
 from discord import app_commands
 from discord.ext import commands, tasks
 from pymongo import AsyncMongoClient
-from relink.models import CacheSettings, InactivitySettings
+from sonolink.models import CacheSettings, InactivitySettings
 
 from app.classes.content_monitor import ContentMonitor
 from app.classes.lavalink_server import LavalinkServerManager
@@ -94,8 +94,8 @@ class TempGuildData(TypedDict):
 
 
 class KexoBotClient(commands.Bot):
-    node: relink.Node | None
-    relink_client: relink.Client
+    node: sonolink.Node | None
+    sonolink_client: sonolink.Client
     user_data: dict[int, UserData]
     temp_user_data: dict[int, TempUserData]
     guild_data: dict[int, GuildData]
@@ -152,13 +152,13 @@ async def get_guild_node(guild_id: int) -> tuple[str, dict]:
     )
 
 
-async def check_node_status(node: relink.Node) -> bool:
+async def check_node_status(node: sonolink.Node) -> bool:
     """Check the status of a lavalink node.
     This function will try to connect to the lavalink node
 
     Parameters
     ----------
-    node: relink.Node
+    node: sonolink.Node
         The lavalink node to check the status of.
     Returns
     -------
@@ -191,21 +191,21 @@ async def close_unused_nodes() -> None:
     This function will check if there are any lavalink nodes
     that are not being used and will close them.
     """
-    nodes = list(bot.relink_client.nodes)
-    relink_nodes = getattr(bot.relink_client, "_nodes", None)
+    nodes = list(bot.sonolink_client.nodes)
+    sonolink_nodes = getattr(bot.sonolink_client, "_nodes", None)
     for node in nodes:
-        if len(bot.relink_client.nodes) == 1:
+        if len(bot.sonolink_client.nodes) == 1:
             break
 
         if not node.is_connected:
             logging.info(f"[Lavalink] Node is disconnected, removing. ({node.uri})")
-            if isinstance(relink_nodes, dict):
-                relink_nodes.pop(node.id, None)
+            if isinstance(sonolink_nodes, dict):
+                sonolink_nodes.pop(node.id, None)
             continue
 
         try:
             players = await node.fetch_players()
-        except (RuntimeError, relink.rest.errors.HTTPException) as e:
+        except (RuntimeError, sonolink.rest.errors.HTTPException) as e:
             logging.warning(
                 f"[Lavalink] Skipping node without session. ({node.uri}) - {e}"
             )
@@ -217,15 +217,15 @@ async def close_unused_nodes() -> None:
             except RuntimeError:
                 pass
             finally:
-                if isinstance(relink_nodes, dict):
-                    relink_nodes.pop(node.id, None)
+                if isinstance(sonolink_nodes, dict):
+                    sonolink_nodes.pop(node.id, None)
 
 
 def get_online_nodes() -> int:
     """Get the number of online lavalink nodes,
     returns ``int`` of online nodes.
     """
-    return len([node for node in bot.relink_client.nodes if node.is_connected])
+    return len([node for node in bot.sonolink_client.nodes if node.is_connected])
 
 
 def get_available_nodes() -> int:
@@ -266,15 +266,15 @@ def clear_cached_jokes() -> None:
     bot.loaded_yo_mama_jokes = []
 
 
-def build_node(uri: str, password: str) -> relink.Node:
-    return bot.relink_client.create_node(
+def build_node(uri: str, password: str) -> sonolink.Node:
+    return bot.sonolink_client.create_node(
         uri=uri,
         password=password,
         retries=1,
         resume_timeout=60,
         inactivity_settings=InactivitySettings(
             timeout=300,
-            mode=relink.InactivityMode.ALL_BOTS,
+            mode=sonolink.InactivityMode.ALL_BOTS,
         ),
         cache_settings=CacheSettings(
             enabled=True,
@@ -331,7 +331,7 @@ class KexoBot:
         bot.user_data_db = self._user_data_db
         bot.guild_data_db = self._guild_data_db
 
-        bot.relink_client = relink.Client(bot)
+        bot.sonolink_client = sonolink.Client(bot)
         bot.connect_node = self.connect_node
         bot.close_unused_nodes = close_unused_nodes
         bot.get_online_nodes = get_online_nodes
@@ -478,7 +478,7 @@ class KexoBot:
 
     async def connect_node(
         self, guild_id: int | None = None, switch_node: bool = True
-    ) -> relink.Node | None:
+    ) -> sonolink.Node | None:
         """Connect to lavalink node.
 
         This function will try to connect to the lavalink node
@@ -491,7 +491,7 @@ class KexoBot:
             The guild ID to connect to.
         Returns
         -------
-        relink.Node | None
+        sonolink.Node | None
             The lavalink node that was connected to.
         """
 

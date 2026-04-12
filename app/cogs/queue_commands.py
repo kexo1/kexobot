@@ -1,7 +1,7 @@
 import datetime
 
 import discord
-import relink
+import sonolink
 from discord import app_commands
 from discord.ext import commands
 
@@ -11,18 +11,18 @@ from app.response_handler import send_interaction, send_response
 from app.utils import QueuePaginator, find_track, fix_audio_title, has_pfp
 
 
-def get_queue_status(queue_mode: relink.QueueMode) -> tuple[str, str]:
-    if queue_mode == relink.QueueMode.LOOP_ALL:
+def get_queue_status(queue_mode: sonolink.QueueMode) -> tuple[str, str]:
+    if queue_mode == sonolink.QueueMode.LOOP_ALL:
         return "Looping queue", "🔁 "
 
-    if queue_mode == relink.QueueMode.LOOP:
+    if queue_mode == sonolink.QueueMode.LOOP:
         return "Looping currently playing song", "🔁 "
 
     return "Now Playing", ""
 
 
 def get_queue_embeds(
-    ctx: discord.Interaction, player: relink.Player
+    ctx: discord.Interaction, player: sonolink.Player
 ) -> list[discord.Embed]:
     queue_status, footer = get_queue_status(player.queue.mode)
 
@@ -69,7 +69,7 @@ def get_queue_embeds(
 def get_playing_embed(
     ctx: discord.Interaction,
 ) -> discord.Embed:
-    player: relink.Player = ctx.guild.voice_client
+    player: sonolink.Player = ctx.guild.voice_client
 
     embed = discord.Embed(
         title="Now playing",
@@ -140,7 +140,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: relink.Player = ctx.guild.voice_client
+        player: sonolink.Player = ctx.guild.voice_client
         pages = get_queue_embeds(ctx, player)
 
         if len(pages) == 1:
@@ -181,7 +181,7 @@ class Queue(commands.Cog):
         to_find: str
             The name of the song to be removed from the queue.
         """
-        player: relink.Player = ctx.guild.voice_client
+        player: sonolink.Player = ctx.guild.voice_client
         track_pos = find_track(player, to_find)
         if track_pos is None:
             await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
@@ -212,7 +212,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: relink.Player = ctx.guild.voice_client
+        player: sonolink.Player = ctx.guild.voice_client
 
         if len(player.queue) < 2:
             await send_response(ctx, "CANT_SHUFFLE")
@@ -236,14 +236,14 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: relink.Player = ctx.guild.voice_client
+        player: sonolink.Player = ctx.guild.voice_client
 
-        if player.queue.mode == relink.QueueMode.LOOP_ALL:
-            player.queue.mode = relink.QueueMode.NORMAL
+        if player.queue.mode == sonolink.QueueMode.LOOP_ALL:
+            player.queue.mode = sonolink.QueueMode.NORMAL
             await send_response(ctx, "QUEUE_LOOP_DISABLED")
             return
 
-        player.queue.mode = relink.QueueMode.LOOP_ALL
+        player.queue.mode = sonolink.QueueMode.LOOP_ALL
         await send_response(
             ctx,
             "QUEUE_LOOP_ENABLED",
@@ -265,14 +265,14 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: relink.Player = ctx.guild.voice_client
+        player: sonolink.Player = ctx.guild.voice_client
 
-        if player.queue.mode == relink.QueueMode.LOOP:
-            player.queue.mode = relink.QueueMode.NORMAL
+        if player.queue.mode == sonolink.QueueMode.LOOP:
+            player.queue.mode = sonolink.QueueMode.NORMAL
             await send_response(ctx, "TRACK_LOOP_DISABLED")
             return
 
-        player.queue.mode = relink.QueueMode.LOOP
+        player.queue.mode = sonolink.QueueMode.LOOP
         await send_response(
             ctx,
             "TRACK_LOOP_ENABLED",
@@ -292,7 +292,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: relink.Player = ctx.guild.voice_client
+        player: sonolink.Player = ctx.guild.voice_client
         player.queue.clear()
         await send_response(ctx, "QUEUE_CLEARED", ephemeral=False)
 

@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 import asyncpraw.models
 import discord
 import httpx
-import relink
+import sonolink
 from discord import app_commands
 from discord.ext import commands
 from pymongo import AsyncMongoClient
@@ -129,7 +129,7 @@ class CommandCog(commands.Cog):
             The password for the Lavalink server.
         """
         await defer_interaction(ctx)
-        node: relink.Node = await check_node_status(
+        node: sonolink.Node = await check_node_status(
             self._bot, f"{uri}:{str(port)}", password
         )
 
@@ -159,10 +159,10 @@ class CommandCog(commands.Cog):
             The context of the command invocation.
         """
         await defer_interaction(ctx)
-        player: relink.Player = ctx.guild.voice_client
+        player: sonolink.Player = ctx.guild.voice_client
 
         if player:
-            node: relink.Node | None = await switch_node(
+            node: sonolink.Node | None = await switch_node(
                 self._bot, player=player, play_after=False, send_success_message=False
             )
             if not node:
@@ -178,7 +178,7 @@ class CommandCog(commands.Cog):
             )
             return
 
-        node: relink.Node | None = await self._bot.connect_node(guild_id=ctx.guild.id)
+        node: sonolink.Node | None = await self._bot.connect_node(guild_id=ctx.guild.id)
         if not node:
             await send_response(ctx, "NODE_CONNECT_FAILURE", uri="best available")
             return
@@ -200,9 +200,9 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        node: relink.Node = self._bot.node
+        node: sonolink.Node = self._bot.node
         try:
-            node_info: relink.InfoResponsePayload = await node.fetch_info()
+            node_info: sonolink.InfoResponsePayload = await node.fetch_info()
         except Exception:
             await send_response(ctx, "NO_NODE_INFO")
             return
@@ -211,7 +211,7 @@ class CommandCog(commands.Cog):
             title=urlparse(node.uri).netloc,
             color=discord.Color.blue(),
         )
-        plugins: relink.PluginResponsePayload = node_info.plugins
+        plugins: sonolink.PluginResponsePayload = node_info.plugins
         unix_timestamp = int(iso_to_timestamp(str(node_info.build_time)).timestamp())
 
         embed.add_field(
@@ -238,15 +238,15 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        node: relink.Node = self._bot.node
+        node: sonolink.Node = self._bot.node
 
         try:
-            node_info: relink.InfoResponsePayload = await node.fetch_info()
+            node_info: sonolink.InfoResponsePayload = await node.fetch_info()
         except Exception:
             await send_response(ctx, "NO_NODE_INFO")
             return
 
-        plugins: relink.PluginResponsePayload = node_info.plugins
+        plugins: sonolink.PluginResponsePayload = node_info.plugins
         youtube_plugin, lavasrc_plugin, lavasearch_plugin = False, False, False
         for plugin in plugins:
             if "lavasrc" in plugin.name:
@@ -301,7 +301,7 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        nodes: list[relink.Node] = list(self._bot.relink_client.nodes)
+        nodes: list[sonolink.Node] = list(self._bot.sonolink_client.nodes)
 
         if not nodes:
             await send_response(ctx, "NO_NODES_CONNECTED")
@@ -313,7 +313,7 @@ class CommandCog(commands.Cog):
 
         for node in nodes:
             try:
-                players: relink.PlayerResponsePayload = await node.fetch_players()
+                players: sonolink.PlayerResponsePayload = await node.fetch_players()
             except Exception:
                 continue
 

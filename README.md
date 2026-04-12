@@ -23,7 +23,7 @@ Discord Python bot used for:
 ## Built With
 - [discord.py](https://discordpy.readthedocs.io/en/stable/) — Modern, async-ready Discord API wrapper for Python
 - [asyncpraw](https://asyncpraw.readthedocs.io/en/stable/) — Asynchronous Reddit API wrapper
-- [relink](https://github.com/zshameel/ReLink) — Fully async Python Lavalink wrapper
+- [sonolink](https://github.com/sonolink/sonolink) — Fully async Python Lavalink wrapper
 - [pymongo](https://www.mongodb.com/docs/languages/python/pymongo-driver/current/) — MongoDB driver for Python
 - [matplotlib](https://matplotlib.org/) — Library for static and interactive visualizations
 

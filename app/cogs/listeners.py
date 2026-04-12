@@ -2,10 +2,10 @@ import logging
 import random
 
 import discord
-import relink
+import sonolink
 from discord.ext import commands
-from relink import models as rl_models
-from relink.gateway import (
+from sonolink import models as sl_models
+from sonolink.gateway import (
     ReadyEvent,
     TrackExceptionEvent,
     TrackStartEvent,
@@ -21,11 +21,23 @@ def is_bot_node_connected(bot: commands.Bot) -> bool:
     return bool(getattr(bot, "node", None))
 
 
+def get_extra_value(track: sl_models.Playable, key: str) -> str | None:
+    extras = getattr(track, "extras", None)
+    if extras is None:
+        return None
+
+    getter = getattr(extras, "get", None)
+    if callable(getter):
+        return getter(key)
+
+    return getattr(extras, key, None)
+
+
 def resolve_requester(
-    bot: commands.Bot, track: rl_models.Playable
+    bot: commands.Bot, track: sl_models.Playable
 ) -> tuple[str | None, str | None]:
-    name = track.extras.get("requester_name")
-    avatar = track.extras.get("requester_avatar")
+    name = get_extra_value(track, "requester_name")
+    avatar = get_extra_value(track, "requester_avatar")
     if name:
         return name, avatar
 
@@ -38,7 +50,7 @@ def resolve_requester(
 
 
 def playing_embed(
-    bot: commands.Bot, player: relink.Player, payload: TrackStartEvent
+    bot: commands.Bot, player: sonolink.Player, payload: TrackStartEvent
 ) -> discord.Embed:
     embed = discord.Embed(
         color=discord.Colour.green(),
@@ -62,7 +74,7 @@ def playing_embed(
 
 
 class Listeners(commands.Cog):
-    """Handles various events from the relink library.
+    """Handles various events from the sonolink library.
 
     This class listens for events such as track start, node ready, node disconnected,
     track exception, track stuck, and inactive player. It also handles voice state updates
@@ -78,8 +90,8 @@ class Listeners(commands.Cog):
         self._bot = bot
 
     @commands.Cog.listener()
-    async def on_relink_node_ready(self, payload: ReadyEvent) -> None:
-        """This event is triggered when a relink node is ready.
+    async def on_sonolink_node_ready(self, payload: ReadyEvent) -> None:
+        """This event is triggered when a sonolink node is ready.
 
         It checks if the bot is connected to the node and closes any unused nodes if necessary.
 
@@ -93,14 +105,14 @@ class Listeners(commands.Cog):
             await self._bot.close_unused_nodes()
 
     @commands.Cog.listener()
-    async def on_relink_node_close(self, node: relink.Node) -> None:
-        """This event is triggered when a relink node is closed.
+    async def on_sonolink_node_close(self, node: sonolink.Node) -> None:
+        """This event is triggered when a sonolink node is closed.
 
         It checks if the bot is connected to the node and attempts to reconnect if necessary.
 
         Parameters
         ----------
-        node: :class:`relink.Node`
+        node: :class:`sonolink.Node`
             The node that was closed.
         """
         if self._bot.get_online_nodes() == 0 and is_bot_node_connected(self._bot):
@@ -113,8 +125,8 @@ class Listeners(commands.Cog):
             await self._bot.connect_node()
 
     @commands.Cog.listener()  # noinspection PyUnusedLocal
-    async def on_relink_track_start(
-        self, player: relink.Player, payload: TrackStartEvent
+    async def on_sonolink_track_start(
+        self, player: sonolink.Player, payload: TrackStartEvent
     ) -> None:
         """This event is triggered when a track starts playing.
 
@@ -142,7 +154,7 @@ class Listeners(commands.Cog):
             player.should_respond = False
 
         history_count = len(player.queue.history)
-        if player.autoplay != relink.AutoPlayMode.ENABLED:
+        if player.autoplay != sonolink.AutoPlayMode.ENABLED:
             tips: dict[int, str] = {
                 3: (
                     "-# Not happy with the current node performance?\n"
@@ -165,8 +177,8 @@ class Listeners(commands.Cog):
                 await player.text_channel.send(tip)
 
     @commands.Cog.listener()
-    async def on_relink_track_exception(
-        self, player: relink.Player, payload: TrackExceptionEvent
+    async def on_sonolink_track_exception(
+        self, player: sonolink.Player, payload: TrackExceptionEvent
     ) -> None:
         """This event is triggered when a track encounters an exception.
 
@@ -200,8 +212,8 @@ class Listeners(commands.Cog):
         payload.player.should_respond = False
 
     @commands.Cog.listener()
-    async def on_relink_track_stuck(
-        self, player: relink.Player, payload: TrackStuckEvent
+    async def on_sonolink_track_stuck(
+        self, player: sonolink.Player, payload: TrackStuckEvent
     ) -> None:
         """This event is triggered when a track gets stuck.
 
@@ -231,14 +243,14 @@ class Listeners(commands.Cog):
         player.should_respond = False
 
     @commands.Cog.listener()
-    async def on_relink_inactive_player(self, player: relink.Player) -> None:
+    async def on_sonolink_inactive_player(self, player: sonolink.Player) -> None:
         """This event is triggered when a player becomes inactive.
 
         It sends a message to the text channel and disconnects the player.
 
         Parameters
         ----------
-        player: :class:`relink.Player`
+        player: :class:`sonolink.Player`
             The player that became inactive.
         """
         player.cleanup()
@@ -272,7 +284,7 @@ class Listeners(commands.Cog):
         after: :class:`discord.VoiceState`
             The voice state after the change.
         """
-        player: relink.Player = member.guild.voice_client
+        player: sonolink.Player = member.guild.voice_client
         if player is None:
             return
 

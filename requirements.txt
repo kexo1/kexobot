@@ -1,5 +1,5 @@
 discord.py
-rewavelink[speed]
+sonolink[speed]
 asyncpraw
 asyncprawcore
 httpx

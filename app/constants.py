@@ -34,12 +34,12 @@ logger.addHandler(console_handler)
 
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
-logging.getLogger("relink").setLevel(logging.CRITICAL)
+logging.getLogger("sonolink").setLevel(logging.CRITICAL)
 """
-logging.getLogger("relink.node").setLevel(logging.CRITICAL)
-logging.getLogger("relink.client").setLevel(logging.CRITICAL)
-logging.getLogger("relink.websocket").setLevel(logging.CRITICAL)
-logging.getLogger("relink.player").setLevel(logging.CRITICAL) """
+logging.getLogger("sonolink.node").setLevel(logging.CRITICAL)
+logging.getLogger("sonolink.client").setLevel(logging.CRITICAL)
+logging.getLogger("sonolink.websocket").setLevel(logging.CRITICAL)
+logging.getLogger("sonolink.player").setLevel(logging.CRITICAL) """
 logging.getLogger("discord.client").setLevel(logging.WARNING)
 logging.getLogger("discord.gateway").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)

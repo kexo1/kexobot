@@ -14,9 +14,9 @@ import asyncprawcore
 import discord
 import httpx
 import psutil
-import relink
+import sonolink
 from discord.ext import commands
-from relink.models import CacheSettings, InactivitySettings
+from sonolink.models import CacheSettings, InactivitySettings
 
 from app.constants import (
     ICON_DISCORD,
@@ -149,7 +149,7 @@ async def download_video(
 
 async def check_node_status(
     bot: commands.Bot, uri: str, password: str
-) -> relink.Node | None:
+) -> sonolink.Node | None:
     """Check the status of a Lavalink node and return it if it's online.
 
     Parameters
@@ -163,17 +163,17 @@ async def check_node_status(
 
     Returns
     -------
-    :class:`relink.Node`
+    :class:`sonolink.Node`
         The Lavalink node if it's online, None otherwise.
     """
-    node: relink.Node = bot.relink_client.create_node(
+    node: sonolink.Node = bot.sonolink_client.create_node(
         uri=uri,
         password=password,
         retries=1,
         resume_timeout=0,
         inactivity_settings=InactivitySettings(
             timeout=300,
-            mode=relink.InactivityMode.ALL_BOTS,
+            mode=sonolink.InactivityMode.ALL_BOTS,
         ),
         cache_settings=CacheSettings(enabled=True, max_items=1000),
     )
@@ -189,9 +189,9 @@ async def check_node_status(
         except RuntimeError:
             pass
 
-        relink_nodes = getattr(bot.relink_client, "_nodes", None)
-        if isinstance(relink_nodes, dict):
-            relink_nodes.pop(node.id, None)
+        sonolink_nodes = getattr(bot.sonolink_client, "_nodes", None)
+        if isinstance(sonolink_nodes, dict):
+            sonolink_nodes.pop(node.id, None)
         return None
     return node
 
@@ -216,12 +216,12 @@ def strip_text(text: str, to_strip: tuple[str, ...]) -> str:
     return text.strip()
 
 
-def fix_audio_title(track: relink.Playable) -> str:
+def fix_audio_title(track: sonolink.Playable) -> str:
     """Fix the title of an audio track by removing unwanted characters.
 
     Parameters
     ----------
-    track: :class:`relink.Playable`
+    track: :class:`sonolink.Playable`
         The audio track to fix.
 
     Returns
@@ -281,13 +281,13 @@ def get_search_prefix(query: str) -> str | None:
     return None
 
 
-def find_track(player: relink.Player, to_find: str) -> int | None:
+def find_track(player: sonolink.Player, to_find: str) -> int | None:
     """Find a track in the player's queue by title or index.
 
     Parameters
     ----------
-    player: :class:`relink.Player`
-        The relink Player instance.
+    player: :class:`sonolink.Player`
+        The sonolink Player instance.
     to_find: str
         The title or index of the track to find.
 
@@ -336,11 +336,11 @@ def has_pfp(member: discord.Member) -> str:
 
 async def switch_node(
     bot: commands.Bot,
-    player: relink.Player,
+    player: sonolink.Player,
     play_after: bool = True,
     send_success_message: bool = True,
     send_failure_message: bool = True,
-) -> relink.Node | None:
+) -> sonolink.Node | None:
     """
     Attempt to switch to a new node for audio playback.
 
@@ -348,8 +348,8 @@ async def switch_node(
     ----------
     bot: :class:`discord.Bot`
         The discord bot instance.
-    player: :class:`relink.Player`
-        The relink Player instance to switch the node for.
+    player: :class:`sonolink.Player`
+        The sonolink Player instance to switch the node for.
     play_after: bool
         Whether to play the current track after switching nodes.
     send_success_message: bool
@@ -359,16 +359,16 @@ async def switch_node(
 
     Returns
     -------
-    :class:`relink.Node` | None
-        The new relink.Node instance if successful, None otherwise.
+    :class:`sonolink.Node` | None
+        The new sonolink.Node instance if successful, None otherwise.
     """
     bot.cached_lavalink_servers[player.node.uri]["score"] = -1
     player.node_is_switching = True
 
     for i in range(10):
         player_autoplay_mode = player.autoplay
-        player.autoplay = relink.AutoPlayMode.DISABLED
-        node: relink.Node | None = await bot.connect_node()
+        player.autoplay = sonolink.AutoPlayMode.DISABLED
+        node: sonolink.Node | None = await bot.connect_node()
         if not node:
             continue
 
