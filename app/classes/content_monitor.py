@@ -5,6 +5,7 @@ import re
 import cloudscraper
 import discord
 import httpx
+import requests
 import unidecode
 from bs4 import BeautifulSoup, Tag
 from deep_translator import GoogleTranslator
@@ -252,7 +253,12 @@ class ContentMonitor:
     async def online_fix(self) -> None:
         """Checks for selected games from Online-Fix."""
         onlinefix_cache, games = await self._load_onlinefix_cache()
-        chat_log = self._cloudscraper_session.get(SITE_URL_ONLINEFIX)
+        try:
+            chat_log = self._cloudscraper_session.get(SITE_URL_ONLINEFIX)
+        except requests.exceptions.RequestException as exc:
+            logging.warning(f"[Online-Fix] Request failed: {exc}")
+            return
+
         if not chat_log:
             return
         chat_messages = await get_onlinefix_messages(chat_log.text)
