@@ -83,7 +83,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "NODE_NOT_FOUND": discord.Embed(
         title="",
-        description=":x: Couldn't find node to play this music, try switching to a different node with `/node reconnect`.",
+        description=":x: Couldn't find node to play this music, try switching to a different node with `/node reconnect`, or use Youtube links instead of Spotify/Deezer/Apple Music.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_PLAYERS_CONNECTED": discord.Embed(

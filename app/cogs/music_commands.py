@@ -69,10 +69,11 @@ def set_track_requester(
     if avatar:
         track.data.user_data["requester_avatar"] = avatar
 
-    bot.track_requesters[track.encoded] = {
-        "name": user.name,
-        "avatar": avatar or "",
-    }
+    if bot is not None and getattr(bot, "track_requesters", None) is not None:
+        bot.track_requesters[track.encoded] = {
+            "name": user.name,
+            "avatar": avatar or "",
+        }
 
 
 def get_extra_value(track: sl_models.Playable, key: str) -> str | None:
@@ -94,9 +95,10 @@ def get_track_requester_name(
     if name:
         return name
 
-    cached = bot.track_requesters.get(track.encoded)
-    if cached and cached.get("name"):
-        return cached["name"]
+    if getattr(bot, "track_requesters", None) is not None:
+        cached = bot.track_requesters.get(track.encoded)
+        if cached and cached.get("name"):
+            return cached["name"]
 
     return "Unknown"
 
@@ -108,9 +110,10 @@ def get_track_requester_avatar(
     if avatar:
         return avatar
 
-    cached = bot.track_requesters.get(track.encoded)
-    if cached:
-        return cached.get("avatar") or None
+    if getattr(bot, "track_requesters", None) is not None:
+        cached = bot.track_requesters.get(track.encoded)
+        if cached:
+            return cached.get("avatar") or None
 
     return None
 
