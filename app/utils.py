@@ -362,6 +362,9 @@ async def switch_node(
     :class:`sonolink.Node` | None
         The new sonolink.Node instance if successful, None otherwise.
     """
+    if getattr(player, "node_is_switching", False):
+        return None
+
     bot.cached_lavalink_servers[player.node.uri]["score"] = -1
     player.node_is_switching = True
 
@@ -382,20 +385,20 @@ async def switch_node(
 
         player.autoplay = player_autoplay_mode
 
-        # Legacy track failure synchronization from Wavelink migration.
-        # if play_after:
-        #     track_failed_event = asyncio.Event()
-        #     bot.track_exceptions[player.guild.id] = (
-        #         player.temp_current,
-        #         track_failed_event,
-        #     )
-        #
-        #     try:
-        #         await asyncio.wait_for(track_failed_event.wait(), timeout=3)
-        #         bot.cached_lavalink_servers[node.uri]["score"] -= 1
-        #         continue
-        #     except asyncio.TimeoutError:
-        #         bot.track_exceptions.pop(player.guild.id, None)
+        # Track failure synchronization while switching nodes.
+        if play_after:
+            track_failed_event = asyncio.Event()
+            bot.track_exceptions[player.guild.id] = (
+                player.temp_current,
+                track_failed_event,
+            )
+
+            try:
+                await asyncio.wait_for(track_failed_event.wait(), timeout=3)
+                bot.cached_lavalink_servers[node.uri]["score"] -= 1
+                continue
+            except asyncio.TimeoutError:
+                bot.track_exceptions.pop(player.guild.id, None)
 
         logging.info(f"[Lavalink] {i + 1}. Node switched ({node.uri})")
         if send_success_message:
@@ -478,7 +481,15 @@ async def generate_temp_user_data(bot: commands.Bot, user_id: int) -> dict:
             await multireddit.load()
             break
         except asyncprawcore.exceptions.NotFound:
+            logging.warning(
+                f"[Reddit] Multireddit for user {user_id} not found. Attempting to create it... (Attempt {attempt + 1}/3)"
+            )
             await asyncio.sleep(attempt + 1)
+
+        logging.error(
+            f"[Reddit] Failed to load multireddit for user {user_id} after 3 attempts."
+        )
+        return {}
 
     for subreddit in multireddit.subreddits:
         try:
@@ -621,6 +632,7 @@ async def get_user_data(
         bot.user_data[user_id] = user_data
 
         temp_user_data = await generate_temp_user_data(bot, user_id)
+
     bot.temp_user_data[user_id] = temp_user_data
     return user_data, temp_user_data
 

@@ -272,6 +272,9 @@ class FunCommands(commands.Cog):
         user_id = ctx.user.id
         user_data, temp_user_data = await self._load_user_data(ctx)
 
+        if not temp_user_data.get("multireddit"):
+            await send_interaction(ctx, "REDDIT_CANT_LOAD_MULTIREDDIT")
+
         multireddit: asyncpraw.models.Multireddit = temp_user_data["multireddit"]
         limit = temp_user_data["search_limit"]
 

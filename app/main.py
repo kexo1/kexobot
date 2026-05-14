@@ -192,38 +192,39 @@ async def close_unused_nodes() -> None:
     This function will check if there are any lavalink nodes
     that are not being used and will close them.
     """
-    nodes = list(bot.sonolink_client.nodes)
-    sonolink_nodes = getattr(bot.sonolink_client, "_nodes", None)
-    for node in nodes:
-        if len(bot.sonolink_client.nodes) == 1:
-            break
+    async with bot.close_nodes_lock:
+        nodes = list(bot.sonolink_client.nodes)
+        sonolink_nodes = getattr(bot.sonolink_client, "_nodes", None)
+        for node in nodes:
+            if len(bot.sonolink_client.nodes) == 1:
+                break
 
-        if not node.is_connected:
-            logging.info(f"[Lavalink] Node is disconnected, removing. ({node.uri})")
-            if isinstance(sonolink_nodes, dict):
-                sonolink_nodes.pop(node.id, None)
-            continue
-
-        try:
-            players = await node.fetch_players()
-        except (
-            RuntimeError,
-            sonolink.rest.errors.HTTPException,
-            msgspec.DecodeError,
-        ) as e:
-            logging.warning(
-                f"[Lavalink] Skipping node without session. ({node.uri}) - {e}"
-            )
-            continue
-        if len(players) == 0:
-            logging.info(f"[Lavalink] Node is empty, removing. ({node.uri})")
-            try:
-                await node.close()
-            except RuntimeError:
-                pass
-            finally:
+            if not node.is_connected:
+                logging.info(f"[Lavalink] Node is disconnected, removing. ({node.uri})")
                 if isinstance(sonolink_nodes, dict):
                     sonolink_nodes.pop(node.id, None)
+                continue
+
+            try:
+                players = await node.fetch_players()
+            except (
+                RuntimeError,
+                sonolink.rest.errors.HTTPException,
+                msgspec.DecodeError,
+            ) as e:
+                logging.warning(
+                    f"[Lavalink] Skipping node without session. ({node.uri}) - {e}"
+                )
+                continue
+            if len(players) == 0:
+                logging.info(f"[Lavalink] Node is empty, removing. ({node.uri})")
+                try:
+                    await node.close()
+                except (TypeError, RuntimeError, Exception):
+                    pass
+                finally:
+                    if isinstance(sonolink_nodes, dict):
+                        sonolink_nodes.pop(node.id, None)
 
 
 def get_online_nodes() -> int:
@@ -331,6 +332,7 @@ class KexoBot:
         bot.guild_data = {}
         bot.temp_guild_data = {}
         bot.cached_lavalink_servers = {}
+        bot.close_nodes_lock = asyncio.Lock()
 
         bot.bot_config = self._bot_config
         bot.user_data_db = self._user_data_db
@@ -343,6 +345,7 @@ class KexoBot:
         bot.get_available_nodes = get_available_nodes
 
         bot.humor_api_tokens = {}
+        bot.track_exceptions = {}
         bot.track_requesters = {}
         bot.loaded_jokes = []
         bot.loaded_dad_jokes = []

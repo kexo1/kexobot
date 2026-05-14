@@ -76,45 +76,32 @@ def set_track_requester(
         }
 
 
-def get_extra_value(track: sl_models.Playable, key: str) -> str | None:
-    extras = getattr(track, "extras", None)
-    if extras is None:
-        return None
-
-    getter = getattr(extras, "get", None)
-    if callable(getter):
-        return getter(key)
-
-    return getattr(extras, key, None)
-
-
 def get_track_requester_name(
     track: sl_models.Playable, bot: commands.Bot | None = None
 ) -> str:
-    name = get_extra_value(track, "requester_name")
-    if name:
-        return name
-
-    if getattr(bot, "track_requesters", None) is not None:
+    requester_name = None
+    if track.data.user_data:
+        requester_name = track.data.user_data.get("requester_name")
+    if requester_name:
+        return requester_name
+    if bot is not None and getattr(bot, "track_requesters", None) is not None:
         cached = bot.track_requesters.get(track.encoded)
         if cached and cached.get("name"):
             return cached["name"]
-
     return "Unknown"
 
 
 def get_track_requester_avatar(
     track: sl_models.Playable, bot: commands.Bot | None = None
 ) -> str | None:
-    avatar = get_extra_value(track, "requester_avatar")
-    if avatar:
-        return avatar
-
-    if getattr(bot, "track_requesters", None) is not None:
+    if track.data.user_data:
+        avatar = track.data.user_data.get("requester_avatar")
+        if avatar:
+            return avatar
+    if bot is not None and getattr(bot, "track_requesters", None) is not None:
         cached = bot.track_requesters.get(track.encoded)
         if cached:
             return cached.get("avatar") or None
-
     return None
 
 
@@ -156,6 +143,7 @@ async def fetch_first_track(
         player.should_respond = False
         return track
 
+    # If it's a single track in playlist
     if isinstance(tracks, sl_models.Playable):
         set_track_requester(tracks, ctx.user, ctx.client)
         return tracks
@@ -314,7 +302,7 @@ class MusicCommands(commands.Cog):
             return
 
         if player.should_respond:
-            await send_interaction(ctx, embed=playing_embed(track))
+            await send_interaction(ctx, embed=playing_embed(track, ctx.client))
             player.should_respond = False
 
     @radio.command(name="random", description="Gets random radio from RadioMap.")

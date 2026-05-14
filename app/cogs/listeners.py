@@ -21,25 +21,16 @@ def is_bot_node_connected(bot: commands.Bot) -> bool:
     return bool(getattr(bot, "node", None))
 
 
-def get_extra_value(track: sl_models.Playable, key: str) -> str | None:
-    extras = getattr(track, "extras", None)
-    if extras is None:
-        return None
-
-    getter = getattr(extras, "get", None)
-    if callable(getter):
-        return getter(key)
-
-    return getattr(extras, key, None)
-
-
 def resolve_requester(
     bot: commands.Bot, track: sl_models.Playable
 ) -> tuple[str | None, str | None]:
-    name = get_extra_value(track, "requester_name")
-    avatar = get_extra_value(track, "requester_avatar")
-    if name:
-        return name, avatar
+    requester_name = None
+    requester_avatar = None
+    if track.data.user_data:
+        requester_name = track.data.user_data.get("requester_name")
+        requester_avatar = track.data.user_data.get("requester_avatar")
+    if requester_name:
+        return requester_name, requester_avatar
 
     cached = bot.track_requesters.get(track.encoded)
     if cached:
@@ -142,6 +133,14 @@ class Listeners(commands.Cog):
             return
 
         current_track = player.current or payload.track
+        if (
+            current_track
+            and player.temp_current
+            and not current_track.data.user_data
+            and player.temp_current.data.user_data
+        ):
+            current_track.data.user_data = dict(player.temp_current.data.user_data)
+
         requester_name = None
         if current_track:
             requester_name, _ = resolve_requester(self._bot, current_track)
@@ -189,27 +188,35 @@ class Listeners(commands.Cog):
         payload: :class:`TrackExceptionEventPayload`
             The payload containing information about the track exception.
         """
-        # Temporarily disabled track_exceptions synchronization check.
-        # data = self._bot.track_exceptions.get(player.guild.id)
-        # if data:
-        #     track, track_failed_event = data
-        #     if track == payload.track:
-        #         track_failed_event.set()
-        #         return
+        data = self._bot.track_exceptions.get(player.guild.id)
+        if data:
+            track, track_failed_event = data
+            track_encoded = getattr(track, "encoded", None)
+            payload_encoded = getattr(payload.track, "encoded", None)
+            same_track = track == payload.track
+            if (
+                not same_track
+                and track_encoded
+                and payload_encoded
+                and track_encoded == payload_encoded
+            ):
+                same_track = True
+            if same_track:
+                track_failed_event.set()
+                return
 
-        if not hasattr(payload, "player"):
-            logging.warning("Player not found, skipping track exception message.")
+        if getattr(player, "node_is_switching", False):
             return
-
+        
         await send_response(
-            payload.player.text_channel,
+            player.text_channel,
             "TRACK_EXCEPTION",
             respond=False,
-            message=payload.exception["message"],
-            severity=payload.exception["severity"],
+            message=payload.exception.message,
+            severity=payload.exception.severity.value,
         )
-        await switch_node(bot=self._bot, player=payload.player)
-        payload.player.should_respond = False
+        await switch_node(bot=self._bot, player=player)
+        player.should_respond = False
 
     @commands.Cog.listener()
     async def on_sonolink_track_stuck(
@@ -224,13 +231,25 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStuckEventPayload`
             The payload containing information about the track that got stuck.
         """
-        # Temporarily disabled track_exceptions synchronization check.
-        # data = self._bot.track_exceptions.get(player.guild.id)
-        # if data:
-        #     track, track_failed_event = data
-        #     if track == payload.track:
-        #         track_failed_event.set()
-        #         return
+        data = self._bot.track_exceptions.get(player.guild.id)
+        if data:
+            track, track_failed_event = data
+            track_encoded = getattr(track, "encoded", None)
+            payload_encoded = getattr(payload.track, "encoded", None)
+            same_track = track == payload.track
+            if (
+                not same_track
+                and track_encoded
+                and payload_encoded
+                and track_encoded == payload_encoded
+            ):
+                same_track = True
+            if same_track:
+                track_failed_event.set()
+                return
+
+        if getattr(player, "node_is_switching", False):
+            return
 
         await send_response(player.text_channel, "TRACK_STUCK", respond=False)
         await switch_node(

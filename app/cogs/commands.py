@@ -213,7 +213,10 @@ class CommandCog(commands.Cog):
         )
         plugins: sonolink.PluginResponsePayload = node_info.plugins
         unix_timestamp = int(iso_to_timestamp(str(node_info.build_time)).timestamp())
-
+        embed.add_field(
+            name="Score:",
+            value=self._bot.cached_lavalink_servers[node.uri]["score"],
+        )
         embed.add_field(
             name="Plugins:",
             value=", ".join(f"{plugin.name}: {plugin.version}" for plugin in plugins),

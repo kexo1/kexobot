@@ -181,6 +181,11 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         "error? - Reddit is down, Subreddit is locked, API might be overloaded",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
+    "REDDIT_CANT_LOAD_MULTIREDDIT": discord.Embed(
+        title="",
+        description=":x: Failed to load reddit, please try again later.",
+        color=discord.Color.from_rgb(r=220, g=0, b=0),
+    ),
     "SFD_SERVER_NOT_FOUND": discord.Embed(
         title="",
         description=":x: Server you searched for is not in the list, "
