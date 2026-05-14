@@ -69,7 +69,7 @@ def set_track_requester(
     if avatar:
         track.data.user_data["requester_avatar"] = avatar
 
-    if bot is not None and getattr(bot, "track_requesters", None) is not None:
+    if getattr(bot, "track_requesters", None) is not None:
         bot.track_requesters[track.encoded] = {
             "name": user.name,
             "avatar": avatar or "",
@@ -84,7 +84,7 @@ def get_track_requester_name(
         requester_name = track.data.user_data.get("requester_name")
     if requester_name:
         return requester_name
-    if bot is not None and getattr(bot, "track_requesters", None) is not None:
+    if getattr(bot, "track_requesters", None) is not None:
         cached = bot.track_requesters.get(track.encoded)
         if cached and cached.get("name"):
             return cached["name"]

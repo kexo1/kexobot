@@ -362,66 +362,69 @@ async def switch_node(
     :class:`sonolink.Node` | None
         The new sonolink.Node instance if successful, None otherwise.
     """
-    if getattr(player, "node_is_switching", False):
+    guild_id = player.guild.id
+    switching_map = bot.node_is_switching
+    if switching_map.get(guild_id):
         return None
 
     bot.cached_lavalink_servers[player.node.uri]["score"] = -1
-    player.node_is_switching = True
+    switching_map[guild_id] = True
 
-    for i in range(10):
-        player_autoplay_mode = player.autoplay
-        player.autoplay = sonolink.AutoPlayMode.DISABLED
-        node: sonolink.Node | None = await bot.connect_node()
-        if not node:
-            continue
-
-        try:
-            await player.move_to(node)
-            if play_after and getattr(player, "temp_current", None):
-                await player.play(player.temp_current)
-        except Exception:
-            bot.cached_lavalink_servers[node.uri]["score"] -= 1
-            continue
-
-        player.autoplay = player_autoplay_mode
-
-        # Track failure synchronization while switching nodes.
-        if play_after:
-            track_failed_event = asyncio.Event()
-            bot.track_exceptions[player.guild.id] = (
-                player.temp_current,
-                track_failed_event,
-            )
+    try:
+        for i in range(10):
+            player_autoplay_mode = player.autoplay
+            player.autoplay = sonolink.AutoPlayMode.DISABLED
+            node: sonolink.Node | None = await bot.connect_node()
+            if not node:
+                continue
 
             try:
-                await asyncio.wait_for(track_failed_event.wait(), timeout=3)
+                await player.move_to(node)
+                if play_after and getattr(player, "temp_current", None):
+                    await player.play(player.temp_current)
+            except Exception:
                 bot.cached_lavalink_servers[node.uri]["score"] -= 1
                 continue
-            except asyncio.TimeoutError:
-                bot.track_exceptions.pop(player.guild.id, None)
 
-        logging.info(f"[Lavalink] {i + 1}. Node switched ({node.uri})")
-        if send_success_message:
+            player.autoplay = player_autoplay_mode
+
+            # Track failure synchronization while switching nodes.
+            if play_after:
+                track_failed_event = asyncio.Event()
+                bot.track_exceptions[player.guild.id] = (
+                    player.temp_current,
+                    track_failed_event,
+                )
+
+                try:
+                    await asyncio.wait_for(track_failed_event.wait(), timeout=3)
+                    bot.cached_lavalink_servers[node.uri]["score"] -= 1
+                    continue
+                except asyncio.TimeoutError:
+                    bot.track_exceptions.pop(player.guild.id, None)
+
+            logging.info(f"[Lavalink] {i + 1}. Node switched ({node.uri})")
+            if send_success_message:
+                embed = discord.Embed(
+                    title="",
+                    description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
+                    color=discord.Color.green(),
+                )
+                await player.text_channel.send(embed=embed)
+
+            return node
+
+        if send_failure_message:
             embed = discord.Embed(
                 title="",
-                description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
-                color=discord.Color.green(),
+                description=":x: Failed to find node to play requested track.",
+                color=discord.Color.from_rgb(r=220, g=0, b=0),
             )
             await player.text_channel.send(embed=embed)
 
-        player.node_is_switching = False
-        return node
-
-    if send_failure_message:
-        embed = discord.Embed(
-            title="",
-            description=":x: Failed to find node to play requested track.",
-            color=discord.Color.from_rgb(r=220, g=0, b=0),
-        )
-        await player.text_channel.send(embed=embed)
-
-    player.node_is_switching = False
-    return None
+        return None
+    finally:
+        switching_map[guild_id] = False
 
 
 def generate_temp_guild_data() -> dict:

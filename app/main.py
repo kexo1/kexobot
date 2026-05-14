@@ -345,6 +345,7 @@ class KexoBot:
         bot.get_available_nodes = get_available_nodes
 
         bot.humor_api_tokens = {}
+        bot.node_is_switching = {}
         bot.track_exceptions = {}
         bot.track_requesters = {}
         bot.loaded_jokes = []

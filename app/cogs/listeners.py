@@ -129,7 +129,7 @@ class Listeners(commands.Cog):
             The payload containing information about the track that started playing.
         """
 
-        if getattr(player, "node_is_switching", False):
+        if self._bot.node_is_switching.get(player.guild.id):
             return
 
         current_track = player.current or payload.track
@@ -205,9 +205,9 @@ class Listeners(commands.Cog):
                 track_failed_event.set()
                 return
 
-        if getattr(player, "node_is_switching", False):
+        if self._bot.node_is_switching.get(player.guild.id):
             return
-        
+
         await send_response(
             player.text_channel,
             "TRACK_EXCEPTION",
@@ -248,7 +248,7 @@ class Listeners(commands.Cog):
                 track_failed_event.set()
                 return
 
-        if getattr(player, "node_is_switching", False):
+        if self._bot.node_is_switching.get(player.guild.id):
             return
 
         await send_response(player.text_channel, "TRACK_STUCK", respond=False)
