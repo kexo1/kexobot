@@ -714,6 +714,68 @@ class CommandCog(commands.Cog):
         await send_interaction(ctx, "I chose " + "`" + str(random.choice(words)) + "`")
 
     @app_commands.command(
+        name="random_message",
+        description="Picks a random message from the server (non-bot).",
+    )
+    @app_commands.checks.cooldown(1, 30, key=lambda i: i.user.id)
+    @app_commands.guild_only()
+    async def random_message(self, ctx: discord.Interaction) -> None:
+        """Pick a random non-bot message across all text channels.
+
+        This walks full history for each channel to allow selecting old messages.
+        """
+        await defer_interaction(ctx)
+
+        guild = ctx.guild
+        if guild is None:
+            await send_response(ctx, "COMMAND_GUILD_ONLY")
+            return
+
+        bot_member = guild.me or guild.get_member(self._bot.user.id)
+        if bot_member is None:
+            await send_response(ctx, "NO_BOT_MEMBER")
+            return
+
+        picked_message: discord.Message | None = None
+        seen_count = 0
+
+        for channel in guild.text_channels:
+            permissions = channel.permissions_for(bot_member)
+            if not (permissions.view_channel and permissions.read_message_history):
+                continue
+
+            try:
+                async for message in channel.history(limit=None, oldest_first=True):
+                    if message.author.bot:
+                        continue
+                    seen_count += 1
+                    if random.randrange(seen_count) == 0:
+                        picked_message = message
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+
+        if picked_message is None:
+            await send_response(ctx, "NO_MESSAGES_FOUND")
+            return
+
+        embed = discord.Embed(
+            title="Random Message",
+            description=picked_message.content or "(no text content)",
+            color=discord.Color.blue(),
+        )
+        embed.add_field(name="Channel", value=picked_message.channel.mention)
+        embed.add_field(name="Author", value=picked_message.author.mention)
+        embed.add_field(
+            name="Timestamp",
+            value=f"<t:{int(picked_message.created_at.timestamp())}:F>",
+        )
+        embed.add_field(name="Jump", value=picked_message.jump_url, inline=False)
+        if picked_message.attachments:
+            embed.set_image(url=picked_message.attachments[0].url)
+
+        await send_interaction(ctx, embed=embed)
+
+    @app_commands.command(
         name="clear-messages", description="Clears messages, max 50 (Admin)"
     )
     @app_commands.describe(integer="How many messages to delete (1-50).")
