@@ -302,7 +302,7 @@ class MusicCommands(commands.Cog):
             return
 
         if player.should_respond:
-            await send_interaction(ctx, embed=playing_embed(track, ctx.client))
+            await send_interaction(ctx, embed=playing_embed(track))
             player.should_respond = False
 
     @radio.command(name="random", description="Gets random radio from RadioMap.")
