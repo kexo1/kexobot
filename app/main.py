@@ -13,7 +13,6 @@ import asyncprawcore.exceptions
 import cloudscraper
 import discord
 import httpx
-import msgspec
 import sonolink
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -205,17 +204,29 @@ async def close_unused_nodes() -> None:
                     sonolink_nodes.pop(node.id, None)
                 continue
 
+            if not getattr(node, "session_id", None):
+                logging.info(f"[Lavalink] Skipping node without session. ({node.uri})")
+                continue
+
             try:
                 players = await node.fetch_players()
-            except (
-                RuntimeError,
-                sonolink.rest.errors.HTTPException,
-                msgspec.DecodeError,
-            ) as e:
+            except sonolink.rest.errors.HTTPException as e:
+                message = str(e)
+                if "Session not found" in message or "404" in message:
+                    logging.info(
+                        f"[Lavalink] Skipping node without session. ({node.uri})"
+                    )
+                else:
+                    logging.warning(
+                        f"[Lavalink] Skipping node on fetch_players error. ({node.uri}) - {e}"
+                    )
+                continue
+            except Exception as e:
                 logging.warning(
-                    f"[Lavalink] Skipping node without session. ({node.uri}) - {e}"
+                    f"[Lavalink] Skipping node on fetch_players error. ({node.uri}) - {e}"
                 )
                 continue
+
             if len(players) == 0:
                 logging.info(f"[Lavalink] Node is empty, removing. ({node.uri})")
                 try:
