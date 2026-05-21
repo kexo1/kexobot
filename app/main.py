@@ -28,6 +28,7 @@ from app.constants import (
     CHANNEL_ID_FREE_STUFF_CHANNEL,
     CHANNEL_ID_GAME_CRACKS_CHANNEL,
     CHANNEL_ID_GAME_UPDATES_CHANNEL,
+    CHANNEL_ID_KEXO_SERVER,
     DB_CACHE,
     ENV_API_DB,
     ENV_DISCORD_TOKEN,
@@ -210,17 +211,6 @@ async def close_unused_nodes() -> None:
 
             try:
                 players = await node.fetch_players()
-            except sonolink.rest.errors.HTTPException as e:
-                message = str(e)
-                if "Session not found" in message or "404" in message:
-                    logging.info(
-                        f"[Lavalink] Skipping node without session. ({node.uri})"
-                    )
-                else:
-                    logging.warning(
-                        f"[Lavalink] Skipping node on fetch_players error. ({node.uri}) - {e}"
-                    )
-                continue
             except Exception as e:
                 logging.warning(
                     f"[Lavalink] Skipping node on fetch_players error. ({node.uri}) - {e}"
@@ -658,6 +648,7 @@ async def setup_cogs() -> None:
         await bot.load_extension(f"app.cogs.{cog}")
 
     await bot.tree.sync()
+    await bot.tree.sync(guild=discord.Object(id=CHANNEL_ID_KEXO_SERVER))
 
     logging.info("[Starter] Cogs loaded.")
 

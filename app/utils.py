@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
@@ -15,6 +13,7 @@ import discord
 import httpx
 import psutil
 import sonolink
+import sonolink.models as sl_models
 from discord.ext import commands
 from sonolink.models import CacheSettings, InactivitySettings
 
@@ -216,7 +215,7 @@ def strip_text(text: str, to_strip: tuple[str, ...]) -> str:
     return text.strip()
 
 
-def fix_audio_title(track: sonolink.Playable) -> str:
+def fix_audio_title(track: sl_models.Playable) -> str:
     """Fix the title of an audio track by removing unwanted characters.
 
     Parameters
