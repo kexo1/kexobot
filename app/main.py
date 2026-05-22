@@ -450,12 +450,8 @@ class KexoBot:
             await self._content_monitor.online_fix()
 
         elif self._main_loop_counter == 4:
-            self._main_loop_counter = 5
-            await self._reddit_fetcher.crackwatch()
-
-        elif self._main_loop_counter == 5:
             self._main_loop_counter = 0
-            await self._content_monitor.fanatical()
+            await self._reddit_fetcher.crackwatch()
 
         if now.minute % 6 == 0 and self._hostname != LOCAL_MACHINE_NAME:
             await self._sfd_servers.update_stats(now)

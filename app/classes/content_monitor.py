@@ -14,13 +14,8 @@ from pymongo import AsyncMongoClient
 from app.constants import (
     ALIENWAREARENA_MAX_RESULTS,
     ALIENWAREARENA_TO_REMOVE,
-    API_FANATICAL,
-    API_FANATICAL_IMG,
-    API_FANATICAL_MEGAMENU,
     DB_CACHE,
     DB_LISTS,
-    FANATICAL_MAX_RESULTS,
-    FANATICAL_TO_REMOVE,
     GAME3RB_TO_REMOVE,
     ICON_GAME3RB,
     ICON_ONLINEFIX,
@@ -29,7 +24,7 @@ from app.constants import (
     SITE_URL_GAME3RB,
     SITE_URL_ONLINEFIX,
 )
-from app.utils import iso_to_timestamp, make_http_request, strip_text
+from app.utils import make_http_request, strip_text
 
 
 async def get_onlinefix_messages(chat_log: str) -> list:
@@ -242,13 +237,6 @@ class ContentMonitor:
                 DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
             )
 
-    async def fanatical(self) -> None:
-        """Checks for free games from Fanatical."""
-        fanatical_cache = await self._load_fanatical_cache()
-        json_data = await make_http_request(self._session, API_FANATICAL, get_json=True)
-        if not json_data:
-            return
-        await self._send_fanatical_embed(json_data, fanatical_cache)
 
     async def online_fix(self) -> None:
         """Checks for selected games from Online-Fix."""
@@ -304,69 +292,6 @@ class ContentMonitor:
             await self._bot_config.update_one(
                 DB_CACHE,
                 {"$set": {"alienwarearena_cache": alienwarearena_cache}},
-            )
-
-    async def _send_fanatical_embed(
-        self, json_data: dict, fanatical_cache: list
-    ) -> None:
-        fanatical_cache_copy = fanatical_cache.copy()
-        for giveaway in json_data["freeProducts"][:FANATICAL_MAX_RESULTS]:
-            if giveaway["min_spend"]["EUR"] != 0:
-                continue  # Skip if not free
-
-            if not giveaway["required_products"]:
-                continue
-
-            product_info = giveaway["required_products"][0]
-            url = "https://www.fanatical.com/en/game/" + product_info["slug"]
-
-            # Check if product is preorder
-            product_data: dict = await make_http_request(
-                self._session,
-                API_FANATICAL_MEGAMENU,
-                headers={"referer": url},
-                get_json=True,
-            )
-
-            if not product_data:
-                logging.warning(f"[Fanatical] Product data not found - {url}")
-                continue
-
-            title = product_info["name"]
-            title_strip = strip_text(title, FANATICAL_TO_REMOVE)
-
-            is_preorder = False
-            for unreleased_game in product_data["comingSoon"]:
-                if title_strip in unreleased_game["name"]:
-                    is_preorder = True
-                    break
-
-            if url in fanatical_cache_copy:
-                break
-
-            fanatical_cache.pop(0)
-            fanatical_cache.append(url)
-
-            if is_preorder:
-                continue
-
-            img_url = API_FANATICAL_IMG + product_info["cover"]
-            timestamp = (
-                f"<t:{int(iso_to_timestamp(giveaway['valid_until']).timestamp())}:F>"
-            )
-
-            embed = discord.Embed(
-                title=title,
-                description=f"Get the key before {timestamp}\n\n**[www.fanatical.com]({url})**",
-                colour=discord.Colour.dark_theme(),
-                timestamp=iso_to_timestamp(giveaway["valid_from"]),
-            )
-            embed.set_image(url=img_url)
-            await self._free_stuff_channel.send(embed=embed)
-
-        if fanatical_cache != fanatical_cache_copy:
-            await self._bot_config.update_one(
-                DB_CACHE, {"$set": {"fanatical_cache": fanatical_cache}}
             )
 
     async def _send_onlinefix_embed(self, url: str, game_title: str) -> None:
@@ -449,10 +374,6 @@ class ContentMonitor:
             alienwarearena_cache["alienwarearena_cache"],
             to_filter["alienwarearena_exceptions"],
         )
-
-    async def _load_fanatical_cache(self) -> list[str]:
-        fanatical_cache = await self._bot_config.find_one(DB_CACHE)
-        return fanatical_cache["fanatical_cache"]
 
     async def _load_onlinefix_cache(self) -> tuple[list[str], list[str]]:
         onlinefix_cache = await self._bot_config.find_one(DB_CACHE)

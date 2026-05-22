@@ -91,15 +91,8 @@ ICON_REDDIT_CRACKWATCH = (
     "https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
 )
 ICON_REDDIT = "https://www.pngkit.com/png/full/207-2074270_reddit-icon-png.png"
-ICON_GAME3RB = (
-    "https://media.discordapp.net/attachments/796453724713123870"
-    "/1162443171209433088/d95X3.png?ex=653bf491&is=65297f91&hm"
-    "=c36058433d50580eeec7cd89ddfe60965ec297d6fc8054994fee5ae976bedfd3&="
-)
-ICON_ONLINEFIX = (
-    "https://media.discordapp.net/attachments/"
-    "796453724713123870/1035951759505506364/favicon-1.png"
-)
+ICON_GAME3RB = "https://files.catbox.moe/oj3jso.png"
+ICON_ONLINEFIX = "https://files.catbox.moe/o361yb.png"
 
 ############################# Reddit Configuration ############################
 ENV_REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
@@ -122,7 +115,7 @@ REDDIT_FREEGAMEFINDINGS_EMBEDS = {
         "title": "Gleam",
         "description": "**Gleam** - keys from this site __disappear really fast__"
         " so you should get it fast!",
-        "icon": "https://static-00.iconduck.com/assets.00/gleam-icon-512x512-vxvvbmg8.png",
+        "icon": "https://files.catbox.moe/or8beg.png",
     },
     "AlienwareArena": {
         "title": "AlienwareArena",
@@ -134,7 +127,7 @@ REDDIT_FREEGAMEFINDINGS_EMBEDS = {
     "Fanatical": {
         "title": "Fanatical",
         "description": "**Fanatical** - keys from this site __disappear really fast__ so you should get it fast!",
-        "icon": "https://cdn.discordapp.com/attachments/796453724713123870/1474746180247486595/Fanatical_Icon-removebg-preview.png?ex=699af7e8&is=6999a668&hm=f8db9f836fa5b3209c1c3e1765c7ab3b90f744a853c61dd4b75111d35e9798dd&animated=true",
+        "icon": "https://files.catbox.moe/6hns7j.png",
     },
 }
 
@@ -200,33 +193,6 @@ SITE_URL_ALIENWAREARENA = (
     "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
 )
 ALIENWAREARENA_TO_REMOVE = ("Key", "Giveaway", "Steam Game")
-
-# Fanatical
-FANATICAL_MAX_RESULTS = 3
-API_FANATICAL = "https://www.fanatical.com/api/all-promotions/en"
-API_FANATICAL_MEGAMENU = "https://www.fanatical.com/api/algolia/megamenu?altRank=false"
-API_FANATICAL_IMG = "https://cdn-ext.fanatical.com/production/product/1280x720/"
-FANATICAL_TO_REMOVE = (
-    "Super Deluxe Edition",
-    "Game of the Year Edition",
-    "Platinum Edition",
-    "Premium Edition",
-    "Collector's Edition",
-    "Game of the Year",
-    "Deluxe Edition",
-    "Gold Edition",
-    "Ultimate Edition",
-    "Complete Edition",
-    "Definitive Edition",
-    "Enhanced Edition",
-    "Standard Edition",
-    "Ultimate Edition",
-    "Complete Edition",
-    "Bundle Pack",
-    "Bundle Collection",
-    "Game Bundle",
-    "Bundle",
-)
 
 ############################## SFD Configuration ############################
 API_SFD_SERVER = "https://mythologicinteractive.com/SFDGameServices.asmx"

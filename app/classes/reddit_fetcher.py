@@ -95,21 +95,11 @@ class RedditFetcher:
         )
         try:
             async for submission in subreddit.new(limit=REDDIT_CRACKWATCH_MAX_RESULTS):
-                if (
-                    submission.locked
-                    or submission.stickied
-                    or submission.over_18
-                    or hasattr(submission, "poll_data")
+                if not self._is_valid_crackwatch_submission(
+                    submission,
+                    crackwatch_cache,
+                    to_filter,
                 ):
-                    continue
-
-                if submission.permalink in crackwatch_cache:
-                    continue
-
-                is_filtered = [
-                    k for k in to_filter if k.lower() in submission.title.lower()
-                ]
-                if is_filtered:
                     continue
 
                 img_url = None
@@ -178,6 +168,29 @@ class RedditFetcher:
                 "crackwatch_cache", crackwatch_cache, crackwatch_cache_upload
             )
 
+    def _is_valid_crackwatch_submission(
+        self,
+        submission: asyncpraw.models.Submission,
+        cache: list[str],
+        to_filter: list[str],
+    ) -> bool:
+        if (
+            submission.locked
+            or submission.stickied
+            or submission.over_18
+            or hasattr(submission, "poll_data")
+        ):
+            return False
+
+        if submission.permalink in cache:
+            return False
+
+        title_lower = submission.title.lower()
+        if any(token.lower() in title_lower for token in to_filter):
+            return False
+
+        return True
+
     async def freegamefindings(self) -> None:
         """Method to fetch free games from r/FreeGameFindings subreddit."""
         freegamefindings_cache, to_filter = await self._load_bot_config(
@@ -192,29 +205,11 @@ class RedditFetcher:
             async for submission in subreddit.new(
                 limit=REDDIT_FREEGAMEFINDINGS_MAX_RESULTS
             ):
-                # If post is locked, or is stickied, nsfw, or it's a poll, skip it
-                if (
-                    submission.locked
-                    or submission.stickied
-                    or submission.over_18
-                    or hasattr(submission, "poll_data")
+                if not self._is_valid_freegame_submission(
+                    submission,
+                    freegamefindings_cache,
+                    to_filter,
                 ):
-                    continue
-
-                if submission.url in freegamefindings_cache:
-                    continue
-
-                if "[PSA]" in submission.title and "Amazon" not in submission.title:
-                    continue
-
-                if "(Game)" not in submission.title:
-                    continue
-
-                if "https" not in submission.url:
-                    continue
-
-                is_filtered = [k for k in to_filter if k in submission.url]
-                if is_filtered:
                     continue
 
                 freegamefindings_cache_upload.pop(0)
@@ -223,7 +218,7 @@ class RedditFetcher:
 
         except discord.errors.HTTPException as e:
             logging.warning(
-                f"[CrackWatch] - Error when sending message ({submission.permalink}):\n{e}"
+                f"[FreeGameFindings] - Error when sending message ({submission.permalink}):\n{e}"
             )
         except (
             AsyncPrawcoreException,
@@ -239,6 +234,38 @@ class RedditFetcher:
                 freegamefindings_cache,
                 freegamefindings_cache_upload,
             )
+
+    def _is_valid_freegame_submission(
+        self,
+        submission: asyncpraw.models.Submission,
+        cache: list[str],
+        to_filter: list[str],
+    ) -> bool:
+        if (
+            submission.locked
+            or submission.stickied
+            or submission.over_18
+            or hasattr(submission, "poll_data")
+        ):
+            return False
+
+        if submission.url in cache:
+            return False
+
+        if "[PSA]" in submission.title and "Amazon" not in submission.title:
+            return False
+
+        if "(Game)" not in submission.title:
+            return False
+
+        url_obj = urlparse(submission.url)
+        if url_obj.scheme not in {"http", "https"}:
+            return False
+
+        if any(token in submission.url for token in to_filter):
+            return False
+
+        return True
 
     async def _process_submission(
         self, submission: asyncpraw.models.Submission
