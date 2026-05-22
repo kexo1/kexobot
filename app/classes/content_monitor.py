@@ -362,7 +362,7 @@ class ContentMonitor:
                 timestamp=iso_to_timestamp(giveaway["valid_from"]),
             )
             embed.set_image(url=img_url)
-            await self._game_updates_channel.send(embed=embed)
+            await self._free_stuff_channel.send(embed=embed)
 
         if fanatical_cache != fanatical_cache_copy:
             await self._bot_config.update_one(
