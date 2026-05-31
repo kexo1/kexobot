@@ -92,7 +92,7 @@ class Listeners(commands.Cog):
         payload: :class:`NodeReadyEventPayload`
             The payload containing information about the node that is ready.
         """
-        logging.info("[Lavalink] A node is ready.")
+        logging.info("[Sonolink] A node is ready.")
         if self._bot.get_online_nodes() > 1 and is_bot_node_connected(self._bot):
             await self._bot.close_unused_nodes()
 
@@ -109,7 +109,7 @@ class Listeners(commands.Cog):
         """
         if self._bot.get_online_nodes() == 0 and is_bot_node_connected(self._bot):
             logging.warning(
-                f"[Lavalink] Node got disconnected, connecting new node. ({node.uri})"
+                f"[Sonolink] Node got disconnected, connecting new node. ({node.uri})"
             )
             node_data = self._bot.cached_lavalink_servers.get(node.uri)
             if node_data:
@@ -197,7 +197,7 @@ class Listeners(commands.Cog):
 
         if self._bot.get_online_nodes() == 0:
             logging.warning(
-                f"[Lavalink] Node websocket closed, connecting new node. ({node.uri})"
+                f"[Sonolink] Node websocket closed, connecting new node. ({node.uri})"
             )
             await self._bot.connect_node()
             return

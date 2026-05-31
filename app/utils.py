@@ -404,7 +404,7 @@ async def switch_node(
                 except asyncio.TimeoutError:
                     bot.track_exceptions.pop(player.guild.id, None)
 
-            logging.info(f"[Lavalink] {i + 1}. Node switched ({node.uri})")
+            logging.info(f"[Sonolink] {i + 1}. Node switched ({node.uri})")
             if send_success_message:
                 embed = discord.Embed(
                     title="",

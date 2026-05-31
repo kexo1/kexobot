@@ -176,9 +176,25 @@ async def check_node_status(node: sonolink.Node) -> bool:
         await node.fetch_info()
         return True
     except Exception:
-        logging.info(f"[Lavalink] Node failed to connect: ({node.uri})")
+        logging.info(f"[Sonolink] Node failed to connect: ({node.uri})")
         bot.cached_lavalink_servers[node.uri]["score"] -= 1
+
     return False
+
+
+async def verify_node_health(node: sonolink.Node) -> bool:
+    """Validate that a connected node still responds to requests."""
+    try:
+        await asyncio.wait_for(node.fetch_info(), timeout=2)
+        return True
+    except Exception:
+        logging.info(f"[Sonolink] Node failed health check: ({node.uri})")
+        try:
+            await node.close()
+        except RuntimeError:
+            pass
+
+        return False
 
 
 def load_humor_api_tokens() -> None:
@@ -202,7 +218,7 @@ async def close_unused_nodes() -> None:
                 continue
 
             await node.close()
-            logging.info(f"[Lavalink] Closed unused node: {node.uri}")
+            logging.info(f"[Sonolink] Closed unused node: {node.uri}")
 
 
 def get_online_nodes() -> int:
@@ -486,6 +502,7 @@ class KexoBot:
         if guild_id:
             for _ in range(len(bot.cached_lavalink_servers)):
                 uri, info = await get_guild_node(guild_id)
+
                 if exclude_uri and uri == exclude_uri:
                     continue
 
@@ -494,7 +511,12 @@ class KexoBot:
                     None,
                 )
                 if existing_node and existing_node.is_connected:
-                    return existing_node
+                    if await verify_node_health(existing_node):
+                        return existing_node
+
+                    node_data = bot.cached_lavalink_servers.get(existing_node.uri)
+                    if node_data:
+                        node_data["score"] -= 1
 
                 node = build_node(uri, info["password"])
                 is_connected = await check_node_status(node)
@@ -505,11 +527,11 @@ class KexoBot:
         node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
 
         # Exclude node if exclude_uri is provided and bot node
-        if exclude_uri:
-            node_candidates.pop(exclude_uri, None)
+        if bot.node and switch_node and bot.node.uri != exclude_uri:
+            del node_candidates[bot.node.uri]
 
-        if switch_node and bot.node:
-            node_candidates.pop(bot.node.uri, None)
+        if exclude_uri:
+            del node_candidates[exclude_uri]
 
         # Shorted node candidates if there are too many
         if len(node_candidates) > NODE_MAX_CANDIDATES:
@@ -527,9 +549,17 @@ class KexoBot:
                 None,
             )
             if existing_node and existing_node.is_connected:
-                node = existing_node
-                is_connected = True
-                break
+                if await verify_node_health(existing_node):
+                    node = existing_node
+                    is_connected = True
+                    break
+
+                node_data = bot.cached_lavalink_servers.get(existing_node.uri)
+                if node_data:
+                    node_data["score"] -= 1
+
+                del node_candidates[node_uri]
+                continue
 
             node = build_node(node_uri, node_info["password"])
             is_connected = await check_node_status(node)
@@ -686,14 +716,14 @@ async def bot_loader(main: KexoBot) -> None:
 
     node = await main.connect_node(switch_node=False)
     if not node:
-        logging.warning("[Lavalink] Startup connect failed, refreshing node cache.")
+        logging.warning("[Sonolink] Startup connect failed, refreshing node cache.")
         await main._lavalink_server_manager.fetch()
         node = await main.connect_node(switch_node=False)
 
     if node:
-        logging.info(f"[Lavalink] Connected to node: {node.uri}")
+        logging.info(f"[Sonolink] Connected to node: {node.uri}")
     else:
-        logging.error("[Lavalink] Node is not connected after startup attempts.")
+        logging.error("[Sonolink] Node is not connected after startup attempts.")
 
     await setup_cogs()
 

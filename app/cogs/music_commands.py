@@ -1023,7 +1023,7 @@ class MusicCommands(commands.Cog):
                 await player.set_volume(volume)
             except Exception as retry_error:
                 logging.warning(
-                    "[Lavalink] Volume sync skipped after retry failure: %s",
+                    "[Sonolink] Volume sync skipped after retry failure: %s",
                     retry_error,
                 )
                 await send_response(
