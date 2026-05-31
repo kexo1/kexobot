@@ -86,6 +86,11 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         description=":x: Couldn't find node to play this music, try switching to a different node with `/node reconnect`, or use Youtube links instead of Spotify/Deezer/Apple Music.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
+    "FAILED_TO_JOIN_CHANNEL": discord.Embed(
+        title="",
+        description=":x: Failed to join your voice channel, try `/node reconnect`.",
+        color=discord.Color.from_rgb(r=220, g=0, b=0),
+    ),
     "NO_PLAYERS_CONNECTED": discord.Embed(
         title="",
         description=":x: No players are playing music.",

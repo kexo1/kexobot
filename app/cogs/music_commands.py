@@ -38,25 +38,6 @@ async def is_owner(interaction: discord.Interaction) -> bool:
     return await interaction.client.is_owner(interaction.user)
 
 
-async def disconnect_after_timeout(player: sonolink.Player, timeout: float) -> None:
-    """Disconnect the player after a timeout if no further activity.
-
-    Parameters:
-    -----------
-    player: :class:`sonolink.Player`
-        The player to disconnect.
-    timeout: float
-        The timeout in seconds.
-    """
-    try:
-        await asyncio.sleep(timeout)
-        if player and player.connected:
-            player.cleanup()
-            await player.disconnect()
-    except asyncio.CancelledError:
-        pass
-
-
 def set_track_requester(
     track: sl_models.Playable,
     user: discord.abc.User,
@@ -845,11 +826,6 @@ class MusicCommands(commands.Cog):
             playing_track = await player.play(track)
             set_track_requester(playing_track, ctx.user, self._bot)
 
-        disconnect_task = asyncio.create_task(
-            disconnect_after_timeout(player, track.length / 1000 + 2)
-        )
-        player.disconnect_task = disconnect_task
-
     # ----------------------- Helper functions ------------------------ #
     def _queue_insert_front(
         self, player: sonolink.Player, track: sl_models.Playable
@@ -954,10 +930,31 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "NO_PERMISSIONS")
             return False
         except Exception:
-            await send_response(ctx, "NO_NODES", ephemeral=False)
-            return False
+            return await self._retry_join_channel(ctx)
 
         return True
+
+    async def _retry_join_channel(self, ctx: discord.Interaction) -> bool:
+        logging.error(
+            f"[Sonolink] Error connecting to voice channel, retrying ({self._bot.node.uri})"
+        )
+        await switch_node(
+            bot=self._bot,
+            player=ctx.guild.voice_client,
+            play_after=False,
+            send_success_message=False,
+            send_failure_message=False,
+        )
+        try:
+            await self._connect_voice_channel(ctx.user.voice.channel)
+            return True
+        except Exception:
+            logging.error(
+                f"[Sonolink] Error retrying connection to voice channel ({self._bot.node.uri})"
+            )
+            await send_response(ctx, "FAILED_TO_JOIN_CHANNEL", ephemeral=False)
+
+        return False
 
     def _build_player_class(
         self,
@@ -985,10 +982,6 @@ class MusicCommands(commands.Cog):
         if not node:
             raise RuntimeError("No connected node available")
 
-        wait_session = getattr(node, "_wait_session", None)
-        if callable(wait_session):
-            await wait_session()
-
         player_cls = self._build_player_class(node, autoplay_mode)
         await channel.connect(cls=player_cls, timeout=5)
 
@@ -1006,10 +999,6 @@ class MusicCommands(commands.Cog):
 
     async def _prepare_sonolink(self, ctx: discord.Interaction) -> None:
         player: sonolink.Player = ctx.guild.voice_client
-
-        if hasattr(player, "disconnect_task") and player.disconnect_task:
-            player.disconnect_task.cancel()
-            player.disconnect_task = None
 
         player.text_channel = ctx.channel
         player.should_respond = False
