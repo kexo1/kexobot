@@ -338,7 +338,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "SPEED_CHANGED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**:stopwatch:  Speed increased by `{kwargs.get('multiplier')}x`**",
+        description=f"**:stopwatch:  Speed changed to `{kwargs.get('multiplier')}x`**",
         color=discord.Color.blue(),
     ),
     "EFFECTS_CLEARED": _embed_with_footer(

@@ -558,7 +558,7 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "ALREADY_PAUSED")
             return
 
-        await player.pause(True)
+        await player.pause()
         await send_response(ctx, "TRACK_PAUSED", ephemeral=False, delete_after=10)
 
     @music.command(name="resume", description="Resumes paused song.")
@@ -573,7 +573,7 @@ class MusicCommands(commands.Cog):
             The context of the command.
         """
         player: sonolink.Player = ctx.guild.voice_client
-        await player.pause(False)
+        await player.resume()
         await send_response(ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10)
 
     @music.command(
@@ -938,6 +938,10 @@ class MusicCommands(commands.Cog):
         logging.error(
             f"[Sonolink] Error connecting to voice channel, retrying ({self._bot.node.uri})"
         )
+        node = self._bot.cached_lavalink_servers.get(self._bot.node.uri)
+        if node:
+            node["score"] -= 5
+
         await switch_node(
             bot=self._bot,
             player=ctx.guild.voice_client,

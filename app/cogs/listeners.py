@@ -305,7 +305,6 @@ class Listeners(commands.Cog):
         player: :class:`sonolink.Player`
             The player that became inactive.
         """
-        player.cleanup()
         await player.disconnect()
         await send_response(
             player.text_channel,
