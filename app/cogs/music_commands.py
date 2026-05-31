@@ -942,13 +942,7 @@ class MusicCommands(commands.Cog):
         if node:
             node["score"] -= 5
 
-        await switch_node(
-            bot=self._bot,
-            player=ctx.guild.voice_client,
-            play_after=False,
-            send_success_message=False,
-            send_failure_message=False,
-        )
+        await self._bot.connect_node()
         try:
             await self._connect_voice_channel(ctx.user.voice.channel)
             return True

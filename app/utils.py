@@ -372,7 +372,10 @@ async def switch_node(
         for i in range(10):
             player_autoplay_mode = player.autoplay
             player.autoplay = sonolink.AutoPlayMode.DISABLED
-            node: sonolink.Node | None = await bot.connect_node()
+
+            node: sonolink.Node | None = await bot.connect_node(
+                exclude_uri=player.node.uri
+            )
             if not node:
                 continue
 

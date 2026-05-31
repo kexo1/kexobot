@@ -460,7 +460,10 @@ class KexoBot:
             await self.wordnik_presence()
 
     async def connect_node(
-        self, guild_id: int | None = None, switch_node: bool = True
+        self,
+        guild_id: int | None = None,
+        switch_node: bool = True,
+        exclude_uri: str | None = None,
     ) -> sonolink.Node | None:
         """Connect to lavalink node.
 
@@ -483,6 +486,9 @@ class KexoBot:
         if guild_id:
             for _ in range(len(bot.cached_lavalink_servers)):
                 uri, info = await get_guild_node(guild_id)
+                if exclude_uri and uri == exclude_uri:
+                    continue
+
                 existing_node = next(
                     (n for n in bot.sonolink_client.nodes if n.uri == uri),
                     None,
@@ -498,13 +504,12 @@ class KexoBot:
         is_connected = False
         node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
 
-        if switch_node:
-            try:
-                del node_candidates[bot.node.uri]
-            except AttributeError:
-                logging.critical(
-                    f"[Lavalink] Type: {type(bot.node)}, Value: {bot.node}, Repr: {repr(bot.node)}, Full: {bot.node.__dict__}"
-                )
+        # Exclude node if exclude_uri is provided and bot node
+        if exclude_uri:
+            node_candidates.pop(exclude_uri, None)
+
+        if switch_node and bot.node:
+            node_candidates.pop(bot.node.uri, None)
 
         # Shorted node candidates if there are too many
         if len(node_candidates) > NODE_MAX_CANDIDATES:
