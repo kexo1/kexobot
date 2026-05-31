@@ -447,6 +447,7 @@ class MusicCommands(commands.Cog):
         except QueueEmpty:
             await send_response(ctx, "NO_TRACKS_IN_QUEUE")
             return
+
         player.should_respond = False
         await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
 

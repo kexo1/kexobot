@@ -1,5 +1,5 @@
 discord.py
-sonolink[speed]
+sonolink
 asyncpraw
 asyncprawcore
 httpx
