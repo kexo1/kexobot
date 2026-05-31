@@ -178,7 +178,7 @@ class CommandCog(commands.Cog):
             )
             return
 
-        node: sonolink.Node | None = await self._bot.connect_node(guild_id=ctx.guild.id)
+        node: sonolink.Node | None = await self._bot.connect_node()
         if not node:
             await send_response(ctx, "NODE_CONNECT_FAILURE", uri="best available")
             return

@@ -437,7 +437,6 @@ def generate_temp_guild_data() -> dict:
         A dictionary containing temporary guild data.
     """
     return {
-        "lavalink_server_pos": 0,
         "jokes": {
             "viewed_jokes": [],
             "viewed_dad_jokes": [],

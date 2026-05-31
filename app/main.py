@@ -90,7 +90,6 @@ class GuildJokesData(TypedDict):
 
 
 class TempGuildData(TypedDict):
-    lavalink_server_pos: int
     jokes: GuildJokesData
 
 
@@ -120,37 +119,6 @@ intents.message_content = False
 intents.members = False
 
 bot = KexoBotClient(command_prefix=commands.when_mentioned, intents=intents)
-
-
-async def get_guild_node(guild_id: int) -> tuple[str, dict]:
-    """Get the next lavalink node, cycling is guild based.
-
-    Parameters
-    ----------
-    guild_id: int
-        The guild ID to get the node for.
-
-    Returns
-    -------
-    tuple[str, dict]
-        The next lavalink node URI and its metadata.
-    """
-    _, temp_guild_data = await get_guild_data(bot, guild_id)
-    lavalink_server_pos = temp_guild_data["lavalink_server_pos"]
-
-    lavalink_server_pos += 1
-    if lavalink_server_pos >= len(bot.cached_lavalink_servers):
-        lavalink_server_pos = 0
-
-    temp_guild_data["lavalink_server_pos"] = lavalink_server_pos
-    bot.temp_guild_data[guild_id] = temp_guild_data
-    return next(
-        islice(
-            bot.cached_lavalink_servers.items(),
-            lavalink_server_pos,
-            lavalink_server_pos + 1,
-        )
-    )
 
 
 async def check_node_status(node: sonolink.Node) -> bool:
@@ -477,7 +445,6 @@ class KexoBot:
 
     async def connect_node(
         self,
-        guild_id: int | None = None,
         switch_node: bool = True,
         exclude_uri: str | None = None,
     ) -> sonolink.Node | None:
@@ -489,39 +456,17 @@ class KexoBot:
 
         Parameters
         ----------
-        guild_id: int
-            The guild ID to connect to.
+        switch_node: bool, optional
+            Whether to switch the node if the bot is already connected to one.
+        exclude_uri: str | None, optional
+            A lavalink node URI to exclude from connection attempts.
+            This is useful when switching nodes to avoid reconnecting to the same node.
+
         Returns
         -------
         sonolink.Node | None
             The lavalink node that was connected to.
         """
-
-        # If user requested to reconnect node, we will try to
-        # connect to the next node based on the guild ID.
-        if guild_id:
-            for _ in range(len(bot.cached_lavalink_servers)):
-                uri, info = await get_guild_node(guild_id)
-
-                if exclude_uri and uri == exclude_uri:
-                    continue
-
-                existing_node = next(
-                    (n for n in bot.sonolink_client.nodes if n.uri == uri),
-                    None,
-                )
-                if existing_node and existing_node.is_connected:
-                    if await verify_node_health(existing_node):
-                        return existing_node
-
-                    node_data = bot.cached_lavalink_servers.get(existing_node.uri)
-                    if node_data:
-                        node_data["score"] -= 1
-
-                node = build_node(uri, info["password"])
-                is_connected = await check_node_status(node)
-                if is_connected:
-                    return node
 
         is_connected = False
         node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
