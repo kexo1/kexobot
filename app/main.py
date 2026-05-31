@@ -193,39 +193,16 @@ async def close_unused_nodes() -> None:
     that are not being used and will close them.
     """
     async with bot.close_nodes_lock:
-        nodes = list(bot.sonolink_client.nodes)
-        sonolink_nodes = getattr(bot.sonolink_client, "_nodes", None)
+        nodes: list[sonolink.Node] = list(bot.sonolink_client.nodes)
         for node in nodes:
             if len(bot.sonolink_client.nodes) == 1:
                 break
 
-            if not node.is_connected:
-                logging.info(f"[Lavalink] Node is disconnected, removing. ({node.uri})")
-                if isinstance(sonolink_nodes, dict):
-                    sonolink_nodes.pop(node.id, None)
+            if node.is_connected:
                 continue
 
-            if not getattr(node, "session_id", None):
-                logging.info(f"[Lavalink] Skipping node without session. ({node.uri})")
-                continue
-
-            try:
-                players = await node.fetch_players()
-            except Exception as e:
-                logging.warning(
-                    f"[Lavalink] Skipping node on fetch_players error. ({node.uri}) - {e}"
-                )
-                continue
-
-            if len(players) == 0:
-                logging.info(f"[Lavalink] Node is empty, removing. ({node.uri})")
-                try:
-                    await node.close()
-                except (TypeError, RuntimeError, Exception):
-                    pass
-                finally:
-                    if isinstance(sonolink_nodes, dict):
-                        sonolink_nodes.pop(node.id, None)
+            await node.close()
+            logging.info(f"[Lavalink] Closed unused node: {node.uri}")
 
 
 def get_online_nodes() -> int:
@@ -506,6 +483,13 @@ class KexoBot:
         if guild_id:
             for _ in range(len(bot.cached_lavalink_servers)):
                 uri, info = await get_guild_node(guild_id)
+                existing_node = next(
+                    (n for n in bot.sonolink_client.nodes if n.uri == uri),
+                    None,
+                )
+                if existing_node and existing_node.is_connected:
+                    return existing_node
+
                 node = build_node(uri, info["password"])
                 is_connected = await check_node_status(node)
                 if is_connected:
@@ -533,6 +517,15 @@ class KexoBot:
                 key=lambda x: x[1]["score"],
             )
             node_uri, node_info = best_node
+            existing_node = next(
+                (n for n in bot.sonolink_client.nodes if n.uri == node_uri),
+                None,
+            )
+            if existing_node and existing_node.is_connected:
+                node = existing_node
+                is_connected = True
+                break
+
             node = build_node(node_uri, node_info["password"])
             is_connected = await check_node_status(node)
             if is_connected:

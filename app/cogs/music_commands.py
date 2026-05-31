@@ -11,6 +11,7 @@ from discord import app_commands
 from discord.app_commands import Range
 from discord.ext import commands
 from sonolink import models as sl_models
+from sonolink.gateway.errors import QueueEmpty
 from sonolink.models import AutoPlaySettings, HistorySettings
 
 from app.constants import (
@@ -441,7 +442,11 @@ class MusicCommands(commands.Cog):
             The context of the command.
         """
         player: sonolink.Player = ctx.guild.voice_client
-        await player.skip()
+        try:
+            await player.skip()
+        except QueueEmpty:
+            await send_response(ctx, "NO_TRACKS_IN_QUEUE")
+            return
         player.should_respond = False
         await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
 
@@ -720,7 +725,9 @@ class MusicCommands(commands.Cog):
         name="autoplay_mode",
         description="Change autoplay mode when playing music.",
     )
-    @app_commands.describe(mode="Autoplay mode to use.")
+    @app_commands.describe(
+        mode="Autoplay mode to use, populated adds related tracks to autoplay."
+    )
     @app_commands.choices(
         mode=[
             app_commands.Choice(name="normal", value="normal"),
@@ -741,19 +748,13 @@ class MusicCommands(commands.Cog):
         mode: str
             The autoplay mode to set. Can be either "normal" or "populated".
         """
-        player: sonolink.Player = ctx.guild.voice_client
-        player.autoplay = (
-            sonolink.AutoPlayMode.PARTIAL
-            if mode == "normal"
-            else sonolink.AutoPlayMode.ENABLED
-        )
-
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
         guild_data["music"]["autoplay_mode"] = 1 if mode == "normal" else 2
         await self._bot.guild_data_db.update_one(
             {"_id": ctx.guild.id}, {"$set": guild_data}
         )
         self._bot.guild_data[ctx.guild.id] = guild_data
+
         await send_response(
             ctx, "AUTOPLAY_MODE_CHANGED", ephemeral=False, autoplay_mode=mode
         )
@@ -939,8 +940,15 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "NO_VOICE_CHANNEL")
             return False
 
+        guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
+        autoplay_mode = (
+            sonolink.AutoPlayMode.PARTIAL
+            if guild_data["music"]["autoplay_mode"] == 1
+            else sonolink.AutoPlayMode.ENABLED
+        )
+
         try:
-            await self._connect_voice_channel(ctx.user.voice.channel)
+            await self._connect_voice_channel(ctx.user.voice.channel, autoplay_mode)
         except (discord.Forbidden, discord.ClientException):
             await send_response(ctx, "NO_PERMISSIONS")
             return False
@@ -950,11 +958,16 @@ class MusicCommands(commands.Cog):
 
         return True
 
-    def _build_player_class(self, node: sonolink.Node):
+    def _build_player_class(
+        self,
+        node: sonolink.Node,
+        autoplay_mode: sonolink.AutoPlayMode = sonolink.AutoPlayMode.PARTIAL,
+    ):
+        discovery_count = 10 if autoplay_mode == sonolink.AutoPlayMode.ENABLED else 0
         return node.create_player(
             autoplay_settings=AutoPlaySettings(
-                mode=sonolink.AutoPlayMode.ENABLED,
-                discovery_count=10,
+                mode=autoplay_mode,
+                discovery_count=discovery_count,
             ),
             history_settings=HistorySettings(
                 enabled=True,
@@ -965,6 +978,7 @@ class MusicCommands(commands.Cog):
     async def _connect_voice_channel(
         self,
         channel: discord.VoiceChannel,
+        autoplay_mode: sonolink.AutoPlayMode = sonolink.AutoPlayMode.PARTIAL,
     ) -> None:
         node = self._bot.node
         if not node:
@@ -974,7 +988,7 @@ class MusicCommands(commands.Cog):
         if callable(wait_session):
             await wait_session()
 
-        player_cls = self._build_player_class(node)
+        player_cls = self._build_player_class(node, autoplay_mode)
         await channel.connect(cls=player_cls, timeout=5)
 
     async def _play_track(
@@ -1031,10 +1045,7 @@ class MusicCommands(commands.Cog):
                 )
                 return
 
-        if guild_data["music"]["autoplay_mode"] == 1:
-            player.autoplay = sonolink.AutoPlayMode.PARTIAL
-        else:
-            player.autoplay = sonolink.AutoPlayMode.ENABLED
+        # Autoplay mode is already set at player creation time from guild data
 
         await send_response(
             ctx,

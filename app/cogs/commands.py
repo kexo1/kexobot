@@ -163,7 +163,7 @@ class CommandCog(commands.Cog):
 
         if player:
             node: sonolink.Node | None = await switch_node(
-                self._bot, player=player, play_after=False, send_success_message=False
+                self._bot, player=player, play_after=True, send_success_message=False
             )
             if not node:
                 await send_response(ctx, "NODE_CONNECT_FAILURE", uri=node.uri)

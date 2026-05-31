@@ -366,7 +366,6 @@ async def switch_node(
     if switching_map.get(guild_id):
         return None
 
-    bot.cached_lavalink_servers[player.node.uri]["score"] = -1
     switching_map[guild_id] = True
 
     try:

@@ -10,6 +10,7 @@ from sonolink.gateway import (
     TrackExceptionEvent,
     TrackStartEvent,
     TrackStuckEvent,
+    WebSocketClosedEvent,
 )
 
 from app.constants import ICON_YOUTUBE
@@ -128,10 +129,10 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStartEventPayload`
             The payload containing information about the track that started playing.
         """
-
         if self._bot.node_is_switching.get(player.guild.id):
             return
 
+        self._bot.cached_lavalink_servers[player.node.uri]["score"] += 1
         current_track = player.current or payload.track
         if (
             current_track
@@ -145,7 +146,7 @@ class Listeners(commands.Cog):
         if current_track:
             requester_name, _ = resolve_requester(self._bot, current_track)
 
-        # Avoid noisy autoplay spam: announce only requested tracks or explicit response flow.
+        # Avoid noisy autoplay spam: announce only requested trackS.
         if player.should_respond or requester_name:
             await player.text_channel.send(
                 embed=playing_embed(self._bot, player, payload)
@@ -174,6 +175,34 @@ class Listeners(commands.Cog):
             tip = tips.get(history_count)
             if tip and random.randint(0, 2) == 0:
                 await player.text_channel.send(tip)
+
+    @commands.Cog.listener()
+    async def on_sonolink_websocket_closed(
+        self, player: sonolink.Player, payload: WebSocketClosedEvent
+    ) -> None:
+        """This event is triggered when the websocket connection to the node is closed.
+
+        It sends a message to the text channel and attempts to reconnect to the node.
+
+        Parameters
+        ----------
+        payload: :class:`WebSocketClosedEventPayload`
+            The payload containing information about the websocket closure.
+        """
+        node = player.node
+
+        node_data = self._bot.cached_lavalink_servers.get(node.uri)
+        if node_data:
+            node_data["score"] -= 1
+
+        if self._bot.get_online_nodes() == 0:
+            logging.warning(
+                f"[Lavalink] Node websocket closed, connecting new node. ({node.uri})"
+            )
+            await self._bot.connect_node()
+            return
+
+        await switch_node(bot=self._bot, player=player)
 
     @commands.Cog.listener()
     async def on_sonolink_track_exception(
@@ -207,6 +236,8 @@ class Listeners(commands.Cog):
 
         if self._bot.node_is_switching.get(player.guild.id):
             return
+
+        self._bot.cached_lavalink_servers[player.node.uri]["score"] -= -1
 
         await send_response(
             player.text_channel,
@@ -250,6 +281,8 @@ class Listeners(commands.Cog):
 
         if self._bot.node_is_switching.get(player.guild.id):
             return
+
+        self._bot.cached_lavalink_servers[player.node.uri]["score"] -= -1
 
         await send_response(player.text_channel, "TRACK_STUCK", respond=False)
         await switch_node(

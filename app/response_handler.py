@@ -344,7 +344,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "AUTOPLAY_MODE_CHANGED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**:repeat: Autoplay mode set to `{kwargs.get('autoplay_mode')}`**",
+        description=f"**:repeat: Autoplay mode set to `{kwargs.get('autoplay_mode')}`**\n_Changes will apply upon bot reconnect._",
         color=discord.Color.blue(),
     ),
     "NODE_CONNECT_SUCCESS": lambda **kwargs: discord.Embed(
