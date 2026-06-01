@@ -19,7 +19,7 @@ from app.response_handler import defer_interaction, send_interaction, send_respo
 from app.utils import get_guild_data, get_user_data, load_text_file, make_http_request
 
 
-async def is_valid_submission(
+def is_valid_submission(
     submission: asyncpraw.models.Submission,
     user_data: dict,
     temp_user_data: dict,
@@ -280,9 +280,7 @@ class FunCommands(commands.Cog):
 
         try:
             async for submission in multireddit.hot(limit=limit):
-                is_valid = await is_valid_submission(
-                    submission, user_data, temp_user_data
-                )
+                is_valid = is_valid_submission(submission, user_data, temp_user_data)
                 if not is_valid:
                     continue
 

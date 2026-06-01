@@ -35,7 +35,7 @@ def get_image_from_line(line: str) -> Optional[str]:
     return match.group(1)
 
 
-async def create_embed_crackwatch(
+def create_embed_crackwatch(
     submission: asyncpraw.reddit.Submission,
     description: str,
     color: discord.Color,
@@ -135,11 +135,11 @@ class RedditFetcher:
                     "denuvo removed" in submission.title.lower()
                     or "denuvo removed" in description.lower()
                 ):
-                    embed = await create_embed_crackwatch(
+                    embed = create_embed_crackwatch(
                         submission, description, discord.Color.gold()
                     )
                 else:
-                    embed = await create_embed_crackwatch(
+                    embed = create_embed_crackwatch(
                         submission, description, discord.Color.orange()
                     )
 

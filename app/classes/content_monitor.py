@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 import re
@@ -27,12 +28,14 @@ from app.constants import (
 from app.utils import make_http_request, strip_text
 
 
-async def get_onlinefix_messages(chat_log: str) -> list:
+def get_onlinefix_messages(chat_log: str) -> list:
     soup = BeautifulSoup(chat_log, "html.parser")
     chat_element = soup.find("ul", id="lc_chat")
+
     if not isinstance(chat_element, Tag):
         logging.warning("[Online-Fix] Chat element not found")
         return []
+
     return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
 
 
@@ -237,19 +240,21 @@ class ContentMonitor:
                 DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
             )
 
-
     async def online_fix(self) -> None:
         """Checks for selected games from Online-Fix."""
         onlinefix_cache, games = await self._load_onlinefix_cache()
         try:
-            chat_log = self._cloudscraper_session.get(SITE_URL_ONLINEFIX)
+            chat_log = await asyncio.to_thread(
+                self._cloudscraper_session.get,
+                SITE_URL_ONLINEFIX,
+            )
         except requests.exceptions.RequestException as exc:
             logging.warning(f"[Online-Fix] Request failed: {exc}")
             return
 
         if not chat_log:
             return
-        chat_messages = await get_onlinefix_messages(chat_log.text)
+        chat_messages = get_onlinefix_messages(chat_log.text)
         await self._process_onlinefix_messages(chat_messages, onlinefix_cache, games)
 
     async def _send_alienware_arena_embed(

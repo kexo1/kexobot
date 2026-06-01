@@ -932,7 +932,15 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "NO_PERMISSIONS")
             return False
         except Exception as e:
-            logging.error("[sonolink] Error connecting to voice channel: %s", e)
+            logging.exception(
+                "[sonolink] Voice connect failed | guild=%s channel=%s user=%s node=%s autoplay=%s",
+                ctx.guild.id if ctx.guild else "unknown",
+                ctx.user.voice.channel.id if ctx.user.voice else "unknown",
+                ctx.user.id,
+                self._bot.node.uri if self._bot.node else "none",
+                autoplay_mode,
+                e,
+            )
             return await self._retry_join_channel(ctx)
 
         return True
@@ -946,9 +954,14 @@ class MusicCommands(commands.Cog):
         try:
             await self._connect_voice_channel(ctx.user.voice.channel)
             return True
-        except Exception:
-            logging.error(
-                f"[Sonolink] Error retrying connection to voice channel ({self._bot.node.uri})"
+        except Exception as e:
+            logging.exception(
+                "[Sonolink] Voice connect retry failed | guild=%s channel=%s user=%s node=%s",
+                ctx.guild.id if ctx.guild else "unknown",
+                ctx.user.voice.channel.id if ctx.user.voice else "unknown",
+                ctx.user.id,
+                self._bot.node.uri if self._bot.node else "none",
+                e,
             )
             await send_response(ctx, "FAILED_TO_JOIN_CHANNEL", ephemeral=False)
 
