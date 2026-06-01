@@ -39,6 +39,46 @@ def get_onlinefix_messages(chat_log: str) -> list:
     return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
 
 
+def apply_build_token(
+    full_title: str,
+    game_title: list[str],
+    game3rb_cache: list[str],
+    to_upload: list[str],
+) -> tuple[list[str], str, bool]:
+    pattern = r"Build ([0-9A-Za-z._-]+)"
+    match = re.search(pattern, full_title)
+    if not match:
+        return game_title, "", True
+
+    build_token = match.group(1)
+    version = f" got updated to build {build_token}"
+    lower_token = build_token.lower()
+    removed = False
+
+    for i, part in enumerate(game_title):
+        if part.lower() == "build":
+            game_title.pop(i)
+            removed = True
+            break
+
+    for i, part in enumerate(game_title):
+        if part.lower() == lower_token:
+            game_title.pop(i)
+            removed = True
+            break
+
+    if not removed:
+        if full_title not in game3rb_cache and full_title not in to_upload:
+            logging.warning(
+                "[Game3rb] Broken name - %s",
+                full_title,
+            )
+            to_upload.append(full_title)
+        return game_title, version, False
+
+    return game_title, version, True
+
+
 class ContentMonitor:
     """Class for monitoring and reporting various
     content updates including games.
@@ -125,24 +165,14 @@ class ContentMonitor:
                 version = f" got updated to {game_title[-1]}"
                 game_title.pop()
             else:
-                pattern = r"Build [\d.]+"
-                match = re.search(pattern, full_title)
-                if match:
-                    version = f" got updated to {match.group().lower()}"
-                    to_remove = version.split()[-1]
-                    try:
-                        game_title.pop(game_title.index(to_remove))
-                    except ValueError:
-                        if full_title not in game3rb_cache not in to_upload:
-                            await self._bot_config.update_one(
-                                DB_CACHE,
-                                {"$set": {"game3rb_cache": to_upload}},
-                            )
-                            await self._user_kexo.send(
-                                f"Game3rb: Broken name - {full_title}"
-                            )
-                            to_upload.append(full_title)
-                        continue
+                game_title, version, ok = apply_build_token(
+                    full_title,
+                    game_title,
+                    game3rb_cache,
+                    to_upload,
+                )
+                if not ok:
+                    continue
 
             game_title = " ".join(game_title)
             carts = []

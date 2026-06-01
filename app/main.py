@@ -115,8 +115,6 @@ intents.members = False
 
 bot = KexoBotClient(command_prefix=commands.when_mentioned, intents=intents)
 
-_loop_lag_last_tick: float | None = None
-
 
 async def check_node_status(node: sonolink.Node) -> bool:
     """Check the status of a lavalink node.
@@ -132,10 +130,7 @@ async def check_node_status(node: sonolink.Node) -> bool:
         True if the node is connected, False otherwise.
     """
     try:
-        await asyncio.wait_for(node.connect(), timeout=2)
-        wait_session = getattr(node, "_wait_session", None)
-        if callable(wait_session):
-            await wait_session()
+        await asyncio.wait_for(node.connect(), timeout=3)
         # Some fucking nodes secretly don't respond,
         # I've played these games before!!!
         await node.fetch_info()
@@ -614,22 +609,6 @@ async def hourly_loop_task() -> None:
     await kexobot.hourly_loop()
 
 
-@tasks.loop(seconds=5)
-async def loop_lag_task() -> None:
-    """Log event loop lag to help diagnose timeouts."""
-    global _loop_lag_last_tick
-    now = asyncio.get_running_loop().time()
-    if _loop_lag_last_tick is None:
-        _loop_lag_last_tick = now
-        return
-
-    expected = _loop_lag_last_tick + 5
-    lag = now - expected
-    _loop_lag_last_tick = now
-    if lag >= 1.0:
-        logging.warning("[LoopLag] Event loop lag %.2fs", lag)
-
-
 @main_loop_task.before_loop
 async def before_main_loop() -> None:
     """Wait until the bot is ready before starting the main loop."""
@@ -639,12 +618,6 @@ async def before_main_loop() -> None:
 @hourly_loop_task.before_loop
 async def before_hourly_loop() -> None:
     """Wait until the bot is ready before starting the hourly loop."""
-    await bot.wait_until_ready()
-
-
-@loop_lag_task.before_loop
-async def before_loop_lag() -> None:
-    """Wait until the bot is ready before starting loop lag monitor."""
     await bot.wait_until_ready()
 
 
@@ -676,7 +649,6 @@ async def bot_loader(main: KexoBot) -> None:
 
     main_loop_task.start()
     hourly_loop_task.start()
-    loop_lag_task.start()
 
     while not main.session:
         await asyncio.sleep(1)

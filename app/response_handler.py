@@ -478,14 +478,26 @@ async def send_interaction(
         payload["suppress_embeds"] = suppress
 
     message: discord.Message | None = None
+    channel_payload = {
+        key: value for key, value in payload.items() if key != "ephemeral"
+    }
     if interaction.response.is_done():
-        message = await interaction.followup.send(**payload, wait=True)
-    else:
-        await interaction.response.send_message(**payload)
         try:
-            message = await interaction.original_response()
+            message = await interaction.followup.send(**payload, wait=True)
         except discord.NotFound:
-            message = None
+            if not ephemeral and interaction.channel:
+                message = await interaction.channel.send(**channel_payload)
+    else:
+        try:
+            await interaction.response.send_message(**payload)
+        except discord.NotFound:
+            if not ephemeral and interaction.channel:
+                message = await interaction.channel.send(**channel_payload)
+        else:
+            try:
+                message = await interaction.original_response()
+            except discord.NotFound:
+                message = None
 
     if message and delete_after:
         await message.delete(delay=delete_after)

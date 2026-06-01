@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 
@@ -339,8 +340,15 @@ class Listeners(commands.Cog):
         if player is None:
             return
 
+        if member == member.guild.me and after.channel == player.channel:
+            return
+
         if len(player.channel.members) == 1:
             try:
+                await asyncio.sleep(2)
+                if len(player.channel.members) != 1:
+                    return
+
                 await send_response(
                     player.text_channel,
                     "DISCONNECTED_NO_USERS",
