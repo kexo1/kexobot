@@ -779,7 +779,7 @@ class QueuePaginator(discord.ui.View):
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple)
     async def previous(
-        self, button: discord.ui.Button, interaction: discord.Interaction
+        self, interaction: discord.Interaction, button: discord.ui.Button
     ) -> None:
         """Handles the "Previous" button click event.
 
@@ -798,7 +798,7 @@ class QueuePaginator(discord.ui.View):
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple)
     async def next(
-        self, button: discord.ui.Button, interaction: discord.Interaction
+        self, interaction: discord.Interaction, button: discord.ui.Button
     ) -> None:
         """Handles the "Next" button click event.
 

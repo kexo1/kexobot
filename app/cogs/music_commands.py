@@ -111,7 +111,7 @@ async def fetch_first_track(
         for track in tracks:
             set_track_requester(track, ctx.user, ctx.client)
 
-        track = tracks.pop(0)
+        track = tracks.tracks.pop(0)
         song_count: int = player.queue.put(tracks)
 
         embed = discord.Embed(
