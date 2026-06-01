@@ -46,12 +46,7 @@ from app.constants import (
     USER_AGENT,
 )
 from app.response_handler import send_interaction
-from app.utils import (
-    generate_temp_guild_data,
-    get_guild_data,
-    is_older_than,
-    make_http_request,
-)
+from app.utils import generate_temp_guild_data, is_older_than, make_http_request
 
 
 class UserRedditData(TypedDict):

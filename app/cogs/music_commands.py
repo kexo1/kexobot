@@ -237,11 +237,13 @@ class MusicCommands(commands.Cog):
 
         if not ctx.guild.voice_client:
             joined: bool = await self._join_channel(ctx)
+
             if not joined:
                 node = self._bot.cached_lavalink_servers.get(self._bot.node.uri)
                 if node:
-                    node["score"] -= 1
+                    node["score"] -= 5
                 return
+
             await self._prepare_sonolink(ctx)
 
         is_moved: bool = await should_move_to_channel(ctx)
@@ -929,7 +931,8 @@ class MusicCommands(commands.Cog):
         except (discord.Forbidden, discord.ClientException):
             await send_response(ctx, "NO_PERMISSIONS")
             return False
-        except Exception:
+        except Exception as e:
+            logging.error("[sonolink] Error connecting to voice channel: %s", e)
             return await self._retry_join_channel(ctx)
 
         return True
@@ -938,9 +941,6 @@ class MusicCommands(commands.Cog):
         logging.error(
             f"[Sonolink] Error connecting to voice channel, retrying ({self._bot.node.uri})"
         )
-        node = self._bot.cached_lavalink_servers.get(self._bot.node.uri)
-        if node:
-            node["score"] -= 5
 
         await self._bot.connect_node()
         try:
@@ -989,10 +989,6 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
         playing_track = await player.play(track)
         set_track_requester(playing_track, ctx.user, self._bot)
-
-        node = self._bot.cached_lavalink_servers.get(self._bot.node.uri)
-        if node:
-            node["score"] += 1
         return True
 
     async def _prepare_sonolink(self, ctx: discord.Interaction) -> None:
