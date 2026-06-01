@@ -71,9 +71,9 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         description=":x: No nodes are connected.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
-    "NODE_CONNECT_FAILURE": lambda **kwargs: discord.Embed(
+    "NODE_CONNECT_FAILURE": discord.Embed(
         title="",
-        description=f":x: Failed to connect to `{kwargs.get('uri')}`",
+        description=":x: Failed to reconnect node.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NODE_UNRESPONSIVE": discord.Embed(
@@ -98,8 +98,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "CONNECTION_TIMEOUT": discord.Embed(
         title="",
-        description=":x: Failed to connect to the voice channel."
-        "\nTry using `/node reconnect`.",
+        description=":x: Failed to connect to the voice channel.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "NO_TRACKS_FOUND": lambda **kwargs: discord.Embed(

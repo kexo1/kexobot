@@ -166,8 +166,8 @@ async def close_unused_nodes() -> None:
                 await node.close()
                 logging.info(f"[Sonolink] Closed unused node: {node.uri}")
             except RuntimeError:
-                logging.debug(
-                    "[Sonolink] Skipped closing node not fully connected: %s",
+                logging.error(
+                    "[Sonolink] Failed to close node that is not fully connected: %s",
                     node.uri,
                 )
 

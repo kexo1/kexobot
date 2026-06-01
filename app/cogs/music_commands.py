@@ -235,11 +235,19 @@ class MusicCommands(commands.Cog):
         if not ctx.response.is_done():
             await defer_interaction(ctx)
 
+        node = self._bot.node
+        if not node:
+            raise RuntimeError("No connected node available")
+        
+        if self._bot.node_is_switching.get(ctx.guild.id, False):
+            await send_response(ctx, "WAIT_UNTIL_NODE_SWITCHES")
+            return
+
         if not ctx.guild.voice_client:
             joined: bool = await self._join_channel(ctx)
 
             if not joined:
-                node = self._bot.cached_lavalink_servers.get(self._bot.node.uri)
+                node = self._bot.cached_lavalink_servers.get(node.uri)
                 if node:
                     node["score"] -= 5
                 return
@@ -259,10 +267,6 @@ class MusicCommands(commands.Cog):
             return
 
         player: sonolink.Player = ctx.guild.voice_client
-
-        # if getattr(player, "node_is_switching", False) or self._node_is_switching.get(ctx.guild.id, False):
-        #     await send_response(ctx, "WAIT_UNTIL_NODE_SWITCHES")
-        #     return
 
         player.temp_current = track  # To be used in case of switching nodes
 
@@ -856,34 +860,36 @@ class MusicCommands(commands.Cog):
             list[sl_models.Playable],
         ]
     ]:
-        is_spotify = False
         source = get_search_prefix(search)
+        # If it's not a URL with a recognizable prefix, default to YouTube search
         if source is None:
             source = "ytsearch"
 
         # Prefer youtube over spotify, but if youtube fails, try spotify
         if source == "spsearch":
-            is_spotify = True
+            spotify_search = True
             source = "ytsearch"
+        else:
+            spotify_search = False
 
         player: sonolink.Player = ctx.guild.voice_client
         try:
-            tracks = await asyncio.wait_for(
-                self._bot.sonolink_client.search_track(search, source=source), timeout=3
+            tracks: sl_models.SearchResult = await asyncio.wait_for(
+                self._bot.sonolink_client.search_track(search, source=source), timeout=5
             )
             if not tracks.is_error() and not tracks.is_empty() and tracks.result:
                 return tracks
 
-            if is_spotify:
+            if spotify_search:
                 # Keep one lightweight fallback without switching nodes.
                 tracks = await asyncio.wait_for(
                     self._bot.sonolink_client.search_track(search, source="spsearch"),
-                    timeout=3,
+                    timeout=5,
                 )
                 if not tracks.is_error() and not tracks.is_empty() and tracks.result:
                     return tracks
 
-        except (asyncio.TimeoutError, AttributeError):
+        except asyncio.TimeoutError:
             await send_response(
                 ctx,
                 "NODE_NOT_FOUND",
@@ -915,9 +921,14 @@ class MusicCommands(commands.Cog):
         return None
 
     async def _join_channel(self, ctx: discord.Interaction) -> bool:
-        if not ctx.user.voice or not ctx.user.voice.channel:
+        channel = ctx.user.voice.channel
+        if not ctx.user.voice or not channel:
             await send_response(ctx, "NO_VOICE_CHANNEL")
             return False
+
+        node = self._bot.node
+        if not node:
+            raise RuntimeError("No connected node available")
 
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
         autoplay_mode = (
@@ -927,41 +938,18 @@ class MusicCommands(commands.Cog):
         )
 
         try:
-            await self._connect_voice_channel(ctx.user.voice.channel, autoplay_mode)
-        except (discord.Forbidden, discord.ClientException):
-            await send_response(ctx, "NO_PERMISSIONS")
-            return False
-        except Exception:
-            logging.exception(
-                "[sonolink] Voice connect failed | guild=%s channel=%s user=%s node=%s autoplay=%s",
-                ctx.guild.id if ctx.guild else "unknown",
-                ctx.user.voice.channel.id if ctx.user.voice else "unknown",
-                ctx.user.id,
-                self._bot.node.uri if self._bot.node else "none",
-                autoplay_mode,
-            )
-            return await self._retry_join_channel(ctx)
-
-        return True
-
-    async def _retry_join_channel(self, ctx: discord.Interaction) -> bool:
-        logging.error(
-            f"[Sonolink] Error connecting to voice channel, retrying ({self._bot.node.uri})"
-        )
-
-        await self._bot.connect_node()
-        try:
-            await self._connect_voice_channel(ctx.user.voice.channel)
+            player_cls = self._build_player_class(node, autoplay_mode)
+            await channel.connect(cls=player_cls)
             return True
+        except (discord.Forbidden, discord.ClientException):
+            await send_response(ctx, "NO_PERMISSIONS", ephemeral=False)
         except Exception:
+            await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
             logging.exception(
-                "[Sonolink] Voice connect retry failed | guild=%s channel=%s user=%s node=%s",
+                "[Sonolink] Error connecting to voice channel on guild %s, channel %s",
                 ctx.guild.id if ctx.guild else "unknown",
                 ctx.user.voice.channel.id if ctx.user.voice else "unknown",
-                ctx.user.id,
-                self._bot.node.uri if self._bot.node else "none",
             )
-            await send_response(ctx, "FAILED_TO_JOIN_CHANNEL", ephemeral=False)
 
         return False
 
@@ -970,50 +958,16 @@ class MusicCommands(commands.Cog):
         node: sonolink.Node,
         autoplay_mode: sonolink.AutoPlayMode = sonolink.AutoPlayMode.PARTIAL,
     ):
-        discovery_count = 10 if autoplay_mode == sonolink.AutoPlayMode.ENABLED else 0
         return node.create_player(
             autoplay_settings=AutoPlaySettings(
                 mode=autoplay_mode,
-                discovery_count=discovery_count,
+                discovery_count=10,
             ),
             history_settings=HistorySettings(
                 enabled=True,
                 max_items=100,
             ),
         )
-
-    async def _connect_voice_channel(
-        self,
-        channel: discord.VoiceChannel,
-        autoplay_mode: sonolink.AutoPlayMode = sonolink.AutoPlayMode.PARTIAL,
-    ) -> None:
-        node = self._bot.node
-        if not node:
-            raise RuntimeError("No connected node available")
-
-        player_cls = self._build_player_class(node, autoplay_mode)
-        start_time = asyncio.get_running_loop().time()
-        try:
-            await channel.connect(cls=player_cls, timeout=5)
-        except Exception:
-            elapsed = asyncio.get_running_loop().time() - start_time
-            logging.warning(
-                "[sonolink] Voice connect duration %.2fs (failed) | guild=%s channel=%s node=%s",
-                elapsed,
-                channel.guild.id,
-                channel.id,
-                node.uri,
-            )
-            raise
-        else:
-            elapsed = asyncio.get_running_loop().time() - start_time
-            logging.info(
-                "[sonolink] Voice connect duration %.2fs | guild=%s channel=%s node=%s",
-                elapsed,
-                channel.guild.id,
-                channel.id,
-                node.uri,
-            )
 
     async def _play_track(
         self, ctx: discord.Interaction, track: sl_models.Playable

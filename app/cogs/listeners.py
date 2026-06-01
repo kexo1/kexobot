@@ -345,7 +345,7 @@ class Listeners(commands.Cog):
 
         if len(player.channel.members) == 1:
             try:
-                await asyncio.sleep(2)
+                await asyncio.sleep(5)
                 if len(player.channel.members) != 1:
                     return
 

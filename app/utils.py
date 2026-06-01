@@ -366,6 +366,7 @@ async def switch_node(
     if switching_map.get(guild_id):
         return None
 
+    # Set switching to True for guild
     switching_map[guild_id] = True
 
     try:

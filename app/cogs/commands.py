@@ -166,7 +166,7 @@ class CommandCog(commands.Cog):
                 self._bot, player=player, play_after=True, send_success_message=False
             )
             if not node:
-                await send_response(ctx, "NODE_CONNECT_FAILURE", uri=node.uri)
+                await send_response(ctx, "NODE_CONNECT_FAILURE")
                 return
 
             self._bot.node = node
