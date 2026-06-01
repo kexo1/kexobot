@@ -115,6 +115,8 @@ intents.members = False
 
 bot = KexoBotClient(command_prefix=commands.when_mentioned, intents=intents)
 
+_loop_lag_last_tick: float | None = None
+
 
 async def check_node_status(node: sonolink.Node) -> bool:
     """Check the status of a lavalink node.
@@ -145,21 +147,6 @@ async def check_node_status(node: sonolink.Node) -> bool:
     return False
 
 
-async def verify_node_health(node: sonolink.Node) -> bool:
-    """Validate that a connected node still responds to requests."""
-    try:
-        await asyncio.wait_for(node.fetch_info(), timeout=2)
-        return True
-    except Exception:
-        logging.info(f"[Sonolink] Node failed health check: ({node.uri})")
-        try:
-            await node.close()
-        except RuntimeError:
-            pass
-
-        return False
-
-
 def load_humor_api_tokens() -> None:
     """Load the humor API tokens."""
     bot.humor_api_tokens = {token: {"exhausted": False} for token in ENV_HUMOR_KEY}
@@ -180,8 +167,14 @@ async def close_unused_nodes() -> None:
             if node.is_connected:
                 continue
 
-            await node.close()
-            logging.info(f"[Sonolink] Closed unused node: {node.uri}")
+            try:
+                await node.close()
+                logging.info(f"[Sonolink] Closed unused node: {node.uri}")
+            except RuntimeError:
+                logging.debug(
+                    "[Sonolink] Skipped closing node not fully connected: %s",
+                    node.uri,
+                )
 
 
 def get_online_nodes() -> int:
@@ -489,17 +482,9 @@ class KexoBot:
                 None,
             )
             if existing_node and existing_node.is_connected:
-                if await verify_node_health(existing_node):
-                    node = existing_node
-                    is_connected = True
-                    break
-
-                node_data = bot.cached_lavalink_servers.get(existing_node.uri)
-                if node_data:
-                    node_data["score"] -= 1
-
-                del node_candidates[node_uri]
-                continue
+                node = existing_node
+                is_connected = True
+                break
 
             node = build_node(node_uri, node_info["password"])
             is_connected = await check_node_status(node)
@@ -629,6 +614,22 @@ async def hourly_loop_task() -> None:
     await kexobot.hourly_loop()
 
 
+@tasks.loop(seconds=5)
+async def loop_lag_task() -> None:
+    """Log event loop lag to help diagnose timeouts."""
+    global _loop_lag_last_tick
+    now = asyncio.get_running_loop().time()
+    if _loop_lag_last_tick is None:
+        _loop_lag_last_tick = now
+        return
+
+    expected = _loop_lag_last_tick + 5
+    lag = now - expected
+    _loop_lag_last_tick = now
+    if lag >= 1.0:
+        logging.warning("[LoopLag] Event loop lag %.2fs", lag)
+
+
 @main_loop_task.before_loop
 async def before_main_loop() -> None:
     """Wait until the bot is ready before starting the main loop."""
@@ -638,6 +639,12 @@ async def before_main_loop() -> None:
 @hourly_loop_task.before_loop
 async def before_hourly_loop() -> None:
     """Wait until the bot is ready before starting the hourly loop."""
+    await bot.wait_until_ready()
+
+
+@loop_lag_task.before_loop
+async def before_loop_lag() -> None:
+    """Wait until the bot is ready before starting loop lag monitor."""
     await bot.wait_until_ready()
 
 
@@ -669,6 +676,7 @@ async def bot_loader(main: KexoBot) -> None:
 
     main_loop_task.start()
     hourly_loop_task.start()
+    loop_lag_task.start()
 
     while not main.session:
         await asyncio.sleep(1)

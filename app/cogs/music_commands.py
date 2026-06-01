@@ -931,7 +931,7 @@ class MusicCommands(commands.Cog):
         except (discord.Forbidden, discord.ClientException):
             await send_response(ctx, "NO_PERMISSIONS")
             return False
-        except Exception as e:
+        except Exception:
             logging.exception(
                 "[sonolink] Voice connect failed | guild=%s channel=%s user=%s node=%s autoplay=%s",
                 ctx.guild.id if ctx.guild else "unknown",
@@ -939,7 +939,6 @@ class MusicCommands(commands.Cog):
                 ctx.user.id,
                 self._bot.node.uri if self._bot.node else "none",
                 autoplay_mode,
-                e,
             )
             return await self._retry_join_channel(ctx)
 
@@ -954,14 +953,13 @@ class MusicCommands(commands.Cog):
         try:
             await self._connect_voice_channel(ctx.user.voice.channel)
             return True
-        except Exception as e:
+        except Exception:
             logging.exception(
                 "[Sonolink] Voice connect retry failed | guild=%s channel=%s user=%s node=%s",
                 ctx.guild.id if ctx.guild else "unknown",
                 ctx.user.voice.channel.id if ctx.user.voice else "unknown",
                 ctx.user.id,
                 self._bot.node.uri if self._bot.node else "none",
-                e,
             )
             await send_response(ctx, "FAILED_TO_JOIN_CHANNEL", ephemeral=False)
 
@@ -994,7 +992,28 @@ class MusicCommands(commands.Cog):
             raise RuntimeError("No connected node available")
 
         player_cls = self._build_player_class(node, autoplay_mode)
-        await channel.connect(cls=player_cls, timeout=5)
+        start_time = asyncio.get_running_loop().time()
+        try:
+            await channel.connect(cls=player_cls, timeout=5)
+        except Exception:
+            elapsed = asyncio.get_running_loop().time() - start_time
+            logging.warning(
+                "[sonolink] Voice connect duration %.2fs (failed) | guild=%s channel=%s node=%s",
+                elapsed,
+                channel.guild.id,
+                channel.id,
+                node.uri,
+            )
+            raise
+        else:
+            elapsed = asyncio.get_running_loop().time() - start_time
+            logging.info(
+                "[sonolink] Voice connect duration %.2fs | guild=%s channel=%s node=%s",
+                elapsed,
+                channel.guild.id,
+                channel.id,
+                node.uri,
+            )
 
     async def _play_track(
         self, ctx: discord.Interaction, track: sl_models.Playable
