@@ -1000,20 +1000,7 @@ class MusicCommands(commands.Cog):
                 send_success_message=False,
                 send_failure_message=False,
             )
-
-            try:
-                await player.set_volume(volume)
-            except Exception as retry_error:
-                logging.warning(
-                    "[Sonolink] Volume sync skipped after retry failure: %s",
-                    retry_error,
-                )
-                await send_response(
-                    ctx,
-                    "NODE_UNRESPONSIVE",
-                    ephemeral=False,
-                )
-                return
+            await player.set_volume(volume)
 
         # Autoplay mode is already set at player creation time from guild data
 

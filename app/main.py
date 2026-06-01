@@ -223,10 +223,6 @@ def build_node(uri: str, password: str) -> sonolink.Node:
         password=password,
         retries=1,
         resume_timeout=60,
-        inactivity_settings=InactivitySettings(
-            timeout=300,
-            mode=sonolink.InactivityMode.ALL_BOTS,
-        ),
         cache_settings=CacheSettings(
             enabled=True,
             max_items=1000,

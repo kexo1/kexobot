@@ -21,7 +21,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     # Error responses
     "NO_VOICE_CHANNEL": discord.Embed(
         title="",
-        description=":x: You're not in a voice channel. Type `/play` from vc.",
+        description=":x: You're not in a voice channel. Type `/music play` from vc.",
         color=discord.Color.blue(),
     ),
     "NOT_IN_VOICE_CHANNEL": discord.Embed(
@@ -41,13 +41,13 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "NOT_PLAYING": discord.Embed(
         title="",
-        description=":x: I'm not playing anything. Type `/play` from vc.",
+        description=":x: I'm not playing anything. Type `/music play` from vc.",
         color=discord.Color.blue(),
     ),
     "NO_TRACK_FOUND_IN_QUEUE": lambda **kwargs: discord.Embed(
         title="",
         description=f":x: No tracks with index {kwargs.get('to_find')} were found in the queue."
-        " Type `/queue` to see the list of tracks.",
+        " Type `/music queue` to see the list of tracks.",
         color=discord.Color.blue(),
     ),
     "NO_PERMISSIONS": discord.Embed(
@@ -81,10 +81,22 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         description=":warning: Node is unresponsive, trying to connect to a new node in a moment.",
         color=discord.Color.yellow(),
     ),
+    "NODE_WEBSOCKET_CLOSED": lambda **kwargs: discord.Embed(
+        title="",
+        description=":warning: Node is unresponsive, trying to connect to a new node in a moment"
+        f"\n**Reason**: {kwargs.get('reason')}"
+        f"\n**Caused by discord**: {kwargs.get('by_remote')}",
+        color=discord.Color.yellow(),
+    ),
     "NODE_NOT_FOUND": discord.Embed(
         title="",
         description=":x: Couldn't find node to play this music, try switching to a different node with `/node reconnect`, or use Youtube links instead of Spotify/Deezer/Apple Music.",
         color=discord.Color.from_rgb(r=220, g=0, b=0),
+    ),
+    "KICKED_FROM_CHANNEL": discord.Embed(
+        title="",
+        description="I've been kicked from channel <:sad:1511115119365456073>, please use `/music leave`",
+        color=discord.Color.blue(),
     ),
     "FAILED_TO_JOIN_CHANNEL": discord.Embed(
         title="",
@@ -132,7 +144,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         title="",
         description=":warning: An error occurred when trying to send"
         " request to the node, trying to connect to a new node in a moment."
-        f"\n\n**Message: {kwargs.get('error')}**",
+        f"\n\n**Message:** {kwargs.get('error')}",
         color=discord.Color.yellow(),
     ),
     "JOKE_TIMEOUT": discord.Embed(
@@ -238,106 +250,100 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     # -------------------- Success messages -------------------- #
     "TRACK_SKIPPED": discord.Embed(
         title="",
-        description="**⏭️ Skipped**",
+        description="⏭️ Skipped",
         color=discord.Color.blue(),
     ),
     "TRACK_SKIPPED_TO": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**⏭️ Skipped to [{kwargs.get('title')}]({kwargs.get('uri')})**",
+        description=f"⏭️ Skipped to [{kwargs.get('title')}]({kwargs.get('uri')})",
         color=discord.Color.blue(),
     ),
     "QUEUE_CLEARED": discord.Embed(
         title="",
-        description="**:wastebasket: Queue has been cleared.**",
+        description=":wastebasket: Queue has been cleared.",
         color=discord.Color.blue(),
     ),
     "QUEUE_TRACK_REMOVED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**:wastebasket: Removed [{kwargs.get('title')}]({kwargs.get('uri')})**",
+        description=f":wastebasket: Removed [{kwargs.get('title')}]({kwargs.get('uri')})",
         color=discord.Color.blue(),
     ),
     "QUEUE_SHUFFLED": discord.Embed(
         title="",
-        description="**🔀 Queue shuffled!**",
+        description="🔀 Queue shuffled.",
         color=discord.Color.blue(),
     ),
     "QUEUE_LOOP_DISABLED": discord.Embed(
         title="",
-        description="**✅ No longer looping queue.**",
+        description="✅ No longer looping queue.",
         color=discord.Color.blue(),
     ),
     "QUEUE_LOOP_ENABLED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**🔁 Looping queue with `({kwargs.get('count')}` songs)**",
+        description=f"🔁 Looping queue with `({kwargs.get('count')}` songs)",
         color=discord.Color.blue(),
     ),
     "TRACK_LOOP_DISABLED": discord.Embed(
         title="",
-        description="**✅ No longer looping current song.**",
+        description="✅ No longer looping current song.",
         color=discord.Color.blue(),
     ),
     "TRACK_LOOP_ENABLED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**🔁 Looping [{kwargs.get('title')}]({kwargs.get('uri')})**",
+        description=f"🔁 Looping [{kwargs.get('title')}]({kwargs.get('uri')})",
         color=discord.Color.blue(),
     ),
     "VOLUME_CHANGED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**🔊 Volume set to `{kwargs.get('volume')}%`**",
+        description=f"🔊 Volume set to `{kwargs.get('volume')}%`",
         color=discord.Color.blue(),
     ),
     "TRACK_PAUSED": _embed_with_footer(
         title="",
-        description="**⏸️ Paused**",
+        description="⏸️ Paused",
         color=discord.Color.blue(),
         footer_text="Deleting in 10s.",
     ),
     "TRACK_RESUMED": _embed_with_footer(
         title="",
-        description="**:arrow_forward: Resumed**",
+        description=":arrow_forward: Resumed",
         color=discord.Color.blue(),
         footer_text="Deleting in 10s.",
     ),
     "DISCONNECTED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**✅ Left <#{kwargs.get('channel_id')}>**",
+        description=f"✅ Left <#{kwargs.get('channel_id')}>",
         color=discord.Color.blue(),
     ),
     "DISCONNECTED_INACTIVITY": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**Left <#{kwargs.get('channel_id')}> after 10 minutes of inactivity.**",
+        description=f"Left <#{kwargs.get('channel_id')}> after 10 minutes of inactivity.",
         color=discord.Color.blue(),
     ),
     "DISCONNECTED_NO_USERS": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**Left <#{kwargs.get('channel_id')}>, no users in channel.**",
-        color=discord.Color.blue(),
-    ),
-    "DISCONNECTED_MANUALLY": lambda **kwargs: discord.Embed(
-        title="",
-        description=f"**Disconnected from <#{kwargs.get('channel_id')}>,"
-        f" please use `/leave` next time.**",
+        description=f"Left <#{kwargs.get('channel_id')}>, no users in channel.",
         color=discord.Color.blue(),
     ),
     "JOINED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**✅ Joined to <#{kwargs.get('channel_id')}>"
-        f" and set text channel to <#{kwargs.get('text_channel_id')}>.**",
+        description=f"✅ Joined to <#{kwargs.get('channel_id')}>"
+        f" and set text channel to <#{kwargs.get('text_channel_id')}>.",
         color=discord.Color.blue(),
     ),
     "MOVED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**:wheelchair: Moving to <#{kwargs.get('channel_id')}>**",
+        description=f":wheelchair: Moving to <#{kwargs.get('channel_id')}>",
         color=discord.Color.blue(),
     ),
     "CURRENT_VOLUME": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**🔊 `{kwargs.get('volume')}%`**",
+        description=f"🔊 `{kwargs.get('volume')}%`",
         color=discord.Color.blue(),
     ),
     "SPEED_CHANGED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**:stopwatch:  Speed changed to `{kwargs.get('multiplier')}x`**",
+        description=f":stopwatch:  Speed changed to `{kwargs.get('multiplier')}x`",
         color=discord.Color.blue(),
     ),
     "EFFECTS_CLEARED": _embed_with_footer(
@@ -348,27 +354,27 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "AUTOPLAY_MODE_CHANGED": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**:repeat: Autoplay mode set to `{kwargs.get('autoplay_mode')}`**\n_Changes will apply upon bot reconnect._",
+        description=f":repeat: Autoplay mode set to `{kwargs.get('autoplay_mode')}`\n_Changes will apply upon bot reconnect._",
         color=discord.Color.blue(),
     ),
     "NODE_CONNECT_SUCCESS": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**✅ Connected to node `{kwargs.get('uri')}`**",
+        description=f"✅ Connected to node `{kwargs.get('uri')}`",
         color=discord.Color.blue(),
     ),
     "NODE_RECONNECT_TO_PLAYER_SUCCESS": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**✅ Reconnected your player to node `{kwargs.get('uri')}`**",
+        description=f"✅ Reconnected your player to node `{kwargs.get('uri')}`",
         color=discord.Color.blue(),
     ),
     "NODE_RECONNECT_SUCCESS": lambda **kwargs: discord.Embed(
         title="",
-        description=f"**✅ Reconnected to node `{kwargs.get('uri')}`**",
+        description=f"✅ Reconnected to node `{kwargs.get('uri')}`",
         color=discord.Color.blue(),
     ),
     "USER_DATA_GENERATED": lambda **kwargs: discord.Embed(
         title="",
-        description="**:floppy_disk:  Generated user data.**",
+        description=":floppy_disk:  Generated user data.",
         color=discord.Color.blue(),
     ),
     "DB_ADDED": lambda **kwargs: discord.Embed(

@@ -190,11 +190,27 @@ class Listeners(commands.Cog):
         payload: :class:`WebSocketClosedEventPayload`
             The payload containing information about the websocket closure.
         """
+        if payload.by_remote:
+            await send_response(
+                player.text_channel,
+                "KICKED_FROM_CHANNEL",
+                respond=False,
+            )
+            return
+
         node = player.node
 
         node_data = self._bot.cached_lavalink_servers.get(node.uri)
         if node_data:
             node_data["score"] -= 1
+
+        await send_response(
+            player.text_channel,
+            "NODE_WEBSOCKET_CLOSED",
+            respond=False,
+            reason=payload.reason,
+            by_remote=payload.by_remote,
+        )
 
         if self._bot.get_online_nodes() == 0:
             logging.warning(
@@ -203,6 +219,9 @@ class Listeners(commands.Cog):
             await self._bot.connect_node()
             return
 
+        logging.warning(
+            f"[Sonolink] Node websocket closed, switching node. ({node.uri})"
+        )
         await switch_node(bot=self._bot, player=player)
 
     @commands.Cog.listener()
@@ -340,26 +359,23 @@ class Listeners(commands.Cog):
         if player is None:
             return
 
-        if member == member.guild.me and after.channel == player.channel:
+        if before.channel != player.channel and after.channel != player.channel:
             return
 
-        if len(player.channel.members) == 1:
+        if (
+            len(player.channel.members) == 1
+            and player.channel.members[0] == player.guild.me
+        ):
             try:
-                await asyncio.sleep(5)
-                if len(player.channel.members) != 1:
-                    return
-
                 await send_response(
                     player.text_channel,
                     "DISCONNECTED_NO_USERS",
                     respond=False,
                     channel_id=player.channel.id,
                 )
-                player.cleanup()
-                await player.disconnect()
+                await player.disconnect(force=True)
             except AttributeError:
                 pass
-            return
 
 
 async def setup(bot: commands.Bot) -> None:
