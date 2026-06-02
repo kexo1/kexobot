@@ -3,7 +3,7 @@ import datetime
 import logging
 import random
 import re
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import discord
 import sonolink
@@ -33,6 +33,9 @@ from app.utils import (
     switch_node,
 )
 
+if TYPE_CHECKING:
+    from app.main import KexoBotClient
+
 
 async def is_owner(interaction: discord.Interaction) -> bool:
     return await interaction.client.is_owner(interaction.user)
@@ -41,7 +44,7 @@ async def is_owner(interaction: discord.Interaction) -> bool:
 def set_track_requester(
     track: sl_models.Playable,
     user: discord.abc.User,
-    bot: commands.Bot | None = None,
+    bot: commands.Bot,
 ) -> None:
     if track.data.user_data is None:
         track.data.user_data = {}
@@ -51,39 +54,33 @@ def set_track_requester(
     if avatar:
         track.data.user_data["requester_avatar"] = avatar
 
-    if getattr(bot, "track_requesters", None) is not None:
-        bot.track_requesters[track.encoded] = {
-            "name": user.name,
-            "avatar": avatar or "",
-        }
+    bot.state.cache_track_requester(track.encoded, user.name, avatar or "")
 
 
 def get_track_requester_name(
-    track: sl_models.Playable, bot: commands.Bot | None = None
+    track: sl_models.Playable, bot: commands.Bot
 ) -> str:
     requester_name = None
     if track.data.user_data:
         requester_name = track.data.user_data.get("requester_name")
     if requester_name:
         return requester_name
-    if getattr(bot, "track_requesters", None) is not None:
-        cached = bot.track_requesters.get(track.encoded)
-        if cached and cached.get("name"):
-            return cached["name"]
+    cached = bot.state.get_track_requester(track.encoded)
+    if cached and cached.get("name"):
+        return cached["name"]
     return "Unknown"
 
 
 def get_track_requester_avatar(
-    track: sl_models.Playable, bot: commands.Bot | None = None
+    track: sl_models.Playable, bot: commands.Bot
 ) -> str | None:
     if track.data.user_data:
         avatar = track.data.user_data.get("requester_avatar")
         if avatar:
             return avatar
-    if bot is not None and getattr(bot, "track_requesters", None) is not None:
-        cached = bot.track_requesters.get(track.encoded)
-        if cached:
-            return cached.get("avatar") or None
+    cached = bot.state.get_track_requester(track.encoded)
+    if cached:
+        return cached.get("avatar") or None
     return None
 
 
@@ -163,8 +160,8 @@ def queue_embed(track: sl_models.Playable) -> discord.Embed:
     )
 
 
-def playing_embed(track: sl_models.Playable) -> discord.Embed:
-    author_pfp = get_track_requester_avatar(track)
+def playing_embed(track: sl_models.Playable, bot: commands.Bot) -> discord.Embed:
+    author_pfp = get_track_requester_avatar(track, bot)
 
     embed = discord.Embed(
         title="Now playing",
@@ -172,7 +169,7 @@ def playing_embed(track: sl_models.Playable) -> discord.Embed:
         color=discord.Colour.green(),
     )
     embed.set_footer(
-        text=f"Requested by {get_track_requester_name(track)}", icon_url=author_pfp
+        text=f"Requested by {get_track_requester_name(track, bot)}", icon_url=author_pfp
     )
     embed.set_thumbnail(url=track.artwork)
     return embed
@@ -195,10 +192,9 @@ class MusicCommands(commands.Cog):
         The bot instance that this cog is associated with.
     """
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: "KexoBotClient"):
         self._bot = bot
         self._session = self._bot.session
-        # self._node_is_switching: dict[int, bool] = {}
         self._radiomap_cache: list[str] = []
 
     music = app_commands.Group(name="music", description="All music commands")
@@ -291,7 +287,7 @@ class MusicCommands(commands.Cog):
             return
 
         if player.should_respond:
-            await send_interaction(ctx, embed=playing_embed(track))
+            await send_interaction(ctx, embed=playing_embed(track, self._bot))
             player.should_respond = False
 
     @radio.command(name="random", description="Gets random radio from RadioMap.")
@@ -934,36 +930,23 @@ class MusicCommands(commands.Cog):
             else sonolink.AutoPlayMode.ENABLED
         )
 
-        last_error: Exception | None = None
-        for attempt in range(2):
-            node = await self._bot.ensure_bot_node_ready(force_refresh=attempt > 0)
-            if not node:
-                await send_response(ctx, "NODE_NOT_FOUND", ephemeral=False)
-                return False
+        node = await self._bot.ensure_bot_node_ready()
+        if not node:
+            await send_response(ctx, "NODE_NOT_FOUND", ephemeral=False)
+            return False
 
-            try:
-                player_cls = self._build_player_class(node, autoplay_mode)
-                await channel.connect(cls=player_cls)
-                return True
-            except (discord.Forbidden, discord.ClientException):
-                await send_response(ctx, "NO_PERMISSIONS", ephemeral=False)
-                return False
-            except Exception as exc:
-                last_error = exc
-                logging.warning(
-                    "[Sonolink] Voice connect attempt %s failed for guild %s: %s",
-                    attempt + 1,
-                    ctx.guild.id if ctx.guild else "unknown",
-                    exc,
-                )
-
-        await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
-        if last_error:
-            logging.error(
+        try:
+            player_cls = self._build_player_class(node, autoplay_mode)
+            await channel.connect(cls=player_cls)
+            return True
+        except (discord.Forbidden, discord.ClientException):
+            await send_response(ctx, "NO_PERMISSIONS", ephemeral=False)
+        except Exception:
+            await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
+            logging.exception(
                 "[Sonolink] Error connecting to voice channel on guild %s, channel %s",
                 ctx.guild.id if ctx.guild else "unknown",
                 ctx.user.voice.channel.id if ctx.user.voice else "unknown",
-                exc_info=last_error,
             )
 
         return False
@@ -1154,7 +1137,7 @@ class MusicCommands(commands.Cog):
         return []
 
 
-async def setup(bot: commands.Bot) -> None:
+async def setup(bot: "KexoBotClient") -> None:
     """Setup function for the MusicCommands cog."""
     cog = MusicCommands(bot)
     await bot.add_cog(cog)

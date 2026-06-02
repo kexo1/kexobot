@@ -369,9 +369,37 @@ async def switch_node(
     # Set switching to True for guild
     switching_map[guild_id] = True
 
+    original_autoplay_mode = player.autoplay
+
+    async def _try_move_and_resume(target_node: sonolink.Node) -> bool:
+        try:
+            await player.move_to(target_node)
+            if play_after and getattr(player, "temp_current", None):
+                await player.play(player.temp_current)
+            return True
+        except Exception:
+            bot.state.change_node_score(target_node.uri, -1)
+            return False
+
+    async def _playback_probe_failed(target_node: sonolink.Node) -> bool:
+        if not play_after:
+            return False
+
+        track_failed_event = asyncio.Event()
+        bot.state.set_track_exception_probe(
+            guild_id, player.temp_current, track_failed_event
+        )
+        try:
+            await asyncio.wait_for(track_failed_event.wait(), timeout=3)
+            bot.state.change_node_score(target_node.uri, -1)
+            return True
+        except asyncio.TimeoutError:
+            return False
+        finally:
+            bot.state.clear_track_exception_probe(guild_id)
+
     try:
-        for i in range(10):
-            player_autoplay_mode = player.autoplay
+        for attempt in range(10):
             player.autoplay = sonolink.AutoPlayMode.DISABLED
 
             node: sonolink.Node | None = await bot.connect_node(
@@ -380,32 +408,14 @@ async def switch_node(
             if not node:
                 continue
 
-            try:
-                await player.move_to(node)
-                if play_after and getattr(player, "temp_current", None):
-                    await player.play(player.temp_current)
-            except Exception:
-                bot.cached_lavalink_servers[node.uri]["score"] -= 1
+            is_moved = await _try_move_and_resume(node)
+            if not is_moved:
                 continue
 
-            player.autoplay = player_autoplay_mode
+            if await _playback_probe_failed(node):
+                continue
 
-            # Track failure synchronization while switching nodes.
-            if play_after:
-                track_failed_event = asyncio.Event()
-                bot.track_exceptions[player.guild.id] = (
-                    player.temp_current,
-                    track_failed_event,
-                )
-
-                try:
-                    await asyncio.wait_for(track_failed_event.wait(), timeout=3)
-                    bot.cached_lavalink_servers[node.uri]["score"] -= 1
-                    continue
-                except asyncio.TimeoutError:
-                    bot.track_exceptions.pop(player.guild.id, None)
-
-            logging.info(f"[Sonolink] {i + 1}. Node switched ({node.uri})")
+            logging.info(f"[Sonolink] {attempt + 1}. Node switched ({node.uri})")
             if send_success_message:
                 embed = discord.Embed(
                     title="",
@@ -426,6 +436,7 @@ async def switch_node(
 
         return None
     finally:
+        player.autoplay = original_autoplay_mode
         switching_map[guild_id] = False
 
 

@@ -6,7 +6,7 @@ import os
 import random
 import sys
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from urllib.parse import urlparse
 
 import asyncpraw.models
@@ -38,6 +38,9 @@ from app.utils import (
     switch_node,
 )
 
+if TYPE_CHECKING:
+    from app.main import KexoBotClient
+
 host_authors = []
 
 
@@ -65,8 +68,8 @@ class CommandCog(commands.Cog):
         The bot instance.
     """
 
-    def __init__(self, bot: commands.Bot) -> None:
-        self._bot = bot
+    def __init__(self, bot: KexoBotClient) -> None:
+        self._bot: KexoBotClient = bot
         self._session: httpx.AsyncClient = self._bot.session
         self._bot_config: AsyncMongoClient = self._bot.bot_config
         self._user_data_db: AsyncMongoClient = self._bot.user_data_db
@@ -215,7 +218,7 @@ class CommandCog(commands.Cog):
         unix_timestamp = int(iso_to_timestamp(str(node_info.build_time)).timestamp())
         embed.add_field(
             name="Score:",
-            value=self._bot.cached_lavalink_servers[node.uri]["score"],
+            value=self._bot.state.get_node_score(node.uri) or 0,
         )
         embed.add_field(
             name="Plugins:",
@@ -1218,6 +1221,6 @@ class SubredditSelect(discord.ui.Select):
         await interaction.response.defer()
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: KexoBotClient):
     """Setup function to add the CommandCog to the bot."""
     await bot.add_cog(CommandCog(bot))

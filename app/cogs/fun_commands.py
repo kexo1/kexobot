@@ -1,6 +1,6 @@
 import random
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import asyncpraw.models
 import asyncpraw.reddit
@@ -17,6 +17,9 @@ from discord.ext import commands
 from app.constants import API_DAD_JOKE, API_HUMORAPI, API_JOKEAPI, JOKE_EXCLUDED_WORDS
 from app.response_handler import defer_interaction, send_interaction, send_response
 from app.utils import get_guild_data, get_user_data, load_text_file, make_http_request
+
+if TYPE_CHECKING:
+    from app.main import KexoBotClient
 
 
 def is_valid_submission(
@@ -64,7 +67,7 @@ class FunCommands(commands.Cog):
         The bot instance that this cog is associated with.
     """
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "KexoBotClient") -> None:
         self._bot = bot
         self._bot_config = self._bot.bot_config
         self._user_data_db = self._bot.user_data_db
@@ -500,6 +503,6 @@ class FunCommands(commands.Cog):
         return token
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: "KexoBotClient"):
     """This function sets up the FunCommands cog."""
     await bot.add_cog(FunCommands(bot))

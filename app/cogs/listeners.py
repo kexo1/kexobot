@@ -1,6 +1,6 @@
-import asyncio
 import logging
 import random
+from typing import TYPE_CHECKING
 
 import discord
 import sonolink
@@ -18,13 +18,16 @@ from app.constants import ICON_YOUTUBE
 from app.response_handler import send_response
 from app.utils import fix_audio_title, switch_node
 
+if TYPE_CHECKING:
+    from app.main import KexoBotClient
+
 
 def is_bot_node_connected(bot: commands.Bot) -> bool:
     return bool(getattr(bot, "node", None))
 
 
 def resolve_requester(
-    bot: commands.Bot, track: sl_models.Playable
+    bot: "KexoBotClient", track: sl_models.Playable
 ) -> tuple[str | None, str | None]:
     requester_name = None
     requester_avatar = None
@@ -34,7 +37,7 @@ def resolve_requester(
     if requester_name:
         return requester_name, requester_avatar
 
-    cached = bot.track_requesters.get(track.encoded)
+    cached = bot.state.get_track_requester(track.encoded)
     if cached:
         cached_avatar = cached.get("avatar") or None
         return cached.get("name"), cached_avatar
@@ -79,8 +82,19 @@ class Listeners(commands.Cog):
         The bot instance that this cog is associated with.
     """
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: "KexoBotClient"):
         self._bot = bot
+
+    @staticmethod
+    def _is_same_track(
+        track: sl_models.Playable, payload_track: sl_models.Playable
+    ) -> bool:
+        track_encoded = getattr(track, "encoded", None)
+        payload_encoded = getattr(payload_track, "encoded", None)
+        return bool(
+            track == payload_track
+            or (track_encoded and payload_encoded and track_encoded == payload_encoded)
+        )
 
     @commands.Cog.listener()
     async def on_sonolink_node_ready(self, payload: ReadyEvent) -> None:
@@ -114,7 +128,7 @@ class Listeners(commands.Cog):
             )
             node_data = self._bot.cached_lavalink_servers.get(node.uri)
             if node_data:
-                node_data["score"] -= 1
+                self._bot.state.change_node_score(node.uri, -1)
             await self._bot.connect_node()
 
     @commands.Cog.listener()  # noinspection PyUnusedLocal
@@ -133,7 +147,7 @@ class Listeners(commands.Cog):
         if self._bot.node_is_switching.get(player.guild.id):
             return
 
-        self._bot.cached_lavalink_servers[player.node.uri]["score"] += 1
+        self._bot.state.change_node_score(player.node.uri, 1)
         current_track = player.current or payload.track
         if (
             current_track
@@ -190,6 +204,9 @@ class Listeners(commands.Cog):
         payload: :class:`WebSocketClosedEventPayload`
             The payload containing information about the websocket closure.
         """
+        logging.warning(
+            f"[Sonolink] Websocket closed for node {player.node.uri}, reason: {payload.reason}, by_remote: {payload.by_remote}"
+        )
         if payload.by_remote:
             await send_response(
                 player.text_channel,
@@ -202,7 +219,7 @@ class Listeners(commands.Cog):
 
         node_data = self._bot.cached_lavalink_servers.get(node.uri)
         if node_data:
-            node_data["score"] -= 1
+            self._bot.state.change_node_score(node.uri, -1)
 
         await send_response(
             player.text_channel,
@@ -213,15 +230,9 @@ class Listeners(commands.Cog):
         )
 
         if self._bot.get_online_nodes() == 0:
-            logging.warning(
-                f"[Sonolink] Node websocket closed, connecting new node. ({node.uri})"
-            )
             await self._bot.connect_node()
             return
 
-        logging.warning(
-            f"[Sonolink] Node websocket closed, switching node. ({node.uri})"
-        )
         await switch_node(bot=self._bot, player=player)
 
     @commands.Cog.listener()
@@ -237,27 +248,18 @@ class Listeners(commands.Cog):
         payload: :class:`TrackExceptionEventPayload`
             The payload containing information about the track exception.
         """
-        data = self._bot.track_exceptions.get(player.guild.id)
-        if data:
-            track, track_failed_event = data
-            track_encoded = getattr(track, "encoded", None)
-            payload_encoded = getattr(payload.track, "encoded", None)
-            same_track = track == payload.track
-            if (
-                not same_track
-                and track_encoded
-                and payload_encoded
-                and track_encoded == payload_encoded
-            ):
-                same_track = True
-            if same_track:
-                track_failed_event.set()
-                return
 
         if self._bot.node_is_switching.get(player.guild.id):
             return
 
-        self._bot.cached_lavalink_servers[player.node.uri]["score"] -= -1
+        data = self._bot.state.get_track_exception_probe(player.guild.id)
+        if data:
+            track, track_failed_event = data
+            if self._is_same_track(track, payload.track):
+                track_failed_event.set()
+                return
+
+        self._bot.state.change_node_score(player.node.uri, -1)
 
         await send_response(
             player.text_channel,
@@ -282,27 +284,17 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStuckEventPayload`
             The payload containing information about the track that got stuck.
         """
-        data = self._bot.track_exceptions.get(player.guild.id)
-        if data:
-            track, track_failed_event = data
-            track_encoded = getattr(track, "encoded", None)
-            payload_encoded = getattr(payload.track, "encoded", None)
-            same_track = track == payload.track
-            if (
-                not same_track
-                and track_encoded
-                and payload_encoded
-                and track_encoded == payload_encoded
-            ):
-                same_track = True
-            if same_track:
-                track_failed_event.set()
-                return
-
         if self._bot.node_is_switching.get(player.guild.id):
             return
 
-        self._bot.cached_lavalink_servers[player.node.uri]["score"] -= -1
+        data = self._bot.state.get_track_exception_probe(player.guild.id)
+        if data:
+            track, track_failed_event = data
+            if self._is_same_track(track, payload.track):
+                track_failed_event.set()
+                return
+
+        self._bot.state.change_node_score(player.node.uri, -1)
 
         await send_response(player.text_channel, "TRACK_STUCK", respond=False)
         await switch_node(
@@ -362,10 +354,10 @@ class Listeners(commands.Cog):
         if before.channel != player.channel and after.channel != player.channel:
             return
 
-        if (
-            len(player.channel.members) == 1
-            and player.channel.members[0] == player.guild.me
-        ):
+        if len(player.channel.members) == 1:
+            await player.disconnect(force=True)
+
+        if player.channel.members[0] == player.guild.me:
             try:
                 await send_response(
                     player.text_channel,
@@ -373,11 +365,10 @@ class Listeners(commands.Cog):
                     respond=False,
                     channel_id=player.channel.id,
                 )
-                await player.disconnect(force=True)
             except AttributeError:
                 pass
 
 
-async def setup(bot: commands.Bot) -> None:
+async def setup(bot: "KexoBotClient") -> None:
     """Adds the Listeners cog to the bot."""
     await bot.add_cog(Listeners(bot))

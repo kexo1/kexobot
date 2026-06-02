@@ -4,7 +4,7 @@ import logging
 import socket
 from datetime import datetime
 from itertools import islice
-from typing import Any, TypedDict
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import asyncpraw
@@ -19,6 +19,7 @@ from discord.ext import commands, tasks
 from pymongo import AsyncMongoClient
 from sonolink.models import CacheSettings
 
+from app.bot_state import BotState
 from app.classes.content_monitor import ContentMonitor
 from app.classes.lavalink_server import LavalinkServerManager
 from app.classes.reddit_fetcher import RedditFetcher
@@ -46,46 +47,14 @@ from app.constants import (
     USER_AGENT,
 )
 from app.response_handler import send_interaction
+from app.state_types import (
+    GuildData,
+    NodeCacheEntry,
+    TempGuildData,
+    TempUserData,
+    UserData,
+)
 from app.utils import generate_temp_guild_data, is_older_than, make_http_request
-
-
-class UserRedditData(TypedDict):
-    subreddits: tuple[str, ...] | list[str]
-    nsfw_posts: bool
-
-
-class UserData(TypedDict):
-    reddit: UserRedditData
-
-
-class TempUserRedditData(TypedDict):
-    viewed_posts: set[str]
-    search_limit: int
-    last_used: datetime
-    multireddit: asyncpraw.models.Multireddit
-
-
-class TempUserData(TypedDict):
-    reddit: TempUserRedditData
-
-
-class GuildMusicData(TypedDict):
-    autoplay_mode: int
-    volume: int
-
-
-class GuildData(TypedDict):
-    music: GuildMusicData
-
-
-class GuildJokesData(TypedDict):
-    viewed_jokes: list[str]
-    viewed_dad_jokes: list[str]
-    viewed_yo_mama_jokes: list[str]
-
-
-class TempGuildData(TypedDict):
-    jokes: GuildJokesData
 
 
 class KexoBotClient(commands.Bot):
@@ -95,8 +64,8 @@ class KexoBotClient(commands.Bot):
     temp_user_data: dict[int, TempUserData]
     guild_data: dict[int, GuildData]
     temp_guild_data: dict[int, TempGuildData]
-    track_exceptions: dict[str, Any]
-    cached_lavalink_servers: dict[str, dict[str, Any]]
+    track_exceptions: dict[int, tuple[Any, asyncio.Event]]
+    cached_lavalink_servers: dict[str, NodeCacheEntry]
     bot_config: AsyncMongoClient
     user_data_db: AsyncMongoClient
     guild_data_db: AsyncMongoClient
@@ -107,6 +76,7 @@ class KexoBotClient(commands.Bot):
     loaded_dad_jokes: list[str]
     loaded_yo_mama_jokes: list[str]
     session: httpx.AsyncClient | None
+    state: BotState
 
 
 intents = discord.Intents.default()
@@ -137,7 +107,7 @@ async def check_node_status(node: sonolink.Node) -> bool:
         return True
     except Exception:
         logging.info(f"[Sonolink] Node failed to connect: ({node.uri})")
-        bot.cached_lavalink_servers[node.uri]["score"] -= 1
+        bot.state.change_node_score(node.uri, -1)
 
     return False
 
@@ -145,40 +115,28 @@ async def check_node_status(node: sonolink.Node) -> bool:
 NODE_HEALTH_TIMEOUT = 3
 
 
-async def ensure_bot_node_ready(*, force_refresh: bool = False) -> sonolink.Node | None:
-    """Ensure the bot's Lavalink node can accept new voice sessions.
+async def ensure_bot_node_ready() -> sonolink.Node | None:
+    """Best-effort guard against stale node sessions.
 
-    After long uptime the node WebSocket can die while ``is_connected`` stays true
-    until the next operation; ``fetch_info`` catches that before voice connect.
+    This does not clear ``bot.node``. If the current node looks unhealthy, we try to
+    connect to a different one (excluding the current URI). If that fails, we keep
+    the existing node reference and return it.
     """
-    if force_refresh and bot.node:
-        try:
-            await bot.node.close()
-        except RuntimeError:
-            pass
-        bot.node = None
-
-    node = bot.node
-    if node is None or not node.is_connected:
+    node = getattr(bot, "node", None)
+    if node is None:
         return await bot.connect_node(switch_node=False)
 
     try:
-        await asyncio.wait_for(node.fetch_info(), timeout=NODE_HEALTH_TIMEOUT)
-        return node
+        if node.is_connected:
+            await asyncio.wait_for(node.fetch_info(), timeout=NODE_HEALTH_TIMEOUT)
+            return node
     except Exception:
-        logging.warning(
-            "[Sonolink] Active node failed health check, reconnecting (%s)",
-            node.uri,
-        )
-        node_data = bot.cached_lavalink_servers.get(node.uri)
-        if node_data:
-            node_data["score"] -= 1
-        try:
-            await node.close()
-        except RuntimeError:
-            pass
-        bot.node = None
-        return await bot.connect_node(switch_node=False, exclude_uri=node.uri)
+        logging.warning("[Sonolink] Node health check failed (%s)", node.uri)
+
+    new_node = await bot.connect_node(
+        switch_node=True, exclude_uri=getattr(node, "uri", None)
+    )
+    return new_node or node
 
 
 def load_humor_api_tokens() -> None:
@@ -230,30 +188,19 @@ def clear_temp_reddit_data() -> None:
     """Clear the temporary user reddit data."""
     if not bot.temp_user_data:
         return
-
-    for _, user_data in bot.temp_user_data.items():
-        reddit_data = user_data["reddit"]
-        last_used = reddit_data["last_used"]
-        if not last_used:
-            continue
-
-        if is_older_than(5, last_used):
-            reddit_data["last_used"] = None
-            reddit_data["viewed_posts"] = set()
-            reddit_data["search_limit"] = 3
+    bot.state.clear_stale_temp_reddit_data(
+        is_older_than_fn=is_older_than, stale_hours=5
+    )
 
 
 def clear_temp_guild_data() -> None:
     """Clear the temporary guild data."""
-    for guild_id in bot.temp_guild_data:
-        bot.temp_guild_data[guild_id] = generate_temp_guild_data()
+    bot.state.reset_temp_guild_data(generate_temp_guild_data)
 
 
 def clear_cached_jokes() -> None:
     """Clear the cached jokes loaded from FunCommands"""
-    bot.loaded_jokes = []
-    bot.loaded_dad_jokes = []
-    bot.loaded_yo_mama_jokes = []
+    bot.state.clear_joke_caches()
 
 
 def build_node(uri: str, password: str) -> sonolink.Node:
@@ -319,6 +266,8 @@ class KexoBot:
         bot.guild_data_db = self._guild_data_db
 
         bot.sonolink_client = sonolink.Client(bot)
+        bot.state = BotState(bot)
+
         bot.connect_node = self.connect_node
         bot.ensure_bot_node_ready = ensure_bot_node_ready
         bot.close_unused_nodes = close_unused_nodes
@@ -446,9 +395,6 @@ class KexoBot:
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
         weekday = now.weekday()
 
-        if bot.node:
-            await ensure_bot_node_ready()
-
         if weekday == 6 and now.hour == 0:
             clear_cached_jokes()
             clear_temp_guild_data()
@@ -495,10 +441,10 @@ class KexoBot:
 
         # Exclude node if exclude_uri is provided and bot node
         if bot.node and switch_node and bot.node.uri != exclude_uri:
-            del node_candidates[bot.node.uri]
+            node_candidates.pop(bot.node.uri, None)
 
         if exclude_uri:
-            del node_candidates[exclude_uri]
+            node_candidates.pop(exclude_uri, None)
 
         # Shorted node candidates if there are too many
         if len(node_candidates) > NODE_MAX_CANDIDATES:
@@ -518,7 +464,8 @@ class KexoBot:
             if existing_node and existing_node.is_connected:
                 try:
                     await asyncio.wait_for(
-                        existing_node.fetch_info(), timeout=NODE_HEALTH_TIMEOUT
+                        existing_node.fetch_info(),
+                        timeout=NODE_HEALTH_TIMEOUT,
                     )
                     node = existing_node
                     is_connected = True
@@ -536,10 +483,10 @@ class KexoBot:
             node = build_node(node_uri, node_info["password"])
             is_connected = await check_node_status(node)
             if is_connected:
-                bot.cached_lavalink_servers[node.uri]["score"] += 1
+                bot.state.change_node_score(node.uri, 1)
                 break
 
-            del node_candidates[node_uri]
+            node_candidates.pop(node_uri, None)
 
         await self._upload_cached_lavalink_servers()
 

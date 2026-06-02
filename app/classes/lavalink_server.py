@@ -1,11 +1,14 @@
 import copy
 import logging
+from typing import TYPE_CHECKING
 
 import httpx
-from discord.ext import commands
 
 from app.constants import API_LAVALIST, DB_CACHE
 from app.utils import make_http_request
+
+if TYPE_CHECKING:
+    from app.main import KexoBotClient
 
 
 def get_full_node_url(host: str, port: int, secure: bool = False) -> str:
@@ -29,7 +32,7 @@ class LavalinkServerManager:
         List of offline lavalink servers.
     """
 
-    def __init__(self, bot: commands.Bot, session: httpx.AsyncClient) -> None:
+    def __init__(self, bot: "KexoBotClient", session: httpx.AsyncClient) -> None:
         self._bot = bot
         self._session = session
         self._cached_lavalink_servers = self._bot.cached_lavalink_servers
@@ -95,4 +98,4 @@ class LavalinkServerManager:
         fresh_set = set(self._fresh_nodes)
         for uri in list(self._cached_lavalink_servers.keys()):
             if uri not in fresh_set:
-                del self._cached_lavalink_servers[uri]
+                self._cached_lavalink_servers.pop(uri, None)

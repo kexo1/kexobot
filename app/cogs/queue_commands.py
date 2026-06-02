@@ -1,4 +1,5 @@
 import datetime
+from typing import TYPE_CHECKING
 
 import discord
 import sonolink
@@ -9,6 +10,9 @@ from app.constants import ICON_YOUTUBE
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import send_interaction, send_response
 from app.utils import QueuePaginator, find_track, fix_audio_title, has_pfp
+
+if TYPE_CHECKING:
+    from app.main import KexoBotClient
 
 
 def get_queue_status(queue_mode: sonolink.QueueMode) -> tuple[str, str]:
@@ -125,7 +129,7 @@ class Queue(commands.Cog):
         The bot instance that this cog is associated with.
     """
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "KexoBotClient") -> None:
         self._bot = bot
 
     @app_commands.command(name="queue", description="Shows the current queue")
@@ -297,6 +301,6 @@ class Queue(commands.Cog):
         await send_response(ctx, "QUEUE_CLEARED", ephemeral=False)
 
 
-async def setup(bot: commands.Bot) -> None:
+async def setup(bot: "KexoBotClient") -> None:
     """This function sets up the Queue cog."""
     await bot.add_cog(Queue(bot))
