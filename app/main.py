@@ -17,7 +17,7 @@ import sonolink
 from discord import app_commands
 from discord.ext import commands, tasks
 from pymongo import AsyncMongoClient
-from sonolink.models import CacheSettings, InactivitySettings
+from sonolink.models import CacheSettings
 
 from app.classes.content_monitor import ContentMonitor
 from app.classes.lavalink_server import LavalinkServerManager
@@ -140,6 +140,45 @@ async def check_node_status(node: sonolink.Node) -> bool:
         bot.cached_lavalink_servers[node.uri]["score"] -= 1
 
     return False
+
+
+NODE_HEALTH_TIMEOUT = 3
+
+
+async def ensure_bot_node_ready(*, force_refresh: bool = False) -> sonolink.Node | None:
+    """Ensure the bot's Lavalink node can accept new voice sessions.
+
+    After long uptime the node WebSocket can die while ``is_connected`` stays true
+    until the next operation; ``fetch_info`` catches that before voice connect.
+    """
+    if force_refresh and bot.node:
+        try:
+            await bot.node.close()
+        except RuntimeError:
+            pass
+        bot.node = None
+
+    node = bot.node
+    if node is None or not node.is_connected:
+        return await bot.connect_node(switch_node=False)
+
+    try:
+        await asyncio.wait_for(node.fetch_info(), timeout=NODE_HEALTH_TIMEOUT)
+        return node
+    except Exception:
+        logging.warning(
+            "[Sonolink] Active node failed health check, reconnecting (%s)",
+            node.uri,
+        )
+        node_data = bot.cached_lavalink_servers.get(node.uri)
+        if node_data:
+            node_data["score"] -= 1
+        try:
+            await node.close()
+        except RuntimeError:
+            pass
+        bot.node = None
+        return await bot.connect_node(switch_node=False, exclude_uri=node.uri)
 
 
 def load_humor_api_tokens() -> None:
@@ -281,6 +320,7 @@ class KexoBot:
 
         bot.sonolink_client = sonolink.Client(bot)
         bot.connect_node = self.connect_node
+        bot.ensure_bot_node_ready = ensure_bot_node_ready
         bot.close_unused_nodes = close_unused_nodes
         bot.get_online_nodes = get_online_nodes
         bot.get_available_nodes = get_available_nodes
@@ -406,6 +446,9 @@ class KexoBot:
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
         weekday = now.weekday()
 
+        if bot.node:
+            await ensure_bot_node_ready()
+
         if weekday == 6 and now.hour == 0:
             clear_cached_jokes()
             clear_temp_guild_data()
@@ -473,9 +516,22 @@ class KexoBot:
                 None,
             )
             if existing_node and existing_node.is_connected:
-                node = existing_node
-                is_connected = True
-                break
+                try:
+                    await asyncio.wait_for(
+                        existing_node.fetch_info(), timeout=NODE_HEALTH_TIMEOUT
+                    )
+                    node = existing_node
+                    is_connected = True
+                    break
+                except Exception:
+                    logging.info(
+                        "[Sonolink] Cached node failed health check: %s",
+                        node_uri,
+                    )
+                    try:
+                        await existing_node.close()
+                    except RuntimeError:
+                        pass
 
             node = build_node(node_uri, node_info["password"])
             is_connected = await check_node_status(node)
