@@ -64,7 +64,7 @@ class CommandCog(commands.Cog):
 
     Parameters
     ----------
-    bot: :class:`commands.Bot`
+    bot: :class:`KexoBotClient`
         The bot instance.
     """
 
@@ -1052,7 +1052,7 @@ class SubredditSelectorView(discord.ui.View):
     """
 
     def __init__(
-        self, current_subreddits: set, bot: commands.Bot, user_id: int
+        self, current_subreddits: set, bot: "KexoBotClient", user_id: int
     ) -> None:
         super().__init__(timeout=600)
         self._current_subreddits = current_subreddits

@@ -125,7 +125,7 @@ class Queue(commands.Cog):
 
     Parameters
     ----------
-    bot: :class:`discord.ext.commands.Bot`
+    bot: :class:`KexoBotClient`
         The bot instance that this cog is associated with.
     """
 

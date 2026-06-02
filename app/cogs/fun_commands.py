@@ -63,7 +63,7 @@ class FunCommands(commands.Cog):
 
     Parameters
     ----------
-    bot: :class:`commands.Bot`
+    bot: :class:`KexoBotClient`
         The bot instance that this cog is associated with.
     """
 

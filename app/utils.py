@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import aiohttp
 import asyncpraw
@@ -14,7 +14,6 @@ import httpx
 import psutil
 import sonolink
 import sonolink.models as sl_models
-from discord.ext import commands
 from sonolink.models import CacheSettings, InactivitySettings
 
 from app.constants import (
@@ -23,6 +22,10 @@ from app.constants import (
     MUSIC_TO_REMOVE,
     SHITPOST_SUBREDDITS_DEFAULT,
 )
+
+if TYPE_CHECKING:
+    from app.main import KexoBotClient
+
 from app.response_handler import defer_interaction
 
 
@@ -147,7 +150,7 @@ async def download_video(
 
 
 async def check_node_status(
-    bot: commands.Bot, uri: str, password: str
+    bot: "KexoBotClient", uri: str, password: str
 ) -> sonolink.Node | None:
     """Check the status of a Lavalink node and return it if it's online.
 
@@ -334,7 +337,7 @@ def has_pfp(member: discord.Member) -> str:
 
 
 async def switch_node(
-    bot: commands.Bot,
+    bot: "KexoBotClient",
     player: sonolink.Player,
     play_after: bool = True,
     send_success_message: bool = True,
@@ -473,7 +476,7 @@ def generate_guild_data() -> dict:
     }
 
 
-async def generate_temp_user_data(bot: commands.Bot, user_id: int) -> dict:
+async def generate_temp_user_data(bot: "KexoBotClient", user_id: int) -> dict:
     """Generate temporary user data for the bot.
 
     Parameters
@@ -609,7 +612,7 @@ def fix_data(
 
 
 async def get_user_data(
-    bot: commands.Bot, ctx: discord.Interaction
+    bot: "KexoBotClient", ctx: discord.Interaction
 ) -> tuple[dict, dict]:
     """Get user data for the given user.
 
@@ -652,7 +655,7 @@ async def get_user_data(
     return user_data, temp_user_data
 
 
-async def get_guild_data(bot: commands.Bot, guild_id: int) -> tuple[dict, dict]:
+async def get_guild_data(bot: "KexoBotClient", guild_id: int) -> tuple[dict, dict]:
     """Get guild data for the given guild.
 
     Parameters

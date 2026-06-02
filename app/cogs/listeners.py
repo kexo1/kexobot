@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from app.main import KexoBotClient
 
 
-def is_bot_node_connected(bot: commands.Bot) -> bool:
+def is_bot_node_connected(bot: "KexoBotClient") -> bool:
     return bool(getattr(bot, "node", None))
 
 
@@ -45,9 +45,7 @@ def resolve_requester(
     return None, None
 
 
-def playing_embed(
-    bot: commands.Bot, player: sonolink.Player, payload: TrackStartEvent
-) -> discord.Embed:
+def playing_embed(bot: "KexoBotClient", payload: TrackStartEvent) -> discord.Embed:
     embed = discord.Embed(
         color=discord.Colour.green(),
         title="Now playing",
@@ -78,7 +76,7 @@ class Listeners(commands.Cog):
 
     Parameters
     ----------
-    bot: :class:`commands.Bot`
+    bot: :class:`KexoBotClient`
         The bot instance that this cog is associated with.
     """
 
@@ -163,9 +161,7 @@ class Listeners(commands.Cog):
 
         # Avoid noisy autoplay spam: announce only requested trackS.
         if player.should_respond or requester_name:
-            await player.text_channel.send(
-                embed=playing_embed(self._bot, player, payload)
-            )
+            await player.text_channel.send(embed=playing_embed(self._bot, payload))
             player.should_respond = False
 
         history_count = len(player.queue.history)

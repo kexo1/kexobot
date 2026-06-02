@@ -44,7 +44,7 @@ async def is_owner(interaction: discord.Interaction) -> bool:
 def set_track_requester(
     track: sl_models.Playable,
     user: discord.abc.User,
-    bot: commands.Bot,
+    bot: "KexoBotClient",
 ) -> None:
     if track.data.user_data is None:
         track.data.user_data = {}
@@ -57,9 +57,7 @@ def set_track_requester(
     bot.state.cache_track_requester(track.encoded, user.name, avatar or "")
 
 
-def get_track_requester_name(
-    track: sl_models.Playable, bot: commands.Bot
-) -> str:
+def get_track_requester_name(track: sl_models.Playable, bot: "KexoBotClient") -> str:
     requester_name = None
     if track.data.user_data:
         requester_name = track.data.user_data.get("requester_name")
@@ -72,7 +70,7 @@ def get_track_requester_name(
 
 
 def get_track_requester_avatar(
-    track: sl_models.Playable, bot: commands.Bot
+    track: sl_models.Playable, bot: "KexoBotClient"
 ) -> str | None:
     if track.data.user_data:
         avatar = track.data.user_data.get("requester_avatar")
@@ -160,7 +158,7 @@ def queue_embed(track: sl_models.Playable) -> discord.Embed:
     )
 
 
-def playing_embed(track: sl_models.Playable, bot: commands.Bot) -> discord.Embed:
+def playing_embed(track: sl_models.Playable, bot: "KexoBotClient") -> discord.Embed:
     author_pfp = get_track_requester_avatar(track, bot)
 
     embed = discord.Embed(
@@ -188,7 +186,7 @@ class MusicCommands(commands.Cog):
     - Getting random radio stations
 
     Parameters:
-    bot: :class:`commands.Bot`
+    bot: :class:`KexoBotClient`
         The bot instance that this cog is associated with.
     """
 
