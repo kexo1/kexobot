@@ -19,7 +19,6 @@ from app.constants import (
     API_RADIOGARDEN_PAGE,
     API_RADIOGARDEN_PLACES,
     API_RADIOGARDEN_SEARCH,
-    API_RADIOGARDEN_STREAM,
     ICON_YOUTUBE,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
@@ -60,7 +59,7 @@ def set_track_requester(
 
 def _parse_radiomap_stream_url(url: str) -> Optional[str]:
     channel_id = url.rstrip("/").split("/")[-1]
-    return f"{API_RADIOGARDEN_STREAM}{channel_id}/channel.mp3"
+    return f"{API_RADIOGARDEN_LISTEN}{channel_id}/channel.mp3"
 
 
 def get_track_requester_name(track: sl_models.Playable, bot: "KexoBotClient") -> str:
@@ -956,11 +955,12 @@ class MusicCommands(commands.Cog):
         return None
 
     async def _join_channel(self, ctx: discord.Interaction) -> bool:
-        channel = ctx.user.voice.channel
-        if not ctx.user.voice or not channel:
+        
+        if not ctx.user.voice or not ctx.user.voice.channel:
             await send_response(ctx, "NO_VOICE_CHANNEL")
             return False
-
+        
+        channel = ctx.user.voice.channel
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
         autoplay_mode = (
             sonolink.AutoPlayMode.PARTIAL
@@ -975,8 +975,7 @@ class MusicCommands(commands.Cog):
                 node = await self._bot.ensure_bot_node_ready()
             else:
                 node = await self._bot.connect_node(
-                    switch_node=True,
-                    exclude_uri=failed_uri,
+                    exclude_nodes=[failed_uri] if failed_uri else None,
                 )
             if not node:
                 await send_response(ctx, "NODE_NOT_FOUND", ephemeral=False)

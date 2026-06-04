@@ -404,6 +404,8 @@ async def switch_node(
 
     # Set switching to True for guild
     switching_map[guild_id] = True
+    excluded_nodes = set()
+    excluded_nodes.add(player.node.uri) if player.node else None
 
     original_autoplay_mode = player.autoplay
 
@@ -442,8 +444,10 @@ async def switch_node(
             player.autoplay = sonolink.AutoPlayMode.DISABLED
 
             node: sonolink.Node | None = await bot.connect_node(
-                exclude_uri=player.node.uri
+                exclude_nodes=excluded_nodes
             )
+            excluded_nodes.add(node.uri) if node else None
+            
             if not node:
                 continue
 

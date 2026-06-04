@@ -3,7 +3,6 @@ import copy
 import logging
 import socket
 from datetime import datetime
-from itertools import islice
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -42,7 +41,6 @@ from app.constants import (
     ENV_WORDNIK_KEY,
     ICON_REDDIT,
     LOCAL_MACHINE_NAME,
-    NODE_MAX_CANDIDATES,
     SHITPOST_SUBREDDITS_ALL,
     USER_AGENT,
 )
@@ -111,6 +109,7 @@ async def check_node_status(node: sonolink.Node) -> bool:
 
     return False
 
+
 # Doesnt work with utils idk why
 def build_node(uri: str, password: str) -> sonolink.Node:
     return bot.sonolink_client.create_node(
@@ -135,7 +134,7 @@ async def ensure_bot_node_ready() -> sonolink.Node | None:
     """
     node = getattr(bot, "node", None)
     if node is None:
-        return await bot.connect_node(switch_node=False)
+        return await bot.connect_node()
 
     try:
         if node.is_connected:
@@ -145,7 +144,7 @@ async def ensure_bot_node_ready() -> sonolink.Node | None:
         logging.warning("[Sonolink] Node health check failed (%s)", node.uri)
 
     new_node = await bot.connect_node(
-        switch_node=True, exclude_uri=getattr(node, "uri", None)
+        exclude_nodes=[getattr(node, "uri", None)]
     )
     return new_node or node
 
@@ -174,10 +173,7 @@ async def close_unused_nodes() -> None:
                 await node.close()
                 logging.info(f"[Sonolink] Closed unused node: {node.uri}")
             except RuntimeError:
-                logging.error(
-                    "[Sonolink] Failed to close node that is not fully connected: %s",
-                    node.uri,
-                )
+                pass
 
 
 def get_online_nodes() -> int:
@@ -411,8 +407,7 @@ class KexoBot:
 
     async def connect_node(
         self,
-        switch_node: bool = True,
-        exclude_uri: str | None = None,
+        exclude_nodes: list[str] | None = None,
     ) -> sonolink.Node | None:
         """Connect to lavalink node.
 
@@ -422,10 +417,8 @@ class KexoBot:
 
         Parameters
         ----------
-        switch_node: bool, optional
-            Whether to switch the node if the bot is already connected to one.
-        exclude_uri: str | None, optional
-            A lavalink node URI to exclude from connection attempts.
+        exclude_nodes: list[str] | None, optional
+            A list of lavalink node URIs to exclude from connection attempts.
             This is useful when switching nodes to avoid reconnecting to the same node.
 
         Returns
@@ -437,16 +430,8 @@ class KexoBot:
         is_connected = False
         node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
 
-        # Exclude node if exclude_uri is provided and bot node
-        if bot.node and switch_node and bot.node.uri != exclude_uri:
-            node_candidates.pop(bot.node.uri, None)
-
-        if exclude_uri:
-            node_candidates.pop(exclude_uri, None)
-
-        # Shorted node candidates if there are too many
-        if len(node_candidates) > NODE_MAX_CANDIDATES:
-            node_candidates = dict(islice(node_candidates.items(), NODE_MAX_CANDIDATES))
+        for exclude_node in exclude_nodes or []:
+            node_candidates.pop(exclude_node, None)
 
         # Try to connect to the best node based on score
         while node_candidates:
@@ -467,7 +452,8 @@ class KexoBot:
                     )
                     node = existing_node
                     is_connected = True
-                    break
+                    return node
+                
                 except Exception:
                     logging.info(
                         "[Sonolink] Cached node failed health check: %s",
@@ -631,11 +617,11 @@ async def bot_loader(main: KexoBot) -> None:
 
     await main.initialize()
 
-    node = await main.connect_node(switch_node=False)
+    node = await main.connect_node()
     if not node:
         logging.warning("[Sonolink] Startup connect failed, refreshing node cache.")
         await main._lavalink_server_manager.fetch()
-        node = await main.connect_node(switch_node=False)
+        node = await main.connect_node()
 
     if not node:
         logging.error("[Sonolink] Node is not connected after startup attempts.")

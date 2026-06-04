@@ -269,7 +269,6 @@ API_RADIOGARDEN_PLACES = "https://radio.garden/api/ara/content/places"
 API_RADIOGARDEN_PAGE = "https://radio.garden/api/ara/content/page/"
 API_RADIOGARDEN_SEARCH = "https://radio.garden/api/search?q="
 API_RADIOGARDEN_LISTEN = "https://radio.garden/api/ara/content/listen/"
-API_RADIOGARDEN_STREAM = "https://radio.garden/api/ara/content/listen/"
 
 # Music Sources
 MUSIC_SOURCES = [
