@@ -492,7 +492,7 @@ class KexoBot:
 
         if not is_connected:
             logging.critical("[Lavalink] No lavalink servers available.")
-            node = None
+            return None
 
         bot.node = node
         return node

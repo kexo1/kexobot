@@ -928,23 +928,47 @@ class MusicCommands(commands.Cog):
             else sonolink.AutoPlayMode.ENABLED
         )
 
-        node = await self._bot.ensure_bot_node_ready()
-        if not node:
-            await send_response(ctx, "NODE_NOT_FOUND", ephemeral=False)
-            return False
+        last_error: Exception | None = None
+        failed_uri: str | None = None
+        for attempt in range(2):
+            if attempt == 0:
+                node = await self._bot.ensure_bot_node_ready()
+            else:
+                node = await self._bot.connect_node(
+                    switch_node=True,
+                    exclude_uri=failed_uri,
+                )
+            if not node:
+                await send_response(ctx, "NODE_NOT_FOUND", ephemeral=False)
+                return False
 
-        try:
-            player_cls = self._build_player_class(node, autoplay_mode)
-            await channel.connect(cls=player_cls)
-            return True
-        except (discord.Forbidden, discord.ClientException):
-            await send_response(ctx, "NO_PERMISSIONS", ephemeral=False)
-        except Exception:
-            await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
-            logging.exception(
+            try:
+                player_cls = self._build_player_class(node, autoplay_mode)
+                await channel.connect(cls=player_cls)
+                return True
+            
+            except (discord.Forbidden, discord.ClientException):
+                await send_response(ctx, "NO_PERMISSIONS", ephemeral=False)
+                return False
+            
+            except Exception as exc:
+                last_error = exc
+                failed_uri = node.uri
+                self._bot.state.change_node_score(node.uri, -1)
+                logging.warning(
+                    "[Sonolink] Voice connect attempt %s failed for guild %s: %s",
+                    attempt + 1,
+                    ctx.guild.id if ctx.guild else "unknown",
+                    exc,
+                )
+
+        await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
+        if last_error:
+            logging.error(
                 "[Sonolink] Error connecting to voice channel on guild %s, channel %s",
                 ctx.guild.id if ctx.guild else "unknown",
                 ctx.user.voice.channel.id if ctx.user.voice else "unknown",
+                exc_info=last_error,
             )
 
         return False

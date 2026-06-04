@@ -336,6 +336,11 @@ def has_pfp(member: discord.Member) -> str:
     return ICON_DISCORD
 
 
+def _resume_track(player: sonolink.Player):
+    """Track to resume after node switch, if any."""
+    return getattr(player, "temp_current", None) or player.current
+
+
 async def switch_node(
     bot: "KexoBotClient",
     player: sonolink.Player,
@@ -377,8 +382,9 @@ async def switch_node(
     async def _try_move_and_resume(target_node: sonolink.Node) -> bool:
         try:
             await player.move_to(target_node)
-            if play_after and getattr(player, "temp_current", None):
-                await player.play(player.temp_current)
+            track = _resume_track(player)
+            if play_after and track:
+                await player.play(track)
             return True
         except Exception:
             bot.state.change_node_score(target_node.uri, -1)
@@ -388,10 +394,12 @@ async def switch_node(
         if not play_after:
             return False
 
+        track = _resume_track(player)
+        if not track:
+            return False
+
         track_failed_event = asyncio.Event()
-        bot.state.set_track_exception_probe(
-            guild_id, player.temp_current, track_failed_event
-        )
+        bot.state.set_track_exception_probe(guild_id, track, track_failed_event)
         try:
             await asyncio.wait_for(track_failed_event.wait(), timeout=3)
             bot.state.change_node_score(target_node.uri, -1)

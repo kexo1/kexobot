@@ -147,13 +147,14 @@ class Listeners(commands.Cog):
 
         self._bot.state.change_node_score(player.node.uri, 1)
         current_track = player.current or payload.track
+        temp_current = getattr(player, "temp_current", None)
         if (
             current_track
-            and player.temp_current
+            and temp_current
             and not current_track.data.user_data
-            and player.temp_current.data.user_data
+            and temp_current.data.user_data
         ):
-            current_track.data.user_data = dict(player.temp_current.data.user_data)
+            current_track.data.user_data = dict(temp_current.data.user_data)
 
         requester_name = None
         if current_track:
@@ -203,7 +204,7 @@ class Listeners(commands.Cog):
         logging.warning(
             f"[Sonolink] Websocket closed for node {player.node.uri}, reason: {payload.reason}, by_remote: {payload.by_remote}"
         )
-        if payload.by_remote:
+        if payload.by_remote and payload.reason in "Disconnected.":
             await send_response(
                 player.text_channel,
                 "KICKED_FROM_CHANNEL",
