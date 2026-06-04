@@ -204,7 +204,7 @@ class Listeners(commands.Cog):
         logging.warning(
             f"[Sonolink] Websocket closed for node {player.node.uri}, reason: {payload.reason}, by_remote: {payload.by_remote}"
         )
-        if payload.by_remote and payload.reason in "Disconnected.":
+        if payload.by_remote and "Disconnected." in payload.reason:
             await send_response(
                 player.text_channel,
                 "KICKED_FROM_CHANNEL",
