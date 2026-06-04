@@ -105,7 +105,7 @@ class Listeners(commands.Cog):
         payload: :class:`NodeReadyEventPayload`
             The payload containing information about the node that is ready.
         """
-        logging.info("[Sonolink] A node is ready.")
+        logging.info(f"[Sonolink] A node is ready ({payload.node.uri})")
         if self._bot.get_online_nodes() > 1 and is_bot_node_connected(self._bot):
             await self._bot.close_unused_nodes()
 
@@ -124,9 +124,7 @@ class Listeners(commands.Cog):
             logging.warning(
                 f"[Sonolink] Node got disconnected, connecting new node. ({node.uri})"
             )
-            node_data = self._bot.cached_lavalink_servers.get(node.uri)
-            if node_data:
-                self._bot.state.change_node_score(node.uri, -1)
+            self._bot.state.change_node_score(node.uri, -1)
             await self._bot.connect_node()
 
     @commands.Cog.listener()  # noinspection PyUnusedLocal
@@ -213,10 +211,7 @@ class Listeners(commands.Cog):
             return
 
         node = player.node
-
-        node_data = self._bot.cached_lavalink_servers.get(node.uri)
-        if node_data:
-            self._bot.state.change_node_score(node.uri, -1)
+        self._bot.state.change_node_score(node.uri, -1)
 
         await send_response(
             player.text_channel,

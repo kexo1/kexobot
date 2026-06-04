@@ -19,6 +19,7 @@ from app.constants import (
     API_RADIOGARDEN_PAGE,
     API_RADIOGARDEN_PLACES,
     API_RADIOGARDEN_SEARCH,
+    API_RADIOGARDEN_STREAM,
     ICON_YOUTUBE,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
@@ -55,6 +56,11 @@ def set_track_requester(
         track.data.user_data["requester_avatar"] = avatar
 
     bot.state.cache_track_requester(track.encoded, user.name, avatar or "")
+
+
+def _parse_radiomap_stream_url(url: str) -> Optional[str]:
+    channel_id = url.rstrip("/").split("/")[-1]
+    return f"{API_RADIOGARDEN_STREAM}{channel_id}/channel.mp3"
 
 
 def get_track_requester_name(track: sl_models.Playable, bot: "KexoBotClient") -> str:
@@ -198,34 +204,13 @@ class MusicCommands(commands.Cog):
     music = app_commands.Group(name="music", description="All music commands")
     radio = app_commands.Group(name="radio", description="All radio commands")
 
-    @music.command(name="play", description="Plays song.")
-    @app_commands.describe(
-        search="Song query or URL to play.",
-        play_next="If enabled, inserts the track at the top of queue.",
-    )
-    @app_commands.guild_only()
-    @app_commands.checks.cooldown(1, 4, key=lambda i: i.user.id)
-    async def play(
+    async def _execute_play(
         self,
         ctx: discord.Interaction,
         search: str,
         play_next: bool = False,
     ) -> None:
-        """Plays a song from a given URL or name.
-
-        This command will search for the song using the provided search query.
-
-        Parameters:
-        -----------
-        ctx: :class:`discord.Interaction`
-            The context of the command.
-        search: :class:`str`
-            The search query for the song.
-        play_next: :class:`bool`
-            If True, the song will be played next in the queue.
-        """
-
-        # Check if response was already sent, for radio command
+        """Shared play flow used by /music play and radio commands."""
         if not ctx.response.is_done():
             await defer_interaction(ctx)
 
@@ -242,9 +227,7 @@ class MusicCommands(commands.Cog):
             joined: bool = await self._join_channel(ctx)
 
             if not joined:
-                node = self._bot.cached_lavalink_servers.get(node.uri)
-                if node:
-                    node["score"] -= 5
+                self._bot.state.change_node_score(node.uri, -5)
                 return
 
             await self._prepare_sonolink(ctx)
@@ -287,6 +270,34 @@ class MusicCommands(commands.Cog):
         if player.should_respond:
             await send_interaction(ctx, embed=playing_embed(track, self._bot))
             player.should_respond = False
+
+    @music.command(name="play", description="Plays song.")
+    @app_commands.describe(
+        search="Song query or URL to play.",
+        play_next="If enabled, inserts the track at the top of queue.",
+    )
+    @app_commands.guild_only()
+    @app_commands.checks.cooldown(1, 4, key=lambda i: i.user.id)
+    async def play(
+        self,
+        ctx: discord.Interaction,
+        search: str,
+        play_next: bool = False,
+    ) -> None:
+        """Plays a song from a given URL or name.
+
+        This command will search for the song using the provided search query.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.Interaction`
+            The context of the command.
+        search: :class:`str`
+            The search query for the song.
+        play_next: :class:`bool`
+            If True, the song will be played next in the queue.
+        """
+        await self._execute_play(ctx, search, play_next)
 
     @radio.command(name="random", description="Gets random radio from RadioMap.")
     @app_commands.describe(
@@ -353,7 +364,7 @@ class MusicCommands(commands.Cog):
         if station.endswith("."):
             station = station[:-1]
 
-        await self.play(ctx, station, play_next)
+        await self._execute_play(ctx, station, play_next)
 
     @radio.command(name="play", description="Search and play radio from RadioGarden")
     @app_commands.describe(
@@ -383,7 +394,6 @@ class MusicCommands(commands.Cog):
         play_next: bool
             If True, the radio station will be played next in the queue.
         """
-
         encoded_station = discord.utils.escape_markdown(station)
         response = await make_http_request(
             self._session,
@@ -402,10 +412,22 @@ class MusicCommands(commands.Cog):
 
             for station_data in data["hits"]["hits"]:
                 station_source = station_data["_source"]["page"]
-                if country and station_source["country"]["title"] != country:
+                if (
+                    country
+                    and country.lower()
+                    not in station_source["country"]["title"].lower()
+                ):
+                    continue
+                stream_url = _parse_radiomap_stream_url(station_source["url"])
+                redirect_response = await make_http_request(
+                    self._session,
+                    stream_url,
+                )
+                stream_url = redirect_response.headers.get("Location", stream_url)
+                if not stream_url:
                     continue
 
-                await self.play(ctx, station_source["stream"], play_next)
+                await self._execute_play(ctx, stream_url, play_next)
                 return
 
             await send_response(ctx, "RADIOMAP_NO_STATION_FOUND", search=station)
@@ -858,7 +880,10 @@ class MusicCommands(commands.Cog):
         source = get_search_prefix(search)
         # If it's not a URL with a recognizable prefix, default to YouTube search
         if source is None:
-            source = "ytsearch"
+            if search.startswith("http://") or search.startswith("https://"):
+                source = None
+            else:
+                source = "ytsearch"
 
         # Prefer youtube over spotify, but if youtube fails, try spotify
         if source == "spsearch":
@@ -946,11 +971,11 @@ class MusicCommands(commands.Cog):
                 player_cls = self._build_player_class(node, autoplay_mode)
                 await channel.connect(cls=player_cls)
                 return True
-            
+
             except (discord.Forbidden, discord.ClientException):
                 await send_response(ctx, "NO_PERMISSIONS", ephemeral=False)
                 return False
-            
+
             except Exception as exc:
                 last_error = exc
                 failed_uri = node.uri
