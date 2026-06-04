@@ -186,46 +186,6 @@ def build_node(bot: "KexoBotClient", uri: str, password: str) -> sonolink.Node:
     )
 
 
-async def check_node_status(
-    bot: "KexoBotClient", uri: str, password: str
-) -> sonolink.Node | None:
-    """Check the status of a Lavalink node and return it if it's online.
-
-    Parameters
-    ----------
-    bot: :class:`discord.Bot`
-        The discord bot instance.
-    uri: str
-        The URI of the Lavalink node to check.
-    password: str
-        The password for the Lavalink node.
-
-    Returns
-    -------
-    :class:`sonolink.Node`
-        The Lavalink node if it's online, None otherwise.
-    """
-    node: sonolink.Node = build_node(bot, uri, password)
-
-    try:
-        await asyncio.wait_for(node.connect(), timeout=3)
-        await node.fetch_info()
-    except (
-        asyncio.TimeoutError,
-        aiohttp.NonHttpUrlClientError,
-    ):
-        try:
-            await node.close()
-        except RuntimeError:
-            pass
-
-        sonolink_nodes = getattr(bot.sonolink_client, "_nodes", None)
-        if isinstance(sonolink_nodes, dict):
-            sonolink_nodes.pop(node.id, None)
-        return None
-    return node
-
-
 def strip_text(text: str, to_strip: tuple[str, ...]) -> str:
     """Strip unwanted characters from a string.
 

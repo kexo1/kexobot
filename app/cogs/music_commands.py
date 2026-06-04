@@ -217,8 +217,7 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "WAIT_UNTIL_NODE_SWITCHES")
             return
 
-        node = await self._bot.ensure_bot_node_ready()
-        if not node:
+        if not self._bot.node:
             await send_response(ctx, "NODE_NOT_FOUND", ephemeral=False)
             return
 
@@ -226,7 +225,7 @@ class MusicCommands(commands.Cog):
             joined: bool = await self._join_channel(ctx)
 
             if not joined:
-                self._bot.state.change_node_score(node.uri, -5)
+                self._bot.state.change_node_score(self._bot.node.uri, -5)
                 return
 
             await self._prepare_sonolink(ctx)
@@ -955,11 +954,10 @@ class MusicCommands(commands.Cog):
         return None
 
     async def _join_channel(self, ctx: discord.Interaction) -> bool:
-        
         if not ctx.user.voice or not ctx.user.voice.channel:
             await send_response(ctx, "NO_VOICE_CHANNEL")
             return False
-        
+
         channel = ctx.user.voice.channel
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
         autoplay_mode = (
@@ -970,9 +968,10 @@ class MusicCommands(commands.Cog):
 
         last_error: Exception | None = None
         failed_uri: str | None = None
+
         for attempt in range(2):
             if attempt == 0:
-                node = await self._bot.ensure_bot_node_ready()
+                node = await self._bot.state.ensure_bot_node_ready()
             else:
                 node = await self._bot.connect_node(
                     exclude_nodes=[failed_uri] if failed_uri else None,

@@ -83,33 +83,6 @@ intents.members = False
 
 bot = KexoBotClient(command_prefix=commands.when_mentioned, intents=intents)
 
-
-async def check_node_status(node: sonolink.Node) -> bool:
-    """Check the status of a lavalink node.
-    This function will try to connect to the lavalink node
-
-    Parameters
-    ----------
-    node: sonolink.Node
-        The lavalink node to check the status of.
-    Returns
-    -------
-    bool
-        True if the node is connected, False otherwise.
-    """
-    try:
-        await asyncio.wait_for(node.connect(), timeout=3)
-        # Some fucking nodes secretly don't respond,
-        # I've played these games before!!!
-        await node.fetch_info()
-        return True
-    except Exception:
-        logging.info(f"[Sonolink] Node failed to connect: ({node.uri})")
-        bot.state.change_node_score(node.uri, -1)
-
-    return False
-
-
 # Doesnt work with utils idk why
 def build_node(uri: str, password: str) -> sonolink.Node:
     return bot.sonolink_client.create_node(
@@ -123,30 +96,6 @@ def build_node(uri: str, password: str) -> sonolink.Node:
         ),
         cache_settings=CacheSettings(enabled=True, max_items=100),
     )
-
-
-async def ensure_bot_node_ready() -> sonolink.Node | None:
-    """Best-effort guard against stale node sessions.
-
-    This does not clear ``bot.node``. If the current node looks unhealthy, we try to
-    connect to a different one (excluding the current URI). If that fails, we keep
-    the existing node reference and return it.
-    """
-    node = getattr(bot, "node", None)
-    if node is None:
-        return await bot.connect_node()
-
-    try:
-        if node.is_connected:
-            await asyncio.wait_for(node.fetch_info(), timeout=3)
-            return node
-    except Exception:
-        logging.warning("[Sonolink] Node health check failed (%s)", node.uri)
-
-    new_node = await bot.connect_node(
-        exclude_nodes=[getattr(node, "uri", None)]
-    )
-    return new_node or node
 
 
 def load_humor_api_tokens() -> None:
@@ -263,7 +212,6 @@ class KexoBot:
         bot.state = BotState(bot)
 
         bot.connect_node = self.connect_node
-        bot.ensure_bot_node_ready = ensure_bot_node_ready
         bot.close_unused_nodes = close_unused_nodes
         bot.get_online_nodes = get_online_nodes
         bot.get_available_nodes = get_available_nodes
@@ -465,7 +413,7 @@ class KexoBot:
                         pass
 
             node = build_node(node_uri, node_info["password"])
-            is_connected = await check_node_status(node)
+            is_connected = await bot.state.check_node_status(node)
             if is_connected:
                 bot.state.change_node_score(node.uri, 1)
                 break

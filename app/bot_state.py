@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable
+
+import sonolink
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -32,6 +36,56 @@ class BotState:
         if not node_entry:
             return
         node_entry["score"] += delta
+
+    async def ensure_bot_node_ready(self) -> sonolink.Node | None:
+        """Best-effort guard against stale node sessions.
+
+        This does not clear ``bot.node``. If the current node looks unhealthy, we try to
+        connect to a different one (excluding the current URI). If that fails, we keep
+        the existing node reference and return it.
+        """
+        node = getattr(self.bot, "node", None)
+        if node is None:
+            return await self.bot.connect_node()
+
+        try:
+            if node.is_connected:
+                await asyncio.wait_for(node.fetch_info(), timeout=3)
+                return node
+
+        except Exception:
+            logging.warning("[Sonolink] Node health check failed (%s)", node.uri)
+
+        new_node = await self.bot.connect_node(
+            exclude_nodes=[node.uri]
+        )
+        return new_node or node
+
+    async def check_node_status(self, node: sonolink.Node) -> bool:
+        """Check the status of a lavalink node.
+        This function will try to connect to the lavalink node
+
+        Parameters
+        ----------
+        node: sonolink.Node
+            The lavalink node to check the status of.
+        Returns
+        -------
+        bool
+            True if the node is connected, False otherwise.
+        """
+        try:
+            await asyncio.wait_for(node.connect(), timeout=3)
+            # Some fucking nodes secretly don't respond,
+            # I've played these games before!!!
+            await node.fetch_info()
+            return True
+        except Exception:
+            logging.info(f"[Sonolink] Node failed to connect: ({node.uri})")
+            self.bot.state.change_node_score(node.uri, -1)
+
+        return False
+
 
     def get_node_score(self, node_uri: str) -> int | None:
         """Get cached score of Lavalink node.

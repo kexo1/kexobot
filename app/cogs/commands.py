@@ -32,7 +32,7 @@ from app.constants import (
 from app.response_handler import defer_interaction, send_interaction, send_response
 from app.utils import (
     QueuePaginator,
-    check_node_status,
+    build_node,
     get_file_age,
     get_memory_usage,
     get_url_response_time,
@@ -135,11 +135,10 @@ class CommandCog(commands.Cog):
             The password for the Lavalink server.
         """
         await defer_interaction(ctx)
-        node: sonolink.Node = await check_node_status(
-            self._bot, f"{uri}:{str(port)}", password
-        )
+        node = build_node(f"{uri}:{str(port)}", password)
+        is_connected: bool = await self._bot.state.check_node_status(node)
 
-        if not node:
+        if not is_connected:
             await send_response(ctx, "NODE_CONNECT_FAILURE", uri=uri)
             return
 
