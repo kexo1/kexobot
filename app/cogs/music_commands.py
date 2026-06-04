@@ -893,42 +893,57 @@ class MusicCommands(commands.Cog):
             spotify_search = False
 
         player: sonolink.Player = ctx.guild.voice_client
-        try:
-            tracks: sl_models.SearchResult = await asyncio.wait_for(
-                self._bot.sonolink_client.search_track(search, source=source), timeout=5
-            )
-            if not tracks.is_error() and not tracks.is_empty() and tracks.result:
-                return tracks
-
-            if spotify_search:
-                # Keep one lightweight fallback without switching nodes.
-                tracks = await asyncio.wait_for(
-                    self._bot.sonolink_client.search_track(search, source="spsearch"),
+        for _ in range(2):
+            try:
+                tracks: sl_models.SearchResult = await asyncio.wait_for(
+                    self._bot.sonolink_client.search_track(search, source=source),
                     timeout=5,
                 )
                 if not tracks.is_error() and not tracks.is_empty() and tracks.result:
                     return tracks
 
-        except asyncio.TimeoutError:
-            await send_response(
-                ctx,
-                "NODE_NOT_FOUND",
-                ephemeral=False,
-                respond=not player.just_joined,
-            )
-            player.just_joined = False
-            return None
+                if spotify_search:
+                    # Keep one lightweight fallback without switching nodes.
+                    tracks = await asyncio.wait_for(
+                        self._bot.sonolink_client.search_track(
+                            search, source="spsearch"
+                        ),
+                        timeout=5,
+                    )
+                    if (
+                        not tracks.is_error()
+                        and not tracks.is_empty()
+                        and tracks.result
+                    ):
+                        return tracks
 
-        except Exception as e:
-            await send_response(
-                ctx,
-                "LAVALINK_ERROR",
-                ephemeral=False,
-                respond=not player.just_joined,
-            )
-            player.just_joined = False
-            logging.error("[sonolink] Error searching for tracks: %s", e)
-            return None
+            except asyncio.TimeoutError:
+                await send_response(
+                    ctx,
+                    "NODE_TIMED_OUT",
+                    ephemeral=False,
+                    respond=not player.just_joined,
+                )
+                await switch_node(
+                    bot=self._bot,
+                    player=player,
+                    play_after=True,
+                    send_success_message=True,
+                    send_failure_message=False,
+                )
+                player.just_joined = False
+                continue
+
+            except Exception as e:
+                await send_response(
+                    ctx,
+                    "LAVALINK_ERROR",
+                    ephemeral=False,
+                    respond=not player.just_joined,
+                )
+                player.just_joined = False
+                logging.error("[sonolink] Error searching for tracks: %s", e)
+                return None
 
         await send_response(
             ctx,

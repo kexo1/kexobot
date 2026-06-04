@@ -17,7 +17,7 @@ import sonolink
 from discord import app_commands
 from discord.ext import commands, tasks
 from pymongo import AsyncMongoClient
-from sonolink.models import CacheSettings
+from sonolink.models import CacheSettings, InactivitySettings
 
 from app.bot_state import BotState
 from app.classes.content_monitor import ContentMonitor
@@ -111,8 +111,19 @@ async def check_node_status(node: sonolink.Node) -> bool:
 
     return False
 
-
-NODE_HEALTH_TIMEOUT = 3
+# Doesnt work with utils idk why
+def build_node(uri: str, password: str) -> sonolink.Node:
+    return bot.sonolink_client.create_node(
+        uri=uri,
+        password=password,
+        retries=1,
+        resume_timeout=60,
+        inactivity_settings=InactivitySettings(
+            timeout=600,
+            mode=sonolink.InactivityMode.ALL_BOTS,
+        ),
+        cache_settings=CacheSettings(enabled=True, max_items=100),
+    )
 
 
 async def ensure_bot_node_ready() -> sonolink.Node | None:
@@ -128,7 +139,7 @@ async def ensure_bot_node_ready() -> sonolink.Node | None:
 
     try:
         if node.is_connected:
-            await asyncio.wait_for(node.fetch_info(), timeout=NODE_HEALTH_TIMEOUT)
+            await asyncio.wait_for(node.fetch_info(), timeout=3)
             return node
     except Exception:
         logging.warning("[Sonolink] Node health check failed (%s)", node.uri)
@@ -201,19 +212,6 @@ def clear_temp_guild_data() -> None:
 def clear_cached_jokes() -> None:
     """Clear the cached jokes loaded from FunCommands"""
     bot.state.clear_joke_caches()
-
-
-def build_node(uri: str, password: str) -> sonolink.Node:
-    return bot.sonolink_client.create_node(
-        uri=uri,
-        password=password,
-        retries=1,
-        resume_timeout=60,
-        cache_settings=CacheSettings(
-            enabled=True,
-            max_items=1000,
-        ),
-    )
 
 
 class KexoBot:
@@ -465,7 +463,7 @@ class KexoBot:
                 try:
                     await asyncio.wait_for(
                         existing_node.fetch_info(),
-                        timeout=NODE_HEALTH_TIMEOUT,
+                        timeout=3,
                     )
                     node = existing_node
                     is_connected = True
@@ -639,9 +637,7 @@ async def bot_loader(main: KexoBot) -> None:
         await main._lavalink_server_manager.fetch()
         node = await main.connect_node(switch_node=False)
 
-    if node:
-        logging.info(f"[Sonolink] Connected to node: {node.uri}")
-    else:
+    if not node:
         logging.error("[Sonolink] Node is not connected after startup attempts.")
 
     await setup_cogs()

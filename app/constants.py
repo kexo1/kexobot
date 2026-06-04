@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import socket
+from enum import Enum
 
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
@@ -258,8 +259,8 @@ JOKE_EXCLUDED_WORDS = [
 ############################## Music / Radio Configuration ############################
 # Lavalink
 API_LAVALIST = "https://lavalink-list.ajieblogs.eu.org/All"
-RAW_LAVALINK = (
-    "https://raw.githubusercontent.com/botxlab/lavalink-list/refs/heads/main/nodes.json"
+FREE_NODELINK = (
+    "https://free-nodelink.nyxbot.app/api/nodes"
 )
 NODE_MAX_CANDIDATES = 30
 
@@ -381,18 +382,75 @@ MUSIC_SOURCES = [
     ),
 ]
 
-MUSIC_SUPPORTED_PLATFORMS = (
-    "Youtube",
-    "Youtube Music",
-    "Soundcloud",
-    "Spotify (likely)",
-    "Apple Music (unlikely)",
-    "Deezer (unlikely)",
-    "Yandex Music (unlikely)",
-    "VK Music (unlikely)",
-    "Tidal (unlikely)",
-    "Qobuz (unlikely)",
-)
+
+class Support(Enum):
+    LIKELY = "likely"
+    UNLIKELY = "unlikely"
+
+
+# Registry: plugin_name_fragment -> {platform -> Support}
+PLUGIN_PLATFORM_REGISTRY: dict[str, dict[str, Support]] = {
+    "youtube-source": {
+        "YouTube": Support.LIKELY,
+        "YouTube Music": Support.LIKELY,
+    },
+    "youtube": {
+        "YouTube": Support.LIKELY,
+        "YouTube Music": Support.LIKELY,
+    },
+    "yt-": {
+        "YouTube": Support.LIKELY,
+        "YouTube Music": Support.LIKELY,
+    },
+    "lavasrc": {
+        "Spotify": Support.LIKELY,
+        "Apple Music": Support.UNLIKELY,
+        "Deezer": Support.UNLIKELY,
+        "Yandex Music": Support.UNLIKELY,
+        "YouTube": Support.UNLIKELY,
+        "YouTube Music": Support.UNLIKELY,
+        "VK Music": Support.UNLIKELY,
+        "Tidal": Support.UNLIKELY,
+        "Qobuz": Support.UNLIKELY,
+    },
+    "lavasearch": {
+        "Spotify": Support.LIKELY,
+        "Apple Music": Support.UNLIKELY,
+        "Deezer": Support.UNLIKELY,
+        "Yandex Music": Support.UNLIKELY,
+        "YouTube": Support.UNLIKELY,
+        "YouTube Music": Support.UNLIKELY,
+        "VK Music": Support.UNLIKELY,
+        "Tidal": Support.UNLIKELY,
+        "Qobuz": Support.UNLIKELY,
+    },
+    "slugyzeon": {
+        "Spotify": Support.LIKELY,
+        "YouTube": Support.UNLIKELY,
+        "Amazon Music": Support.UNLIKELY,
+        "Gaana": Support.UNLIKELY,
+    },
+    "amazonmusic": {
+        "Amazon Music": Support.LIKELY,
+    },
+    "amazon-music": {
+        "Amazon Music": Support.LIKELY,
+    },
+}
+
+PLATFORM_EMOJIS: dict[str, str] = {
+    "Spotify": "🟢",
+    "YouTube": "🔴",
+    "YouTube Music": "🎵",
+    "Apple Music": "🍎",
+    "Deezer": "🟣",
+    "Yandex Music": "🟡",
+    "VK Music": "🔵",
+    "Tidal": "🌊",
+    "Qobuz": "🎼",
+    "Amazon Music": "📦",
+    "Gaana": "🎶",
+}
 
 MUSIC_TO_REMOVE = (
     ";",

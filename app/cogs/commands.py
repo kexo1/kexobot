@@ -23,9 +23,11 @@ from app.constants import (
     CHANNEL_ID_KEXO_SERVER,
     DB_CHOICES,
     DB_LISTS,
-    MUSIC_SUPPORTED_PLATFORMS,
+    PLATFORM_EMOJIS,
+    PLUGIN_PLATFORM_REGISTRY,
     SFD_TIMEZONE_CHOICE,
     SHITPOST_SUBREDDITS_ALL,
+    Support,
 )
 from app.response_handler import defer_interaction, send_interaction, send_response
 from app.utils import (
@@ -33,6 +35,7 @@ from app.utils import (
     check_node_status,
     get_file_age,
     get_memory_usage,
+    get_url_response_time,
     get_user_data,
     iso_to_timestamp,
     switch_node,
@@ -214,6 +217,8 @@ class CommandCog(commands.Cog):
             await send_response(ctx, "NO_NODE_INFO")
             return
 
+        response_time = get_url_response_time(node.uri)
+
         embed = discord.Embed(
             title=urlparse(node.uri).netloc,
             color=discord.Color.blue(),
@@ -224,6 +229,8 @@ class CommandCog(commands.Cog):
             name="Score:",
             value=self._bot.state.get_node_score(node.uri) or 0,
         )
+
+        embed.add_field(name="Ping:", value=f"{response_time} ms")
         embed.add_field(
             name="Plugins:",
             value=", ".join(f"{plugin.name}: {plugin.version}" for plugin in plugins),
@@ -248,6 +255,23 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
+
+        def resolve_platform_support(
+            plugins: list[sonolink.PluginResponsePayload],
+        ) -> dict[str, Support]:
+            """Merge all plugin platform support, preferring LIKELY over UNLIKELY."""
+            merged: dict[str, Support] = {}
+
+            for plugin in plugins:
+                name = plugin.name.lower()
+                for fragment, platforms in PLUGIN_PLATFORM_REGISTRY.items():
+                    if fragment.lower() in name:
+                        for platform, support in platforms.items():
+                            if platform not in merged or support == Support.LIKELY:
+                                merged[platform] = support
+
+            return merged
+
         node: sonolink.Node = self._bot.node
 
         try:
@@ -256,48 +280,45 @@ class CommandCog(commands.Cog):
             await send_response(ctx, "NO_NODE_INFO")
             return
 
-        plugins: sonolink.PluginResponsePayload = node_info.plugins
-        youtube_plugin, lavasrc_plugin, lavasearch_plugin = False, False, False
-        for plugin in plugins:
-            if "lavasrc" in plugin.name:
-                lavasrc_plugin = True
-            if "youtube" in plugin.name or "yt-" in plugin.name:
-                youtube_plugin = True
-            if "lavasearch-plugin" in plugin.name:
-                lavasearch_plugin = True
+        platform_support = resolve_platform_support(node_info.plugins)
+        SEARCH_PLUGINS = {"lavasearch", "youtube"}
+
+        has_search = any(
+            any(fragment in p.name.lower() for fragment in SEARCH_PLUGINS)
+            for p in node_info.plugins
+        )
 
         embed = discord.Embed(
             title=urlparse(node.uri).netloc,
             color=discord.Color.blue(),
         )
 
-        if lavasrc_plugin:
-            supported_platforms_count = len(MUSIC_SUPPORTED_PLATFORMS)
-        elif youtube_plugin:
-            supported_platforms_count = 3
-        else:
+        if not platform_support:
             embed.description = "No platforms supported"
-            supported_platforms_count = 0
+            await send_interaction(ctx, embed=embed)
+            return
 
-        if not lavasearch_plugin:
-            no_search_warning = "(no search plugin, only direct links)"
-        else:
-            no_search_warning = ""
+        likely = [p for p, s in platform_support.items() if s == Support.LIKELY]
+        unlikely = [p for p, s in platform_support.items() if s == Support.UNLIKELY]
 
-        if supported_platforms_count != 0:
+        no_search_warning = (
+            "" if has_search else " _(no search plugin, only direct links)_"
+        )
+
+        if likely:
             embed.add_field(
-                name=f"_{supported_platforms_count} platforms supported {no_search_warning}_",
-                value="\n".join(
-                    f"{i + 1}. {MUSIC_SUPPORTED_PLATFORMS[i]}"
-                    for i in range(supported_platforms_count)
-                ),
+                name=f"{len(likely)} likely supported{no_search_warning}",
+                value="\n".join(f"{PLATFORM_EMOJIS.get(p, '🎵')} {p}" for p in likely),
+                inline=False,
             )
 
-        if lavasrc_plugin:
-            embed.set_footer(
-                text=(
-                    "unlikely - depends if node owner added API key for each platform"
-                )
+        if unlikely:
+            embed.add_field(
+                name=f"{len(unlikely)} unlikely (depends on node configuration)",
+                value="\n".join(
+                    f"{PLATFORM_EMOJIS.get(p, '🎵')} {p}" for p in unlikely
+                ),
+                inline=False,
             )
 
         await send_interaction(ctx, embed=embed)

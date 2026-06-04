@@ -88,10 +88,10 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         f"\n**Caused by discord**: {kwargs.get('by_remote')}",
         color=discord.Color.yellow(),
     ),
-    "NODE_NOT_FOUND": discord.Embed(
+    "NODE_TIMED_OUT": discord.Embed(
         title="",
-        description=":x: Couldn't find node to play this music, try switching to a different node with `/node reconnect`, or use Youtube links instead of Spotify/Deezer/Apple Music.",
-        color=discord.Color.from_rgb(r=220, g=0, b=0),
+        description=":warning: Node couldn't find track, trying to connect to a new node in a moment.",
+        color=discord.Color.yellow(),
     ),
     "KICKED_FROM_CHANNEL": discord.Embed(
         title="",

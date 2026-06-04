@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from app.constants import API_LAVALIST, DB_CACHE
+from app.constants import API_LAVALIST, DB_CACHE, FREE_NODELINK
 from app.utils import make_http_request
 
 if TYPE_CHECKING:
@@ -44,11 +44,11 @@ class LavalinkServerManager:
     async def fetch(self) -> None:
         """Get new Lavalink servers from Lavainfo GitHub and Lavalist."""
         # Lavainfo from github
-        """         json_data: list = await make_http_request(
-            self._session, RAW_LAVALINK, get_json=True
+        json_data: list = await make_http_request(
+            self._session, FREE_NODELINK, get_json=True
         )
         if json_data:
-            self._parse_lavalink_servers(json_data) """
+            self._parse_lavalink_servers(json_data)
 
         # Lavalist
         json_data: list = await make_http_request(

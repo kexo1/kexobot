@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -109,6 +110,28 @@ def get_memory_usage():
     return mem_info.rss / (1024 * 1024)
 
 
+def get_url_response_time(url: str) -> int:
+    """Get the response time of a URL in seconds.
+
+    Parameters
+    ----------
+    url: str
+        The URL to check the response time of.
+
+    Returns
+    -------
+    float
+        The response time of the URL in seconds, or 0.0 if the request failed.
+    """
+    try:
+        start_time = time.perf_counter()
+        httpx.get(url, timeout=5)
+        return int((time.perf_counter() - start_time) * 1000)  # Convert to milliseconds
+    except httpx.RequestError as e:
+        logging.warning(f"[Httpx] Failed to get response time for {url}: {e}")
+        return None
+
+
 async def download_video(
     session: httpx.AsyncClient, url: str, nsfw: bool
 ) -> discord.File | None:
@@ -149,6 +172,20 @@ async def download_video(
         return None
 
 
+def build_node(bot: "KexoBotClient", uri: str, password: str) -> sonolink.Node:
+    return bot.sonolink_client.create_node(
+        uri=uri,
+        password=password,
+        retries=1,
+        resume_timeout=60,
+        inactivity_settings=InactivitySettings(
+            timeout=600,
+            mode=sonolink.InactivityMode.ALL_BOTS,
+        ),
+        cache_settings=CacheSettings(enabled=True, max_items=100),
+    )
+
+
 async def check_node_status(
     bot: "KexoBotClient", uri: str, password: str
 ) -> sonolink.Node | None:
@@ -168,17 +205,8 @@ async def check_node_status(
     :class:`sonolink.Node`
         The Lavalink node if it's online, None otherwise.
     """
-    node: sonolink.Node = bot.sonolink_client.create_node(
-        uri=uri,
-        password=password,
-        retries=1,
-        resume_timeout=0,
-        inactivity_settings=InactivitySettings(
-            timeout=300,
-            mode=sonolink.InactivityMode.ALL_BOTS,
-        ),
-        cache_settings=CacheSettings(enabled=True, max_items=1000),
-    )
+    node: sonolink.Node = build_node(bot, uri, password)
+
     try:
         await asyncio.wait_for(node.connect(), timeout=3)
         await node.fetch_info()
