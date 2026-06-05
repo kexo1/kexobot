@@ -6,13 +6,8 @@ import discord
 import sonolink
 from discord.ext import commands
 from sonolink import models as sl_models
-from sonolink.gateway import (
-    ReadyEvent,
-    TrackExceptionEvent,
-    TrackStartEvent,
-    TrackStuckEvent,
-    WebSocketClosedEvent,
-)
+from sonolink.gateway import (ReadyEvent, TrackExceptionEvent, TrackStartEvent,
+                              TrackStuckEvent, WebSocketClosedEvent)
 
 from app.constants import ICON_YOUTUBE
 from app.response_handler import send_response
@@ -67,6 +62,15 @@ def playing_embed(bot: "KexoBotClient", payload: TrackStartEvent) -> discord.Emb
     return embed
 
 
+def is_same_track(track: sl_models.Playable, payload_track: sl_models.Playable) -> bool:
+    track_encoded = getattr(track, "encoded", None)
+    payload_encoded = getattr(payload_track, "encoded", None)
+    return bool(
+        track == payload_track
+        or (track_encoded and payload_encoded and track_encoded == payload_encoded)
+    )
+
+
 class Listeners(commands.Cog):
     """Handles various events from the sonolink library.
 
@@ -83,16 +87,30 @@ class Listeners(commands.Cog):
     def __init__(self, bot: "KexoBotClient"):
         self._bot = bot
 
-    @staticmethod
-    def _is_same_track(
-        track: sl_models.Playable, payload_track: sl_models.Playable
+    async def _handle_track_error_probe(
+        self,
+        player: sonolink.Player,
+        payload_track: sl_models.Playable,
     ) -> bool:
-        track_encoded = getattr(track, "encoded", None)
-        payload_encoded = getattr(payload_track, "encoded", None)
-        return bool(
-            track == payload_track
-            or (track_encoded and payload_encoded and track_encoded == payload_encoded)
-        )
+        """Check switching state and exception probe; penalize node if neither applies.
+
+        Returns True if the caller should return early (already handled), False otherwise.
+        """
+        # Check if currently switching nodes for this guild
+        if self._bot.node_is_switching.get(player.guild.id):
+            return True
+
+        # Check if this track matches the one in the exception probe
+        # If it does, we set the event to unblock the waiting code in the command and return early without penalizing the node.
+        data = self._bot.state.get_track_exception_probe(player.guild.id)
+        if data:
+            track, track_failed_event = data
+            if is_same_track(track, payload_track):
+                track_failed_event.set()
+                return True
+
+        self._bot.state.change_node_score(player.node.uri, -1)
+        return False
 
     @commands.Cog.listener()
     async def on_sonolink_node_ready(self, payload: ReadyEvent) -> None:
@@ -202,16 +220,16 @@ class Listeners(commands.Cog):
         logging.warning(
             f"[Sonolink] Websocket closed for node {player.node.uri}, reason: {payload.reason}, by_remote: {payload.by_remote}"
         )
+        # Disconnected either by admin or by the node itself, no need to attempt reconnection or switch nodes.
         if payload.by_remote and "Disconnected." in payload.reason:
-            """await send_response(
-                player.text_channel,
-                "KICKED_FROM_CHANNEL",
-                respond=False,
-            )"""
             return
 
-        node = player.node
-        self._bot.state.change_node_score(node.uri, -1)
+        if self._bot.get_online_nodes() == 0:
+            await self._bot.connect_node()
+            return
+
+        if await self._handle_track_error_probe(player, payload.track):
+            return
 
         await send_response(
             player.text_channel,
@@ -221,11 +239,8 @@ class Listeners(commands.Cog):
             by_remote=payload.by_remote,
         )
 
-        if self._bot.get_online_nodes() == 0:
-            await self._bot.connect_node()
-            return
-
         await switch_node(bot=self._bot, player=player)
+        player.should_respond = False
 
     @commands.Cog.listener()
     async def on_sonolink_track_exception(
@@ -241,17 +256,8 @@ class Listeners(commands.Cog):
             The payload containing information about the track exception.
         """
 
-        if self._bot.node_is_switching.get(player.guild.id):
+        if await self._handle_track_error_probe(player, payload.track):
             return
-
-        data = self._bot.state.get_track_exception_probe(player.guild.id)
-        if data:
-            track, track_failed_event = data
-            if self._is_same_track(track, payload.track):
-                track_failed_event.set()
-                return
-
-        self._bot.state.change_node_score(player.node.uri, -1)
 
         await send_response(
             player.text_channel,
@@ -276,17 +282,9 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStuckEventPayload`
             The payload containing information about the track that got stuck.
         """
-        if self._bot.node_is_switching.get(player.guild.id):
+
+        if await self._handle_track_error_probe(player, payload.track):
             return
-
-        data = self._bot.state.get_track_exception_probe(player.guild.id)
-        if data:
-            track, track_failed_event = data
-            if self._is_same_track(track, payload.track):
-                track_failed_event.set()
-                return
-
-        self._bot.state.change_node_score(player.node.uri, -1)
 
         await send_response(player.text_channel, "TRACK_STUCK", respond=False)
         await switch_node(

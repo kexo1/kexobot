@@ -1,6 +1,6 @@
 # ---- Builder Stage ----
 # This stage installs dependencies, including from git
-FROM python:3.13.11-alpine AS builder
+FROM python:3.13.13-alpine AS builder
 
 # Install build-time dependencies
 RUN apk add --no-cache \
@@ -21,7 +21,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-FROM python:3.13.12-alpine
+FROM python:3.13.13-alpine
 
 # Create a non-root user for security
 RUN addgroup -g 1001 -S botuser && \

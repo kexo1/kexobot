@@ -991,7 +991,9 @@ class MusicCommands(commands.Cog):
             except Exception as e:
                 last_error = e
                 failed_uri = node.uri
-                self._bot.state.change_node_score(node.uri, -5)
+                score = self._bot.state.get_node_score(node.uri)
+                # Punish the node on voice connection failure
+                self._bot.state.change_node_score(node.uri, -score)
                 logging.warning(
                     "[Sonolink] Voice connect attempt %s failed: %s",
                     attempt + 1,
