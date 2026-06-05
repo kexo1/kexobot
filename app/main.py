@@ -402,7 +402,7 @@ class KexoBot:
                 if await node_health_check(existing_node):
                     node = existing_node
                     is_connected = True
-                    return node
+                    break
 
                 logging.exception(
                     "[Sonolink] Cached node failed health check: %s",
