@@ -443,11 +443,11 @@ class MusicCommands(commands.Cog):
             The context of the command.
         """
         player: sonolink.Player = ctx.guild.voice_client
+
         try:
             await player.skip()
         except QueueEmpty:
-            await send_response(ctx, "NO_TRACKS_IN_QUEUE")
-            return
+            pass
 
         player.should_respond = False
         await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
@@ -737,10 +737,7 @@ class MusicCommands(commands.Cog):
         ]
     )
     @app_commands.guild_only()
-    @is_joined()
-    async def autoplay_mode(
-        self, ctx: discord.Interaction, mode: str = "normal"
-    ) -> None:
+    async def autoplay_mode(self, ctx: discord.Interaction, mode: str = "") -> None:
         """Change the autoplay mode for the bot.
 
         Parameters:
@@ -751,6 +748,19 @@ class MusicCommands(commands.Cog):
             The autoplay mode to set. Can be either "normal" or "populated".
         """
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
+        autoplay_mode = (
+            "normal" if guild_data["music"]["autoplay_mode"] == 1 else "populated"
+        )
+
+        if not mode:
+            await send_response(
+                ctx,
+                "CURRENT_AUTOPLAY_MODE",
+                ephemeral=False,
+                autoplay_mode=autoplay_mode,
+            )
+            return
+
         guild_data["music"]["autoplay_mode"] = 1 if mode == "normal" else 2
         await self._bot.guild_data_db.update_one(
             {"_id": ctx.guild.id}, {"$set": guild_data}

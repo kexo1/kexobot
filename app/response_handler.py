@@ -352,6 +352,11 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         color=discord.Color.blue(),
         footer_text="takes 3 seconds to apply",
     ),
+    "CURRENT_AUTOPLAY_MODE": lambda **kwargs: discord.Embed(
+        title="",
+        description=f":repeat: Current autoplay mode: `{kwargs.get('autoplay_mode')}`",
+        color=discord.Color.blue(),
+    ),
     "AUTOPLAY_MODE_CHANGED": lambda **kwargs: discord.Embed(
         title="",
         description=f":repeat: Autoplay mode set to `{kwargs.get('autoplay_mode')}`\n_Changes will apply upon bot reconnect._",

@@ -347,7 +347,7 @@ async def node_health_check(node: sonolink.Node) -> bool:
         await asyncio.wait_for(node.fetch_info(), timeout=3)
         return True
     except Exception:
-        logging.warning("[Sonolink] Node health check failed (%s)", node.uri)
+        logging.info("[Sonolink] Node health check failed (%s)", node.uri)
 
     return False
 
@@ -400,7 +400,7 @@ async def switch_node(
                 await player.play(track)
             return True
         except Exception:
-            bot.state.change_node_score(target_node.uri, -1)
+            bot.state.change_node_score(target_node.uri, -2)
             return False
 
     async def _playback_probe_failed(target_node: sonolink.Node) -> bool:
@@ -415,7 +415,7 @@ async def switch_node(
         bot.state.set_track_exception_probe(guild_id, track, track_failed_event)
         try:
             await asyncio.wait_for(track_failed_event.wait(), timeout=3)
-            bot.state.change_node_score(target_node.uri, -1)
+            bot.state.change_node_score(target_node.uri, -2)
             return True
         except asyncio.TimeoutError:
             return False

@@ -259,9 +259,7 @@ JOKE_EXCLUDED_WORDS = [
 ############################## Music / Radio Configuration ############################
 # Lavalink
 API_LAVALIST = "https://lavalink-list.ajieblogs.eu.org/All"
-FREE_NODELINK = (
-    "https://free-nodelink.nyxbot.app/api/nodes"
-)
+FREE_NODELINK = "https://free-nodelink.nyxbot.app/api/nodes"
 NODE_MAX_CANDIDATES = 30
 
 # Radiogarden
@@ -389,10 +387,6 @@ class Support(Enum):
 
 # Registry: plugin_name_fragment -> {platform -> Support}
 PLUGIN_PLATFORM_REGISTRY: dict[str, dict[str, Support]] = {
-    "youtube-source": {
-        "YouTube": Support.LIKELY,
-        "YouTube Music": Support.LIKELY,
-    },
     "youtube": {
         "YouTube": Support.LIKELY,
         "YouTube Music": Support.LIKELY,
@@ -425,7 +419,7 @@ PLUGIN_PLATFORM_REGISTRY: dict[str, dict[str, Support]] = {
     },
     "slugyzeon": {
         "Spotify": Support.LIKELY,
-        "YouTube": Support.UNLIKELY,
+        "YouTube": Support.LIKELY,
         "Amazon Music": Support.UNLIKELY,
         "Gaana": Support.UNLIKELY,
     },

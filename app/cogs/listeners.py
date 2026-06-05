@@ -6,8 +6,15 @@ import discord
 import sonolink
 from discord.ext import commands
 from sonolink import models as sl_models
-from sonolink.gateway import (ReadyEvent, TrackExceptionEvent, TrackStartEvent,
-                              TrackStuckEvent, WebSocketClosedEvent)
+from sonolink.gateway import (
+    DisconnectTriggerType,
+    PlayerDisconnectEvent,
+    ReadyEvent,
+    TrackExceptionEvent,
+    TrackStartEvent,
+    TrackStuckEvent,
+    WebSocketClosedEvent,
+)
 
 from app.constants import ICON_YOUTUBE
 from app.response_handler import send_response
@@ -109,7 +116,7 @@ class Listeners(commands.Cog):
                 track_failed_event.set()
                 return True
 
-        self._bot.state.change_node_score(player.node.uri, -1)
+        self._bot.state.change_node_score(player.node.uri, -2)
         return False
 
     @commands.Cog.listener()
@@ -297,23 +304,29 @@ class Listeners(commands.Cog):
         player.should_respond = False
 
     @commands.Cog.listener()
-    async def on_sonolink_inactive_player(self, player: sonolink.Player) -> None:
-        """This event is triggered when a player becomes inactive.
-
-        It sends a message to the text channel and disconnects the player.
+    async def on_sonolink_player_disconnect(
+        self, player: sonolink.Player, payload: PlayerDisconnectEvent
+    ) -> None:
+        """This event is triggered when a player gets disconnected due to inactivity.
 
         Parameters
         ----------
         player: :class:`sonolink.Player`
-            The player that became inactive.
+            The player that got disconnected.
         """
-        await player.disconnect()
-        await send_response(
-            player.text_channel,
-            "DISCONNECTED_INACTIVITY",
-            respond=False,
-            channel_id=player.channel.id,
-        )
+
+        if payload.trigger == DisconnectTriggerType.INACTIVITY:
+            await send_response(
+                player.text_channel,
+                "DISCONNECTED_INACTIVITY",
+                respond=False,
+                channel_id=player.channel.id,
+            )
+
+        if payload.extra_data:
+            logging.info(
+                f"[Sonolink] Player disconnected for guild {player.guild.id}, trigger: {payload.trigger}, extra_data: {payload.extra_data}"
+            )
 
     # noinspection PyUnusedLocal
     @commands.Cog.listener()
