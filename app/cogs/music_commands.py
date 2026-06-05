@@ -3,6 +3,7 @@ import datetime
 import logging
 import random
 import re
+from enum import Enum
 from typing import TYPE_CHECKING, Optional, Union
 
 import discord
@@ -35,6 +36,18 @@ from app.utils import (
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
+
+
+class ResponseContext(Enum):
+    """Defines how the bot should respond to track start events.
+    
+    NO_RESPONSE: Don't send any message (autoplay, queue, errors)
+    RESPOND_VIA_LISTENER: Only listener should send (when bot joins, playing from queue, autoplay)
+    RESPOND_VIA_INTERACTION: Slash command should send (when queue is empty but not first time joining)
+    """
+    NO_RESPONSE = "no_response"
+    RESPOND_VIA_LISTENER = "respond_via_listener"
+    RESPOND_VIA_INTERACTION = "respond_via_interaction"
 
 
 async def is_owner(interaction: discord.Interaction) -> bool:
@@ -99,13 +112,11 @@ async def fetch_first_track(
     player: sonolink.Player = ctx.guild.voice_client
 
     if isinstance(tracks, sl_models.SearchResult):
-        if tracks.is_error() or tracks.is_empty():
-            raise ValueError("Search returned no playable tracks")
         tracks = tracks.result
 
     # If it's a playlist
     if isinstance(tracks, sl_models.Playlist):
-        if player.should_respond:
+        if player.response_context == ResponseContext.RESPOND_VIA_INTERACTION:
             await defer_interaction(ctx)
 
         for track in tracks:
@@ -122,7 +133,7 @@ async def fetch_first_track(
         )
         await send_interaction(ctx, embed=embed)
 
-        player.should_respond = False
+        player.response_context = ResponseContext.NO_RESPONSE
         return track
 
     # If it's a single track in playlist
@@ -151,7 +162,7 @@ async def should_move_to_channel(ctx: discord.Interaction) -> bool:
         ephemeral=False,
         channel_id=ctx.user.voice.channel.id,
     )
-    player.should_respond = False
+    player.response_context = ResponseContext.NO_RESPONSE
     return True
 
 
@@ -253,20 +264,26 @@ class MusicCommands(commands.Cog):
             await send_interaction(ctx, embed=queue_embed(track))
             return
 
+        # Set response context:
+        # - If queue is empty and not just joined: RESPOND_VIA_INTERACTION (slash command sends)
+        # - If queue is empty and just joined: keep RESPOND_VIA_LISTENER (listener sends, avoid double response)
+        # - If queue not empty: NO_RESPONSE (listener sends for queue/autoplay)
         if len(player.queue) == 0:
-            player.should_respond = True
-
-        if player.just_joined:
-            player.should_respond = False
-            player.just_joined = False
+            if not getattr(player, "just_joined", False):
+                player.response_context = ResponseContext.RESPOND_VIA_INTERACTION
+            else:
+                player.just_joined = False
+        else:
+            player.response_context = ResponseContext.NO_RESPONSE
 
         playing: bool = await self._play_track(ctx, track)
         if not playing:
             return
 
-        if player.should_respond:
+        # Send playing embed via slash command if context is RESPOND_VIA_INTERACTION
+        if player.response_context == ResponseContext.RESPOND_VIA_INTERACTION:
             await send_interaction(ctx, embed=playing_embed(track, self._bot))
-            player.should_respond = False
+            player.response_context = ResponseContext.NO_RESPONSE
 
     @music.command(name="play", description="Plays song.")
     @app_commands.describe(
@@ -449,7 +466,7 @@ class MusicCommands(commands.Cog):
         except QueueEmpty:
             pass
 
-        player.should_respond = False
+        player.response_context = ResponseContext.RESPOND_VIA_LISTENER
         await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
 
     @music.command(name="skip-to", description="Skips to selected song in queue.")
@@ -486,7 +503,7 @@ class MusicCommands(commands.Cog):
             self._queue_insert_front(player, track)
 
         await player.skip()
-        player.should_respond = False
+        player.response_context = ResponseContext.RESPOND_VIA_LISTENER
 
         await send_response(
             ctx,
@@ -817,9 +834,8 @@ class MusicCommands(commands.Cog):
                 return
 
         player: sonolink.Player = channel.guild.voice_client
-        player.just_joined = False
         player.text_channel = ctx.channel
-        player.should_respond = True
+        player.response_context = ResponseContext.RESPOND_VIA_INTERACTION
         player.is_troll = True
 
         search_result = await self._bot.sonolink_client.search_track(search)
@@ -929,7 +945,7 @@ class MusicCommands(commands.Cog):
                     ctx,
                     "NODE_TIMED_OUT",
                     ephemeral=False,
-                    respond=not player.just_joined,
+                    respond=player.response_context != ResponseContext.RESPOND_VIA_LISTENER,
                 )
                 await switch_node(
                     bot=self._bot,
@@ -938,7 +954,7 @@ class MusicCommands(commands.Cog):
                     send_success_message=True,
                     send_failure_message=False,
                 )
-                player.just_joined = False
+                player.response_context = ResponseContext.NO_RESPONSE
                 continue
 
             except Exception as e:
@@ -946,9 +962,9 @@ class MusicCommands(commands.Cog):
                     ctx,
                     "LAVALINK_ERROR",
                     ephemeral=False,
-                    respond=not player.just_joined,
+                    respond=player.response_context != ResponseContext.RESPOND_VIA_LISTENER,
                 )
-                player.just_joined = False
+                player.response_context = ResponseContext.NO_RESPONSE
                 logging.error("[sonolink] Error searching for tracks: %s", e)
                 return None
 
@@ -956,10 +972,10 @@ class MusicCommands(commands.Cog):
             ctx,
             "NO_TRACKS_FOUND",
             ephemeral=False,
-            respond=not player.just_joined,
+            respond=player.response_context != ResponseContext.RESPOND_VIA_LISTENER,
             search=search,
         )
-        player.just_joined = False
+        player.response_context = ResponseContext.NO_RESPONSE
         return None
 
     async def _join_channel(self, ctx: discord.Interaction) -> bool:
@@ -1031,7 +1047,7 @@ class MusicCommands(commands.Cog):
             ),
             history_settings=HistorySettings(
                 enabled=True,
-                max_items=100,
+                max_items=15,
             ),
         )
 
@@ -1047,7 +1063,8 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         player.text_channel = ctx.channel
-        player.should_respond = False
+        # Set to RESPOND_VIA_LISTENER: listener should send playing embed (we already sent JOINED)
+        player.response_context = ResponseContext.RESPOND_VIA_LISTENER
         player.just_joined = True
         player.is_troll = False
 

@@ -16,12 +16,16 @@ from sonolink.gateway import (
     WebSocketClosedEvent,
 )
 
-from app.constants import ICON_YOUTUBE
+from app.constants import ICON_YOUTUBE, MUSIC_TIPS
 from app.response_handler import send_response
 from app.utils import fix_audio_title, switch_node
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
+
+
+# Import ResponseContext enum from music_commands
+from app.cogs.music_commands import ResponseContext
 
 
 def is_bot_node_connected(bot: "KexoBotClient") -> bool:
@@ -169,6 +173,7 @@ class Listeners(commands.Cog):
             return
 
         self._bot.state.change_node_score(player.node.uri, 1)
+
         current_track = player.current or payload.track
         temp_current = getattr(player, "temp_current", None)
         if (
@@ -179,37 +184,24 @@ class Listeners(commands.Cog):
         ):
             current_track.data.user_data = dict(temp_current.data.user_data)
 
-        requester_name = None
-        if current_track:
-            requester_name, _ = resolve_requester(self._bot, current_track)
-
-        # Avoid noisy autoplay spam: announce only requested trackS.
-        if player.should_respond or requester_name:
+        # Send playing embed if:
+        # 1. response_context is RESPOND_VIA_LISTENER (just joined, let listener handle it), OR
+        # 2. response_context is not RESPOND_VIA_INTERACTION (slash command didn't handle it)
+        # This allows listener to send for autoplay and queue tracks while preventing duplicates
+        if player.response_context == ResponseContext.RESPOND_VIA_LISTENER:
             await player.text_channel.send(embed=playing_embed(self._bot, payload))
-            player.should_respond = False
 
-        history_count = len(player.queue.history)
+        if player.response_context == ResponseContext.NO_RESPONSE:
+            player.response_context = ResponseContext.RESPOND_VIA_LISTENER
+
         if player.autoplay != sonolink.AutoPlayMode.ENABLED:
-            tips: dict[int, str] = {
-                3: (
-                    "-# Not happy with the current node performance?\n"
-                    f"-# You can switch between {self._bot.get_available_nodes()} nodes "
-                    "by using /node reconnect."
-                ),
-                10: (
-                    "-# Use the /music autoplay_mode command and\n"
-                    "-# set the mode to populated to enable automatic queuing of "
-                    "similar tracks."
-                ),
-                15: (
-                    "-# Would you like to see which platforms are supported by this "
-                    "node? Use the /node supported_platforms."
-                ),
-            }
+            history_count = len(player.queue.history)
+            tip = MUSIC_TIPS.get(history_count)
 
-            tip = tips.get(history_count)
             if tip and random.randint(0, 2) == 0:
-                await player.text_channel.send(tip)
+                # Format the tip with dynamic values if needed
+                formatted_tip = tip.format(node_count=self._bot.get_available_nodes())
+                await player.text_channel.send(formatted_tip)
 
     @commands.Cog.listener()
     async def on_sonolink_websocket_closed(
@@ -247,7 +239,7 @@ class Listeners(commands.Cog):
         )
 
         await switch_node(bot=self._bot, player=player)
-        player.should_respond = False
+        player.response_context = ResponseContext.NO_RESPONSE
 
     @commands.Cog.listener()
     async def on_sonolink_track_exception(
@@ -262,7 +254,6 @@ class Listeners(commands.Cog):
         payload: :class:`TrackExceptionEventPayload`
             The payload containing information about the track exception.
         """
-
         if await self._handle_track_error_probe(player, payload.track):
             return
 
@@ -274,7 +265,7 @@ class Listeners(commands.Cog):
             severity=payload.exception.severity.value,
         )
         await switch_node(bot=self._bot, player=player)
-        player.should_respond = False
+        player.response_context = ResponseContext.NO_RESPONSE
 
     @commands.Cog.listener()
     async def on_sonolink_track_stuck(
@@ -289,7 +280,6 @@ class Listeners(commands.Cog):
         payload: :class:`TrackStuckEventPayload`
             The payload containing information about the track that got stuck.
         """
-
         if await self._handle_track_error_probe(player, payload.track):
             return
 
@@ -301,7 +291,7 @@ class Listeners(commands.Cog):
             send_success_message=False,
             send_failure_message=False,
         )
-        player.should_respond = False
+        player.response_context = ResponseContext.NO_RESPONSE
 
     @commands.Cog.listener()
     async def on_sonolink_player_disconnect(
@@ -314,7 +304,6 @@ class Listeners(commands.Cog):
         player: :class:`sonolink.Player`
             The player that got disconnected.
         """
-
         if payload.trigger == DisconnectTriggerType.INACTIVITY:
             await send_response(
                 player.text_channel,

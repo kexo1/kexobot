@@ -100,7 +100,7 @@ def build_node(uri: str, password: str) -> sonolink.Node:
             timeout=600,
             mode=sonolink.InactivityMode.ALL_BOTS,
         ),
-        cache_settings=CacheSettings(enabled=True, max_items=100),
+        cache_settings=CacheSettings(enabled=True, max_items=1000),
     )
 
 

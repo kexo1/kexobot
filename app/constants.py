@@ -481,6 +481,24 @@ COUNTRIES = (
     "Czech Republic",
 )
 
+############################# Music Tips Configuration ############################
+MUSIC_TIPS: dict[int, str] = {
+    3: (
+        "-# Not happy with the current node performance?\n"
+        "-# You can switch between {node_count} nodes "
+        "by using /node reconnect."
+    ),
+    10: (
+        "-# Use the /music autoplay_mode command and\n"
+        "-# set the mode to populated to enable automatic queuing of "
+        "similar tracks."
+    ),
+    15: (
+        "-# Would you like to see which platforms are supported by this "
+        "node? Use the /node supported_platforms."
+    ),
+}
+
 ############################# Wordnik API Configuration ############################
 ENV_WORDNIK_KEY = os.getenv("WORDNIK_API_KEY")
 API_WORDNIK = "https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key="
