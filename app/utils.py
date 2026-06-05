@@ -329,6 +329,29 @@ def _resume_track(player: sonolink.Player):
     return getattr(player, "temp_current", None) or player.current
 
 
+async def node_health_check(node: sonolink.Node) -> bool:
+    """Check the health of a lavalink node by attempting to fetch its info.
+
+    Parameters
+    ----------
+    node: :class:`sonolink.Node`
+        The lavalink node to check.
+
+    Returns
+    -------
+    bool
+        True if the node is healthy and responsive, False otherwise.
+    """
+
+    try:
+        await asyncio.wait_for(node.fetch_info(), timeout=3)
+        return True
+    except Exception:
+        logging.warning("[Sonolink] Node health check failed (%s)", node.uri)
+
+    return False
+
+
 async def switch_node(
     bot: "KexoBotClient",
     player: sonolink.Player,
@@ -407,7 +430,7 @@ async def switch_node(
                 exclude_nodes=excluded_nodes
             )
             excluded_nodes.add(node.uri) if node else None
-            
+
             if not node:
                 continue
 

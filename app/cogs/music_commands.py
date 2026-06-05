@@ -225,7 +225,6 @@ class MusicCommands(commands.Cog):
             joined: bool = await self._join_channel(ctx)
 
             if not joined:
-                self._bot.state.change_node_score(self._bot.node.uri, -5)
                 return
 
             await self._prepare_sonolink(ctx)
@@ -969,7 +968,7 @@ class MusicCommands(commands.Cog):
         last_error: Exception | None = None
         failed_uri: str | None = None
 
-        for attempt in range(2):
+        for attempt in range(3):
             if attempt == 0:
                 node = await self._bot.state.ensure_bot_node_ready()
             else:
@@ -989,24 +988,21 @@ class MusicCommands(commands.Cog):
                 await send_response(ctx, "NO_PERMISSIONS", ephemeral=False)
                 return False
 
-            except Exception as exc:
-                last_error = exc
+            except Exception as e:
+                last_error = e
                 failed_uri = node.uri
-                self._bot.state.change_node_score(node.uri, -1)
+                self._bot.state.change_node_score(node.uri, -5)
                 logging.warning(
-                    "[Sonolink] Voice connect attempt %s failed for guild %s: %s",
+                    "[Sonolink] Voice connect attempt %s failed: %s",
                     attempt + 1,
-                    ctx.guild.id if ctx.guild else "unknown",
-                    exc,
+                    e,
                 )
 
         await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
         if last_error:
             logging.error(
-                "[Sonolink] Error connecting to voice channel on guild %s, channel %s",
-                ctx.guild.id if ctx.guild else "unknown",
-                ctx.user.voice.channel.id if ctx.user.voice else "unknown",
-                exc_info=last_error,
+                "[Sonolink] Error connecting to voice channel: %s",
+                last_error,
             )
 
         return False

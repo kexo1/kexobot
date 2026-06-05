@@ -52,7 +52,12 @@ from app.state_types import (
     TempUserData,
     UserData,
 )
-from app.utils import generate_temp_guild_data, is_older_than, make_http_request
+from app.utils import (
+    generate_temp_guild_data,
+    is_older_than,
+    make_http_request,
+    node_health_check,
+)
 
 
 class KexoBotClient(commands.Bot):
@@ -82,6 +87,7 @@ intents.message_content = False
 intents.members = False
 
 bot = KexoBotClient(command_prefix=commands.when_mentioned, intents=intents)
+
 
 # Doesnt work with utils idk why
 def build_node(uri: str, password: str) -> sonolink.Node:
@@ -393,24 +399,19 @@ class KexoBot:
                 None,
             )
             if existing_node and existing_node.is_connected:
-                try:
-                    await asyncio.wait_for(
-                        existing_node.fetch_info(),
-                        timeout=3,
-                    )
+                if await node_health_check(existing_node):
                     node = existing_node
                     is_connected = True
                     return node
-                
-                except Exception:
-                    logging.info(
-                        "[Sonolink] Cached node failed health check: %s",
-                        node_uri,
-                    )
-                    try:
-                        await existing_node.close()
-                    except RuntimeError:
-                        pass
+
+                logging.exception(
+                    "[Sonolink] Cached node failed health check: %s",
+                    node_uri,
+                )
+                try:
+                    await existing_node.close()
+                except RuntimeError:
+                    pass
 
             node = build_node(node_uri, node_info["password"])
             is_connected = await bot.state.check_node_status(node)
@@ -418,6 +419,7 @@ class KexoBot:
                 bot.state.change_node_score(node.uri, 1)
                 break
 
+            bot.state.change_node_score(node.uri, -1)
             node_candidates.pop(node_uri, None)
 
         await self._upload_cached_lavalink_servers()
