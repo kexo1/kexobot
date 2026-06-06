@@ -324,7 +324,7 @@ def has_pfp(member: discord.Member) -> str:
     return ICON_DISCORD
 
 
-def _resume_track(player: sonolink.Player):
+def resume_track(player: sonolink.Player):
     """Track to resume after node switch, if any."""
     return getattr(player, "temp_current", None) or player.current
 
@@ -355,7 +355,7 @@ async def node_health_check(node: sonolink.Node) -> bool:
 async def switch_node(
     bot: "KexoBotClient",
     player: sonolink.Player,
-    play_after: bool = True,
+    play_after: bool = False,
     send_success_message: bool = True,
     send_failure_message: bool = True,
 ) -> sonolink.Node | None:
@@ -395,9 +395,11 @@ async def switch_node(
     async def _try_move_and_resume(target_node: sonolink.Node) -> bool:
         try:
             await player.move_to(target_node)
-            track = _resume_track(player)
+            track = resume_track(player)
+            # Only when we didn't even get to play the track, moving won't play it, so we have to do it manually here.
             if play_after and track:
                 await player.play(track)
+
             return True
         except Exception:
             bot.state.change_node_score(target_node.uri, -2)
@@ -407,7 +409,8 @@ async def switch_node(
         if not play_after:
             return False
 
-        track = _resume_track(player)
+        # Test only if we were playing something before
+        track = resume_track(player)
         if not track:
             return False
 

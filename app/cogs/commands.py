@@ -167,11 +167,9 @@ class CommandCog(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if player:
-            resume_track = getattr(player, "temp_current", None) or player.current
             node: sonolink.Node | None = await switch_node(
                 self._bot,
                 player=player,
-                play_after=resume_track is not None,
                 send_success_message=False,
             )
             if not node:

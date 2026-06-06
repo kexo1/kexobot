@@ -268,6 +268,21 @@ API_RADIOGARDEN_PAGE = "https://radio.garden/api/ara/content/page/"
 API_RADIOGARDEN_SEARCH = "https://radio.garden/api/search?q="
 API_RADIOGARDEN_LISTEN = "https://radio.garden/api/ara/content/listen/"
 
+
+# Response Context for Music Commands
+class ResponseContext(Enum):
+    """Defines how the bot should respond to track start events.
+
+    NO_RESPONSE: Don't send any message (autoplay, queue, errors)
+    RESPOND_VIA_LISTENER: Only listener should send (when bot joins, playing from queue, autoplay)
+    RESPOND_VIA_INTERACTION: Slash command should send (when queue is empty but not first time joining)
+    """
+
+    NO_RESPONSE = "no_response"
+    RESPOND_VIA_LISTENER = "respond_via_listener"
+    RESPOND_VIA_INTERACTION = "respond_via_interaction"
+
+
 # Music Sources
 MUSIC_SOURCES = [
     # YouTube Music (music.youtube.com URLs)
@@ -385,7 +400,6 @@ class Support(Enum):
     UNLIKELY = "unlikely"
 
 
-# Registry: plugin_name_fragment -> {platform -> Support}
 PLUGIN_PLATFORM_REGISTRY: dict[str, dict[str, Support]] = {
     "youtube": {
         "YouTube": Support.LIKELY,
@@ -481,7 +495,6 @@ COUNTRIES = (
     "Czech Republic",
 )
 
-############################# Music Tips Configuration ############################
 MUSIC_TIPS: dict[int, str] = {
     3: (
         "-# Not happy with the current node performance?\n"

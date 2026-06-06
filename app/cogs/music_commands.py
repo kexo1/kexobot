@@ -3,7 +3,6 @@ import datetime
 import logging
 import random
 import re
-from enum import Enum
 from typing import TYPE_CHECKING, Optional, Union
 
 import discord
@@ -21,6 +20,7 @@ from app.constants import (
     API_RADIOGARDEN_PLACES,
     API_RADIOGARDEN_SEARCH,
     ICON_YOUTUBE,
+    ResponseContext,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import defer_interaction, send_interaction, send_response
@@ -36,18 +36,6 @@ from app.utils import (
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
-
-
-class ResponseContext(Enum):
-    """Defines how the bot should respond to track start events.
-    
-    NO_RESPONSE: Don't send any message (autoplay, queue, errors)
-    RESPOND_VIA_LISTENER: Only listener should send (when bot joins, playing from queue, autoplay)
-    RESPOND_VIA_INTERACTION: Slash command should send (when queue is empty but not first time joining)
-    """
-    NO_RESPONSE = "no_response"
-    RESPOND_VIA_LISTENER = "respond_via_listener"
-    RESPOND_VIA_INTERACTION = "respond_via_interaction"
 
 
 async def is_owner(interaction: discord.Interaction) -> bool:
@@ -269,7 +257,7 @@ class MusicCommands(commands.Cog):
         # - If queue is empty and just joined: keep RESPOND_VIA_LISTENER (listener sends, avoid double response)
         # - If queue not empty: NO_RESPONSE (listener sends for queue/autoplay)
         if len(player.queue) == 0:
-            if not getattr(player, "just_joined", False):
+            if not player.just_joined:
                 player.response_context = ResponseContext.RESPOND_VIA_INTERACTION
             else:
                 player.just_joined = False
@@ -460,6 +448,7 @@ class MusicCommands(commands.Cog):
             The context of the command.
         """
         player: sonolink.Player = ctx.guild.voice_client
+        await defer_interaction(ctx)
 
         try:
             await player.skip()
@@ -945,7 +934,8 @@ class MusicCommands(commands.Cog):
                     ctx,
                     "NODE_TIMED_OUT",
                     ephemeral=False,
-                    respond=player.response_context != ResponseContext.RESPOND_VIA_LISTENER,
+                    respond=player.response_context
+                    != ResponseContext.RESPOND_VIA_LISTENER,
                 )
                 await switch_node(
                     bot=self._bot,
@@ -962,7 +952,8 @@ class MusicCommands(commands.Cog):
                     ctx,
                     "LAVALINK_ERROR",
                     ephemeral=False,
-                    respond=player.response_context != ResponseContext.RESPOND_VIA_LISTENER,
+                    respond=player.response_context
+                    != ResponseContext.RESPOND_VIA_LISTENER,
                 )
                 player.response_context = ResponseContext.NO_RESPONSE
                 logging.error("[sonolink] Error searching for tracks: %s", e)
@@ -1079,7 +1070,6 @@ class MusicCommands(commands.Cog):
             await switch_node(
                 bot=self._bot,
                 player=player,
-                play_after=False,
                 send_success_message=False,
                 send_failure_message=False,
             )

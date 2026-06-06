@@ -23,9 +23,7 @@ from app.utils import fix_audio_title, switch_node
 if TYPE_CHECKING:
     from app.main import KexoBotClient
 
-
-# Import ResponseContext enum from music_commands
-from app.cogs.music_commands import ResponseContext
+from app.constants import ResponseContext
 
 
 def is_bot_node_connected(bot: "KexoBotClient") -> bool:
@@ -187,7 +185,6 @@ class Listeners(commands.Cog):
         # Send playing embed if:
         # 1. response_context is RESPOND_VIA_LISTENER (just joined, let listener handle it), OR
         # 2. response_context is not RESPOND_VIA_INTERACTION (slash command didn't handle it)
-        # This allows listener to send for autoplay and queue tracks while preventing duplicates
         if player.response_context == ResponseContext.RESPOND_VIA_LISTENER:
             await player.text_channel.send(embed=playing_embed(self._bot, payload))
 
@@ -287,7 +284,6 @@ class Listeners(commands.Cog):
         await switch_node(
             bot=self._bot,
             player=player,
-            play_after=False,
             send_success_message=False,
             send_failure_message=False,
         )

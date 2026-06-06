@@ -44,20 +44,22 @@ class LavalinkServerManager:
     async def fetch(self) -> None:
         """Get new Lavalink servers from Lavainfo GitHub and Lavalist."""
         # Lavainfo from github
-        json_data: list = await make_http_request(
+        json_data_first: list = await make_http_request(
             self._session, FREE_NODELINK, get_json=True
         )
-        if json_data:
-            self._parse_lavalink_servers(json_data)
+        if json_data_first:
+            self._parse_lavalink_servers(json_data_first)
 
         # Lavalist
-        json_data: list = await make_http_request(
+        json_data_second: list = await make_http_request(
             self._session, API_LAVALIST, get_json=True
         )
-        if json_data:
-            self._parse_lavalink_servers(json_data)
+        if json_data_second:
+            self._parse_lavalink_servers(json_data_second)
 
-        self._clear_removed_nodes()
+        # Clear old nodes if both sources are available, otherwise we might end up with an empty list of nodes.
+        if json_data_first and json_data_second:
+            self._clear_removed_nodes()
 
         if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
             await self._bot.bot_config.update_one(
