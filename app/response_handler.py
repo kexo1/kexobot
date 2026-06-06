@@ -275,7 +275,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "QUEUE_LOOP_DISABLED": discord.Embed(
         title="",
-        description="✅ No longer looping queue.",
+        description="No longer looping queue.",
         color=discord.Color.blue(),
     ),
     "QUEUE_LOOP_ENABLED": lambda **kwargs: discord.Embed(
@@ -285,13 +285,33 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "TRACK_LOOP_DISABLED": discord.Embed(
         title="",
-        description="✅ No longer looping current song.",
+        description="No longer looping current song.",
         color=discord.Color.blue(),
     ),
     "TRACK_LOOP_ENABLED": lambda **kwargs: discord.Embed(
         title="",
         description=f"🔁 Looping [{kwargs.get('title')}]({kwargs.get('uri')})",
         color=discord.Color.blue(),
+    ),
+    "TRACK_SEEKED": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"⏩ Seeked to {kwargs.get('position')} seconds",
+        color=discord.Color.blue(),
+    ),
+    "SEEK_POSITION_INVALID": lambda **kwargs: discord.Embed(
+        title="",
+        description=f":x: Invalid position. Track duration is {kwargs.get('duration')} seconds.",
+        color=discord.Color.from_rgb(r=220, g=0, b=0),
+    ),
+    "PLAYING_PREVIOUS": lambda **kwargs: discord.Embed(
+        title="",
+        description=f"⏮️ Playing previous: [{kwargs.get('title')}]({kwargs.get('uri')})",
+        color=discord.Color.blue(),
+    ),
+    "NO_PREVIOUS_TRACK": discord.Embed(
+        title="",
+        description=":x: No previous track in history.",
+        color=discord.Color.from_rgb(r=220, g=0, b=0),
     ),
     "VOLUME_CHANGED": lambda **kwargs: discord.Embed(
         title="",
@@ -359,7 +379,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "AUTOPLAY_MODE_CHANGED": lambda **kwargs: discord.Embed(
         title="",
-        description=f":repeat: Autoplay mode set to `{kwargs.get('autoplay_mode')}`\n_Changes will apply upon bot reconnect._",
+        description=f":repeat: Autoplay mode set to `{kwargs.get('autoplay_mode')}`",
         color=discord.Color.blue(),
     ),
     "NODE_CONNECT_SUCCESS": lambda **kwargs: discord.Embed(

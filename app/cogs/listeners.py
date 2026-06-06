@@ -23,8 +23,6 @@ from app.utils import fix_audio_title, switch_node
 if TYPE_CHECKING:
     from app.main import KexoBotClient
 
-from app.constants import ResponseContext
-
 
 def is_bot_node_connected(bot: "KexoBotClient") -> bool:
     return bool(getattr(bot, "node", None))
@@ -182,14 +180,8 @@ class Listeners(commands.Cog):
         ):
             current_track.data.user_data = dict(temp_current.data.user_data)
 
-        # Send playing embed if:
-        # 1. response_context is RESPOND_VIA_LISTENER (just joined, let listener handle it), OR
-        # 2. response_context is not RESPOND_VIA_INTERACTION (slash command didn't handle it)
-        if player.response_context == ResponseContext.RESPOND_VIA_LISTENER:
+        if not player.should_respond:
             await player.text_channel.send(embed=playing_embed(self._bot, payload))
-
-        if player.response_context == ResponseContext.NO_RESPONSE:
-            player.response_context = ResponseContext.RESPOND_VIA_LISTENER
 
         if player.autoplay != sonolink.AutoPlayMode.ENABLED:
             history_count = len(player.queue.history)
@@ -236,7 +228,7 @@ class Listeners(commands.Cog):
         )
 
         await switch_node(bot=self._bot, player=player)
-        player.response_context = ResponseContext.NO_RESPONSE
+        player.should_respond = False
 
     @commands.Cog.listener()
     async def on_sonolink_track_exception(
@@ -259,10 +251,10 @@ class Listeners(commands.Cog):
             "TRACK_EXCEPTION",
             respond=False,
             message=payload.exception.message,
-            severity=payload.exception.severity.value,
+            severity=payload.exception.severity.value[:128],
         )
         await switch_node(bot=self._bot, player=player)
-        player.response_context = ResponseContext.NO_RESPONSE
+        player.should_respond = False
 
     @commands.Cog.listener()
     async def on_sonolink_track_stuck(
@@ -287,7 +279,7 @@ class Listeners(commands.Cog):
             send_success_message=False,
             send_failure_message=False,
         )
-        player.response_context = ResponseContext.NO_RESPONSE
+        player.should_respond = False
 
     @commands.Cog.listener()
     async def on_sonolink_player_disconnect(

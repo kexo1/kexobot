@@ -20,7 +20,6 @@ from app.constants import (
     API_RADIOGARDEN_PLACES,
     API_RADIOGARDEN_SEARCH,
     ICON_YOUTUBE,
-    ResponseContext,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import defer_interaction, send_interaction, send_response
@@ -104,7 +103,7 @@ async def fetch_first_track(
 
     # If it's a playlist
     if isinstance(tracks, sl_models.Playlist):
-        if player.response_context == ResponseContext.RESPOND_VIA_INTERACTION:
+        if player.should_respond:
             await defer_interaction(ctx)
 
         for track in tracks:
@@ -121,7 +120,7 @@ async def fetch_first_track(
         )
         await send_interaction(ctx, embed=embed)
 
-        player.response_context = ResponseContext.NO_RESPONSE
+        player.should_respond = False
         return track
 
     # If it's a single track in playlist
@@ -150,7 +149,7 @@ async def should_move_to_channel(ctx: discord.Interaction) -> bool:
         ephemeral=False,
         channel_id=ctx.user.voice.channel.id,
     )
-    player.response_context = ResponseContext.NO_RESPONSE
+    player.should_respond = False
     return True
 
 
@@ -252,26 +251,21 @@ class MusicCommands(commands.Cog):
             await send_interaction(ctx, embed=queue_embed(track))
             return
 
-        # Set response context:
-        # - If queue is empty and not just joined: RESPOND_VIA_INTERACTION (slash command sends)
-        # - If queue is empty and just joined: keep RESPOND_VIA_LISTENER (listener sends, avoid double response)
-        # - If queue not empty: NO_RESPONSE (listener sends for queue/autoplay)
         if len(player.queue) == 0:
-            if not player.just_joined:
-                player.response_context = ResponseContext.RESPOND_VIA_INTERACTION
-            else:
-                player.just_joined = False
-        else:
-            player.response_context = ResponseContext.NO_RESPONSE
+            player.should_respond = True
+        
+        if player.just_joined:
+            player.should_respond = False
+            player.just_joined = False
 
         playing: bool = await self._play_track(ctx, track)
         if not playing:
             return
 
-        # Send playing embed via slash command if context is RESPOND_VIA_INTERACTION
-        if player.response_context == ResponseContext.RESPOND_VIA_INTERACTION:
+        # Send playing embed via slash command if should_respond is True
+        if player.should_respond:
             await send_interaction(ctx, embed=playing_embed(track, self._bot))
-            player.response_context = ResponseContext.NO_RESPONSE
+            player.should_respond = False
 
     @music.command(name="play", description="Plays song.")
     @app_commands.describe(
@@ -455,7 +449,7 @@ class MusicCommands(commands.Cog):
         except QueueEmpty:
             pass
 
-        player.response_context = ResponseContext.RESPOND_VIA_LISTENER
+        player.should_respond = False
         await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
 
     @music.command(name="skip-to", description="Skips to selected song in queue.")
@@ -491,8 +485,12 @@ class MusicCommands(commands.Cog):
             self._queue_remove_at(player, track_pos - 1)
             self._queue_insert_front(player, track)
 
-        await player.skip()
-        player.response_context = ResponseContext.RESPOND_VIA_LISTENER
+        try:
+            await player.skip()
+        except QueueEmpty:
+            pass
+
+        player.should_respond = False
 
         await send_response(
             ctx,
@@ -555,11 +553,11 @@ class MusicCommands(commands.Cog):
             return
 
         if player.queue.mode == sonolink.QueueMode.LOOP_ALL:
-            player.queue.mode = sonolink.QueueMode.NORMAL
-            await send_response(ctx, "QUEUE_LOOP_DISABLED")
+            await player.update(queue_mode=sonolink.QueueMode.NORMAL)
+            await send_response(ctx, "QUEUE_LOOP_DISABLED", ephemeral=False)
             return
 
-        player.queue.mode = sonolink.QueueMode.LOOP_ALL
+        await player.update(queue_mode=sonolink.QueueMode.LOOP_ALL)
         await send_response(
             ctx,
             "QUEUE_LOOP_ENABLED",
@@ -602,6 +600,75 @@ class MusicCommands(commands.Cog):
         await player.resume()
         await send_response(ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10)
 
+    @music.command(name="seek", description="Seek to a position in the current track.")
+    @app_commands.describe(
+        seconds="Position to seek to in seconds (e.g., 30 for 30 seconds, 90 for 1:30)."
+    )
+    @app_commands.guild_only()
+    @is_joined()
+    @is_playing()
+    async def seek(
+        self, ctx: discord.Interaction, seconds: Range[int, 0, 3600]
+    ) -> None:
+        """Seek to a specific position in the currently playing track.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.Interaction`
+            The context of the command.
+        seconds: int
+            The position to seek to in seconds.
+        """
+        player: sonolink.Player = ctx.guild.voice_client
+
+        # Convert seconds to milliseconds
+        position_ms = seconds * 1000
+
+        # Check if position is within track duration
+        if player.current and position_ms > player.current.length:
+            await send_response(
+                ctx,
+                "SEEK_POSITION_INVALID",
+                ephemeral=False,
+                duration=int(player.current.length / 1000),
+            )
+            return
+
+        await player.seek(position_ms)
+        await send_response(
+            ctx,
+            "TRACK_SEEKED",
+            ephemeral=False,
+            position=seconds,
+        )
+
+    @music.command(name="previous", description="Play the previous track from history.")
+    @app_commands.guild_only()
+    @is_joined()
+    async def previous(self, ctx: discord.Interaction) -> None:
+        """Play the most recently played track from history.
+
+        Parameters:
+        -----------
+        ctx: :class:`discord.Interaction`
+            The context of the command.
+        """
+        player: sonolink.Player = ctx.guild.voice_client
+
+        try:
+            track = await player.previous()
+        except sonolink.HistoryEmpty:
+            await send_response(ctx, "NO_PREVIOUS_TRACK", ephemeral=False)
+            return
+
+        await send_response(
+            ctx,
+            "PLAYING_PREVIOUS",
+            ephemeral=False,
+            title=track.title,
+            uri=track.uri,
+        )
+
     @music.command(
         name="loop",
         description="Loops currently playing song, run command again to disable loop.",
@@ -612,11 +679,11 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if player.queue.mode == sonolink.QueueMode.LOOP:
-            player.queue.mode = sonolink.QueueMode.NORMAL
-            await send_response(ctx, "TRACK_LOOP_DISABLED")
+            await player.update(queue_mode=sonolink.QueueMode.NORMAL)
+            await send_response(ctx, "TRACK_LOOP_DISABLED", ephemeral=False)
             return
 
-        player.queue.mode = sonolink.QueueMode.LOOP
+        await player.update(queue_mode=sonolink.QueueMode.LOOP)
         await send_response(
             ctx,
             "TRACK_LOOP_ENABLED",
@@ -743,6 +810,7 @@ class MusicCommands(commands.Cog):
         ]
     )
     @app_commands.guild_only()
+    @is_joined()
     async def autoplay_mode(self, ctx: discord.Interaction, mode: str = "") -> None:
         """Change the autoplay mode for the bot.
 
@@ -754,7 +822,7 @@ class MusicCommands(commands.Cog):
             The autoplay mode to set. Can be either "normal" or "populated".
         """
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
-        autoplay_mode = (
+        current_autoplay_mode = (
             "normal" if guild_data["music"]["autoplay_mode"] == 1 else "populated"
         )
 
@@ -763,9 +831,22 @@ class MusicCommands(commands.Cog):
                 ctx,
                 "CURRENT_AUTOPLAY_MODE",
                 ephemeral=False,
-                autoplay_mode=autoplay_mode,
+                autoplay_mode=current_autoplay_mode,
             )
             return
+
+        new_autoplay_mode = (
+            sonolink.AutoPlayMode.PARTIAL
+            if mode == "normal"
+            else sonolink.AutoPlayMode.POPULATED
+        )
+        player: sonolink.Player = ctx.guild.voice_client
+        await player.update(
+            autoplay_settings=AutoPlaySettings(
+                mode=new_autoplay_mode,
+                discovery_count=10,
+            )
+        )
 
         guild_data["music"]["autoplay_mode"] = 1 if mode == "normal" else 2
         await self._bot.guild_data_db.update_one(
@@ -824,7 +905,7 @@ class MusicCommands(commands.Cog):
 
         player: sonolink.Player = channel.guild.voice_client
         player.text_channel = ctx.channel
-        player.response_context = ResponseContext.RESPOND_VIA_INTERACTION
+        player.should_respond = True
         player.is_troll = True
 
         search_result = await self._bot.sonolink_client.search_track(search)
@@ -934,8 +1015,7 @@ class MusicCommands(commands.Cog):
                     ctx,
                     "NODE_TIMED_OUT",
                     ephemeral=False,
-                    respond=player.response_context
-                    != ResponseContext.RESPOND_VIA_LISTENER,
+                    respond=not player.should_respond,
                 )
                 await switch_node(
                     bot=self._bot,
@@ -944,7 +1024,7 @@ class MusicCommands(commands.Cog):
                     send_success_message=True,
                     send_failure_message=False,
                 )
-                player.response_context = ResponseContext.NO_RESPONSE
+                player.should_respond = False
                 continue
 
             except Exception as e:
@@ -952,10 +1032,9 @@ class MusicCommands(commands.Cog):
                     ctx,
                     "LAVALINK_ERROR",
                     ephemeral=False,
-                    respond=player.response_context
-                    != ResponseContext.RESPOND_VIA_LISTENER,
+                    respond=not player.should_respond,
                 )
-                player.response_context = ResponseContext.NO_RESPONSE
+                player.should_respond = False
                 logging.error("[sonolink] Error searching for tracks: %s", e)
                 return None
 
@@ -963,10 +1042,10 @@ class MusicCommands(commands.Cog):
             ctx,
             "NO_TRACKS_FOUND",
             ephemeral=False,
-            respond=player.response_context != ResponseContext.RESPOND_VIA_LISTENER,
+            respond=not player.should_respond,
             search=search,
         )
-        player.response_context = ResponseContext.NO_RESPONSE
+        player.should_respond = False
         return None
 
     async def _join_channel(self, ctx: discord.Interaction) -> bool:
@@ -1038,7 +1117,7 @@ class MusicCommands(commands.Cog):
             ),
             history_settings=HistorySettings(
                 enabled=True,
-                max_items=15,
+                max_items=16,
             ),
         )
 
@@ -1054,8 +1133,7 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         player.text_channel = ctx.channel
-        # Set to RESPOND_VIA_LISTENER: listener should send playing embed (we already sent JOINED)
-        player.response_context = ResponseContext.RESPOND_VIA_LISTENER
+        player.should_respond = False
         player.just_joined = True
         player.is_troll = False
 
