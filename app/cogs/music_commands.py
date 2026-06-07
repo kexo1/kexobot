@@ -532,10 +532,6 @@ class MusicCommands(commands.Cog):
     @is_queue_empty()
     async def shuffle(self, ctx: discord.Interaction) -> None:
         player: sonolink.Player = ctx.guild.voice_client
-        if len(player.queue) < 2:
-            await send_response(ctx, "CANT_SHUFFLE")
-            return
-
         player.queue.shuffle()
         await send_response(ctx, "QUEUE_SHUFFLED", ephemeral=False)
 
@@ -605,7 +601,6 @@ class MusicCommands(commands.Cog):
         seconds="Position to seek to in seconds (e.g., 30 for 30 seconds, 90 for 1:30)."
     )
     @app_commands.guild_only()
-    @is_joined()
     @is_playing()
     async def seek(
         self, ctx: discord.Interaction, seconds: Range[int, 0, 3600]

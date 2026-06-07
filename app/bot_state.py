@@ -59,8 +59,8 @@ class BotState:
         new_node = await self.bot.connect_node(exclude_nodes=[node.uri])
         return new_node
 
-    async def check_node_status(self, node: sonolink.Node) -> bool:
-        """Check the status of a lavalink node.
+    async def node_attempt_connection(self, node: sonolink.Node) -> bool:
+        """Attempt to connect to a lavalink node.
         This function will try to connect to the lavalink node
 
         Parameters

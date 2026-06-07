@@ -399,22 +399,12 @@ class KexoBot:
                 None,
             )
             if existing_node and existing_node.is_connected:
-                if await node_health_check(existing_node):
-                    node = existing_node
-                    is_connected = True
-                    break
+                is_connected = await node_health_check(existing_node)
+                node = existing_node
+            else:
+                node = build_node(node_uri, node_info["password"])
+                is_connected = await bot.state.node_attempt_connection(node)
 
-                logging.exception(
-                    "[Sonolink] Cached node failed health check: %s",
-                    node_uri,
-                )
-                try:
-                    await existing_node.close()
-                except RuntimeError:
-                    pass
-
-            node = build_node(node_uri, node_info["password"])
-            is_connected = await bot.state.check_node_status(node)
             if is_connected:
                 bot.state.change_node_score(node.uri, 1)
                 break

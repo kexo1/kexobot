@@ -6,7 +6,6 @@ import time
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable
 
-import aiohttp
 import asyncpraw
 import asyncpraw.models
 import asyncprawcore

@@ -128,11 +128,6 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         description=":x: Song is already paused.",
         color=discord.Color.blue(),
     ),
-    "CANT_SHUFFLE": discord.Embed(
-        title="",
-        description=":exploding_head: Can't shuffle 1 song in queue BRUH",
-        color=discord.Color.blue(),
-    ),
     "LAVALINK_ERROR": discord.Embed(
         title="",
         description=":x: Failed to load tracks. You likely entered"

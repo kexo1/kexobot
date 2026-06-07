@@ -136,7 +136,7 @@ class CommandCog(commands.Cog):
         """
         await defer_interaction(ctx)
         node = build_node(f"{uri}:{str(port)}", password)
-        is_connected: bool = await self._bot.state.check_node_status(node)
+        is_connected: bool = await self._bot.state.node_attempt_connection(node)
 
         if not is_connected:
             await send_response(ctx, "NODE_CONNECT_FAILURE", uri=uri)
