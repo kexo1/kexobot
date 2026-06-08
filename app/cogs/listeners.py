@@ -205,9 +205,6 @@ class Listeners(commands.Cog):
         payload: :class:`WebSocketClosedEventPayload`
             The payload containing information about the websocket closure.
         """
-        logging.warning(
-            f"[Sonolink] Websocket closed for node {player.node.uri}, reason: {payload.reason}, by_remote: {payload.by_remote}"
-        )
         # Disconnected either by admin or by the node itself, no need to attempt reconnection or switch nodes.
         if payload.by_remote and "Disconnected." in payload.reason:
             return

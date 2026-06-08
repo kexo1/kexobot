@@ -527,3 +527,25 @@ async def send_interaction(
     if message and delete_after:
         await message.delete(delay=delete_after)
     return message
+
+
+async def send_message(
+    ctx: discord.TextChannel,
+    embed: discord.Embed | None = None,
+    embeds: list[discord.Embed] | None = None,
+    view: discord.ui.View | None = None,
+    files: list[discord.File] | None = None,
+    delete_after: int | None = None,
+) -> None:
+    """Sends a message to the channel, not as an interaction."""
+
+    try:
+        await ctx.send(
+            embed=embed,
+            embeds=embeds,
+            view=view,
+            files=files,
+            delete_after=delete_after,
+        )
+    except discord.HTTPException:
+        pass

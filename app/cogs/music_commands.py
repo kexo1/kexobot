@@ -22,7 +22,12 @@ from app.constants import (
     ICON_YOUTUBE,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
-from app.response_handler import defer_interaction, send_interaction, send_response
+from app.response_handler import (
+    defer_interaction,
+    send_interaction,
+    send_message,
+    send_response,
+)
 from app.utils import (
     QueuePaginator,
     find_track,
@@ -95,42 +100,57 @@ async def fetch_first_track(
         sl_models.Playable,
         list[sl_models.Playable],
     ],
-) -> sl_models.Playable:
+) -> Optional[sl_models.Playable]:
     player: sonolink.Player = ctx.guild.voice_client
 
+    # Unwrap SearchResult
     if isinstance(tracks, sl_models.SearchResult):
         tracks = tracks.result
 
-    # If it's a playlist
+    # Handle Playlist
     if isinstance(tracks, sl_models.Playlist):
-        if player.should_respond:
-            await defer_interaction(ctx)
+        return await _handle_playlist(ctx, player, tracks)
 
-        for track in tracks:
-            set_track_requester(track, ctx.user, ctx.client)
-
-        track = tracks.tracks.pop(0)
-        song_count: int = player.queue.put(tracks)
-
-        embed = discord.Embed(
-            title="",
-            description=f"Added the playlist **`{tracks.name}`**"
-            f" ({song_count} songs) to the queue.",
-            color=discord.Color.blue(),
-        )
-        await send_interaction(ctx, embed=embed)
-
-        player.should_respond = False
-        return track
-
-    # If it's a single track in playlist
+    # Handle single Playable
     if isinstance(tracks, sl_models.Playable):
         set_track_requester(tracks, ctx.user, ctx.client)
         return tracks
 
-    track = tracks[0]
-    set_track_requester(track, ctx.user, ctx.client)
-    return track
+    if not tracks:
+        return None
+
+    first_track = tracks[0]
+    set_track_requester(first_track, ctx.user, ctx.client)
+    return first_track
+
+
+async def _handle_playlist(
+    ctx: discord.Interaction,
+    player: sonolink.Player,
+    playlist: sl_models.Playlist,
+) -> sl_models.Playable:
+    if player.current:
+        player.should_respond = True
+
+    for track in playlist:
+        set_track_requester(track, ctx.user, ctx.client)
+
+    first_track = playlist.tracks.pop(0)
+    song_count = player.queue.put(playlist)
+
+    embed = discord.Embed(
+        title="",
+        description=f"Added the playlist **`{playlist.name}`** ({song_count} songs) to the queue.",
+        color=discord.Color.blue(),
+    )
+
+    if player.should_respond:
+        await send_interaction(ctx, embed=embed)
+        player.should_respond = False
+    else:
+        await send_message(ctx.channel, embed=embed)
+
+    return first_track
 
 
 async def should_move_to_channel(ctx: discord.Interaction) -> bool:
@@ -231,15 +251,22 @@ class MusicCommands(commands.Cog):
         if not is_moved:
             return
 
+        player: sonolink.Player = ctx.guild.voice_client
+
         tracks = await self._search_tracks(ctx, search)
         if not tracks:
             return
 
+        if len(player.queue) == 0:
+            player.should_respond = True
+
+        if player.just_joined:
+            player.should_respond = False
+            player.just_joined = False
+
         track = await fetch_first_track(ctx, tracks)
         if not track:
             return
-
-        player: sonolink.Player = ctx.guild.voice_client
 
         player.temp_current = track  # To be used in case of switching nodes
 
@@ -248,15 +275,13 @@ class MusicCommands(commands.Cog):
                 self._queue_insert_front(player, track)
             else:
                 player.queue.put(track)
-            await send_interaction(ctx, embed=queue_embed(track))
-            return
 
-        if len(player.queue) == 0:
-            player.should_respond = True
-        
-        if player.just_joined:
-            player.should_respond = False
-            player.just_joined = False
+            # If its playlist, we already responded to playlist message
+            if tracks and not isinstance(tracks.result, sl_models.Playlist):
+                await send_interaction(ctx, embed=queue_embed(track))
+            else:
+                await send_message(ctx.channel, embed=queue_embed(track))
+            return
 
         playing: bool = await self._play_track(ctx, track)
         if not playing:
@@ -687,12 +712,13 @@ class MusicCommands(commands.Cog):
             uri=player.current.uri,
         )
 
-    @music.command(name="clear", description="Clears queue")
+    @music.command(name="clear-queue", description="Clears queue and history.")
     @app_commands.guild_only()
     @is_joined()
     async def clear_queue(self, ctx: discord.Interaction) -> None:
         player: sonolink.Player = ctx.guild.voice_client
         player.queue.clear()
+        player.queue.clear_history()
         await send_response(ctx, "QUEUE_CLEARED", ephemeral=False)
 
     @music.command(name="volume", description="Sets audio volume.")
