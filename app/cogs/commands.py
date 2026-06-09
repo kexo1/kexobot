@@ -683,8 +683,10 @@ class CommandCog(commands.Cog):
         )
         embed.add_field(name="Ping:ㅤㅤ", value=f"{round(self._bot.latency * 1000)} ms")
         embed.add_field(name="Memory usage:ㅤㅤ", value=f"{get_memory_usage():.2f} MB")
-        embed.add_field(name="Online nodes:ㅤ", value=self._bot.get_online_nodes())
-        embed.add_field(name="Available nodes:ㅤ", value=self._bot.get_available_nodes())
+        embed.add_field(name="Online nodes:ㅤ", value=self._bot.state.get_online_nodes())
+        embed.add_field(
+            name="Available nodes:ㅤ", value=self._bot.state.get_available_nodes()
+        )
         embed.add_field(name="Joined servers:ㅤ", value=len(self._bot.guilds))
         embed.add_field(name="Bot version:", value=__version__)
         embed.add_field(name="Discord.py version:ㅤㅤ", value=discord.__version__)

@@ -131,8 +131,8 @@ class Listeners(commands.Cog):
             The payload containing information about the node that is ready.
         """
         logging.info(f"[Sonolink] A node is ready ({payload.node.uri})")
-        if self._bot.get_online_nodes() > 1 and is_bot_node_connected(self._bot):
-            await self._bot.close_unused_nodes()
+        if self._bot.state.get_online_nodes() > 1 and is_bot_node_connected(self._bot):
+            await self._bot.state.close_unused_nodes()
 
     @commands.Cog.listener()
     async def on_sonolink_node_close(self, node: sonolink.Node) -> None:
@@ -145,7 +145,7 @@ class Listeners(commands.Cog):
         node: :class:`sonolink.Node`
             The node that was closed.
         """
-        if self._bot.get_online_nodes() == 0 and is_bot_node_connected(self._bot):
+        if self._bot.state.get_online_nodes() == 0 and is_bot_node_connected(self._bot):
             logging.warning(
                 f"[Sonolink] Node got disconnected, connecting new node. ({node.uri})"
             )
@@ -189,7 +189,9 @@ class Listeners(commands.Cog):
 
             if tip and random.randint(0, 2) == 0:
                 # Format the tip with dynamic values if needed
-                formatted_tip = tip.format(node_count=self._bot.get_available_nodes())
+                formatted_tip = tip.format(
+                    node_count=self._bot.state.get_available_nodes()
+                )
                 await player.text_channel.send(formatted_tip)
 
     @commands.Cog.listener()
@@ -209,7 +211,7 @@ class Listeners(commands.Cog):
         if payload.by_remote and "Disconnected." in payload.reason:
             return
 
-        if self._bot.get_online_nodes() == 0:
+        if self._bot.state.get_online_nodes() == 0:
             await self._bot.connect_node()
             return
 

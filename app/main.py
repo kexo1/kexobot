@@ -109,43 +109,6 @@ def load_humor_api_tokens() -> None:
     bot.humor_api_tokens = {token: {"exhausted": False} for token in ENV_HUMOR_KEY}
 
 
-async def close_unused_nodes() -> None:
-    """Clear unused lavalink nodes.
-
-    This function will check if there are any lavalink nodes
-    that are not being used and will close them.
-    """
-    async with bot.close_nodes_lock:
-        nodes: list[sonolink.Node] = list(bot.sonolink_client.nodes)
-        for node in nodes:
-            if len(bot.sonolink_client.nodes) == 1:
-                break
-
-            if node.is_connected:
-                continue
-
-            try:
-                await node.close()
-                logging.info(f"[Sonolink] Closed unused node: {node.uri}")
-            except RuntimeError:
-                pass
-
-
-def get_online_nodes() -> int:
-    """Get the number of online lavalink nodes,
-    returns ``int`` of online nodes.
-    """
-    return len([node for node in bot.sonolink_client.nodes if node.is_connected])
-
-
-def get_available_nodes() -> int:
-    """Get the number of available lavalink nodes.
-
-    Returns the count of cached lavalink nodes.
-    """
-    return len(bot.cached_lavalink_servers)
-
-
 def clear_temp_reddit_data() -> None:
     """Clear the temporary user reddit data."""
     if not bot.temp_user_data:
@@ -218,9 +181,6 @@ class KexoBot:
         bot.state = BotState(bot)
 
         bot.connect_node = self.connect_node
-        bot.close_unused_nodes = close_unused_nodes
-        bot.get_online_nodes = get_online_nodes
-        bot.get_available_nodes = get_available_nodes
 
         bot.humor_api_tokens = {}
         bot.node_is_switching = {}
@@ -380,12 +340,12 @@ class KexoBot:
         sonolink.Node | None
             The lavalink node that was connected to.
         """
-
-        is_connected = False
         node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
 
         for exclude_node in exclude_nodes or []:
             node_candidates.pop(exclude_node, None)
+
+        is_connected = False
 
         # Try to connect to the best node based on score
         while node_candidates:

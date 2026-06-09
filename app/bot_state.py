@@ -39,6 +39,42 @@ class BotState:
             return
         node_entry["score"] += delta
 
+    def get_online_nodes(self) -> int:
+        """Get the number of online lavalink nodes,
+        returns ``int`` of online nodes.
+        """
+        return len(
+            [node for node in self.bot.sonolink_client.nodes if node.is_connected]
+        )
+
+    def get_available_nodes(self) -> int:
+        """Get the number of available lavalink nodes.
+
+        Returns the count of cached lavalink nodes.
+        """
+        return len(self.bot.cached_lavalink_servers)
+
+    async def close_unused_nodes(self) -> None:
+        """Clear unused lavalink nodes.
+
+        This function will check if there are any lavalink nodes
+        that are not being used and will close them.
+        """
+        async with self.bot.close_nodes_lock:
+            nodes: list[sonolink.Node] = list(self.bot.sonolink_client.nodes)
+            for node in nodes:
+                if len(self.bot.sonolink_client.nodes) == 1:
+                    break
+
+                if node.is_connected:
+                    continue
+
+                try:
+                    await node.close()
+                    logging.info(f"[Sonolink] Closed unused node: {node.uri}")
+                except RuntimeError:
+                    pass
+
     async def ensure_bot_node_ready(self) -> sonolink.Node | None:
         """Best-effort guard against stale node sessions.
 
@@ -72,6 +108,9 @@ class BotState:
         bool
             True if the node is connected, False otherwise.
         """
+        logging.info(
+            f"[Sonolink] Attempting to connect to node: ({node.uri}), at {datetime.now().isoformat()}"
+        )
         try:
             await asyncio.wait_for(node.connect(), timeout=3)
             # Some fucking nodes secretly don't respond,
