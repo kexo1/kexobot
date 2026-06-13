@@ -43,14 +43,12 @@ class LavalinkServerManager:
 
     async def fetch(self) -> None:
         """Get new Lavalink servers from Lavainfo GitHub and Lavalist."""
-        # Lavainfo from github
         json_data_first: list = await make_http_request(
             self._session, FREE_NODELINK, get_json=True
         )
         if json_data_first:
             self._parse_lavalink_servers(json_data_first)
 
-        # Lavalist
         json_data_second: list = await make_http_request(
             self._session, API_LAVALIST, get_json=True
         )

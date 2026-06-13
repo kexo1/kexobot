@@ -291,7 +291,9 @@ class Listeners(commands.Cog):
         player: :class:`sonolink.Player`
             The player that got disconnected.
         """
-        if payload.trigger == DisconnectTriggerType.INACTIVITY:
+        if payload.trigger == DisconnectTriggerType.INACTIVITY and hasattr(
+            player, "text_channel"
+        ):
             await send_response(
                 player.text_channel,
                 "DISCONNECTED_INACTIVITY",

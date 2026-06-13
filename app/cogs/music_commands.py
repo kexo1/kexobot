@@ -1083,14 +1083,14 @@ class MusicCommands(commands.Cog):
         )
 
         last_error: Exception | None = None
-        failed_uri: str | None = None
+        failed_uris = set()
 
         for attempt in range(3):
             if attempt == 0:
                 node = await self._bot.state.ensure_bot_node_ready()
             else:
                 node = await self._bot.connect_node(
-                    exclude_nodes=[failed_uri] if failed_uri else None,
+                    exclude_nodes=list(failed_uris),
                 )
             if not node:
                 await send_response(ctx, "NODE_NOT_FOUND", ephemeral=False)
@@ -1107,7 +1107,7 @@ class MusicCommands(commands.Cog):
 
             except Exception as e:
                 last_error = e
-                failed_uri = node.uri
+                failed_uris.add(node.uri)
                 score = self._bot.state.get_node_score(node.uri)
                 # Punish the node on voice connection failure
                 self._bot.state.change_node_score(node.uri, -score)

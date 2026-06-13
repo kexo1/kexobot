@@ -108,9 +108,6 @@ class BotState:
         bool
             True if the node is connected, False otherwise.
         """
-        logging.info(
-            f"[Sonolink] Attempting to connect to node: ({node.uri}), at {datetime.now().isoformat()}"
-        )
         try:
             await asyncio.wait_for(node.connect(), timeout=3)
             # Some fucking nodes secretly don't respond,
