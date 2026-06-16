@@ -215,9 +215,6 @@ class Listeners(commands.Cog):
             await self._bot.connect_node()
             return
 
-        if await self._handle_track_error_probe(player, payload.track):
-            return
-
         await send_response(
             player.text_channel,
             "NODE_WEBSOCKET_CLOSED",
@@ -336,7 +333,7 @@ class Listeners(commands.Cog):
             return
 
         if len(player.channel.members) == 1:
-            await player.disconnect(force=True)
+            await player.disconnect()
 
         if player.channel.members[0] == player.guild.me:
             try:

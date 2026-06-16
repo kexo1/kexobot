@@ -393,6 +393,7 @@ async def switch_node(
 
     async def _try_move_and_resume(target_node: sonolink.Node) -> bool:
         try:
+            player._stop_inactivity_timer()
             await player.move_to(target_node)
             track = resume_track(player)
             # Only when we didn't even get to play the track, moving won't play it, so we have to do it manually here.
