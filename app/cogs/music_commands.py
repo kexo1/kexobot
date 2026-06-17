@@ -35,6 +35,7 @@ from app.utils import (
     get_guild_data,
     get_search_prefix,
     make_http_request,
+    node_health_check,
     switch_node,
 )
 
@@ -1007,7 +1008,10 @@ class MusicCommands(commands.Cog):
             spotify_search = False
 
         player: sonolink.Player = ctx.guild.voice_client
-        for _ in range(2):
+        # If nothing is found
+        player.should_respond = True
+
+        for i in range(2):
             try:
                 tracks: sl_models.SearchResult = await asyncio.wait_for(
                     self._bot.sonolink_client.search_track(search, source=source),
@@ -1036,7 +1040,7 @@ class MusicCommands(commands.Cog):
                     ctx,
                     "NODE_TIMED_OUT",
                     ephemeral=False,
-                    respond=not player.should_respond,
+                    respond=i == 0,
                 )
                 await switch_node(
                     bot=self._bot,
@@ -1053,7 +1057,7 @@ class MusicCommands(commands.Cog):
                     ctx,
                     "LAVALINK_ERROR",
                     ephemeral=False,
-                    respond=not player.should_respond,
+                    respond=i == 0,
                 )
                 player.should_respond = False
                 logging.error("[sonolink] Error searching for tracks: %s", e)
@@ -1063,7 +1067,7 @@ class MusicCommands(commands.Cog):
             ctx,
             "NO_TRACKS_FOUND",
             ephemeral=False,
-            respond=not player.should_respond,
+            respond=player.should_respond,
             search=search,
         )
         player.should_respond = False
@@ -1084,10 +1088,13 @@ class MusicCommands(commands.Cog):
 
         last_error: Exception | None = None
         failed_uris = set()
+        node = self._bot.node
 
-        for attempt in range(3):
+        for attempt in range(4):
             if attempt == 0:
-                node = await self._bot.state.ensure_bot_node_ready()
+                if not await node_health_check(node):
+                    failed_uris.add(node.uri)
+                    continue
             else:
                 node = await self._bot.connect_node(
                     exclude_nodes=list(failed_uris),

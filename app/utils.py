@@ -393,6 +393,7 @@ async def switch_node(
 
     async def _try_move_and_resume(target_node: sonolink.Node) -> bool:
         try:
+            # Stop the inactivity timer on previous node to prevent it from disconnecting
             player._stop_inactivity_timer()
             await player.move_to(target_node)
             track = resume_track(player)
@@ -400,6 +401,8 @@ async def switch_node(
             if play_after and track:
                 await player.play(track)
 
+            # Check for inactivity after moving to the new node
+            player._check_inactivity()
             return True
         except Exception:
             bot.state.change_node_score(target_node.uri, -2)

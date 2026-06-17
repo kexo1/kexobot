@@ -75,26 +75,6 @@ class BotState:
                 except RuntimeError:
                     pass
 
-    async def ensure_bot_node_ready(self) -> sonolink.Node | None:
-        """Best-effort guard against stale node sessions.
-
-        This does not clear ``bot.node``. If the current node looks unhealthy, we try to
-        connect to a different one (excluding the current URI). If that fails, we keep
-        the existing node reference and return it.
-        """
-        node: sonolink.Node | None = getattr(self.bot, "node", None)
-        if node is None:
-            return await self.bot.connect_node()
-
-        if node.is_connected:
-            if await node_health_check(node):
-                return node
-
-        logging.warning("[Sonolink] Node health check failed (%s)", node.uri)
-
-        new_node = await self.bot.connect_node(exclude_nodes=[node.uri])
-        return new_node
-
     async def node_attempt_connection(self, node: sonolink.Node) -> bool:
         """Attempt to connect to a lavalink node.
         This function will try to connect to the lavalink node
