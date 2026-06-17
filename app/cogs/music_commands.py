@@ -1152,8 +1152,16 @@ class MusicCommands(commands.Cog):
         self, ctx: discord.Interaction, track: sl_models.Playable
     ) -> bool:
         player: sonolink.Player = ctx.guild.voice_client
-        playing_track = await player.play(track)
-        set_track_requester(playing_track, ctx.user, self._bot)
+        for i in range(3):
+            try:
+                await player.play(track)
+                break
+            except Exception as e:
+                logging.error(
+                    f"[sonolink] {i + 1}. Error playing track, retrying: %s", e
+                )
+
+        set_track_requester(track, ctx.user, self._bot)
         return True
 
     async def _prepare_sonolink(self, ctx: discord.Interaction) -> None:
