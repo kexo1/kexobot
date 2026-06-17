@@ -328,29 +328,6 @@ def resume_track(player: sonolink.Player):
     return getattr(player, "temp_current", None) or player.current
 
 
-async def node_health_check(node: sonolink.Node) -> bool:
-    """Check the health of a lavalink node by attempting to fetch its info.
-
-    Parameters
-    ----------
-    node: :class:`sonolink.Node`
-        The lavalink node to check.
-
-    Returns
-    -------
-    bool
-        True if the node is healthy and responsive, False otherwise.
-    """
-
-    try:
-        await asyncio.wait_for(node.fetch_info(), timeout=3)
-        return True
-    except Exception:
-        logging.info("[Sonolink] Node health check failed (%s)", node.uri)
-
-    return False
-
-
 async def switch_node(
     bot: "KexoBotClient",
     player: sonolink.Player,
@@ -405,7 +382,7 @@ async def switch_node(
             player._check_inactivity()
             return True
         except Exception:
-            bot.state.change_node_score(target_node.uri, -2)
+            bot.state.change_node_score(target_node.uri, -5)
             return False
 
     async def _playback_probe_failed(target_node: sonolink.Node) -> bool:
@@ -421,7 +398,7 @@ async def switch_node(
         bot.state.set_track_exception_probe(guild_id, track, track_failed_event)
         try:
             await asyncio.wait_for(track_failed_event.wait(), timeout=3)
-            bot.state.change_node_score(target_node.uri, -2)
+            bot.state.change_node_score(target_node.uri, -5)
             return True
         except asyncio.TimeoutError:
             return False

@@ -52,12 +52,7 @@ from app.state_types import (
     TempUserData,
     UserData,
 )
-from app.utils import (
-    generate_temp_guild_data,
-    is_older_than,
-    make_http_request,
-    node_health_check,
-)
+from app.utils import generate_temp_guild_data, is_older_than, make_http_request
 
 
 class KexoBotClient(commands.Bot):
@@ -359,7 +354,7 @@ class KexoBot:
                 None,
             )
             if existing_node and existing_node.is_connected:
-                is_connected = await node_health_check(existing_node)
+                is_connected = await bot.state.node_health_check(existing_node)
                 node = existing_node
             else:
                 node = build_node(node_uri, node_info["password"])
@@ -369,7 +364,6 @@ class KexoBot:
                 bot.state.change_node_score(node.uri, 1)
                 break
 
-            bot.state.change_node_score(node.uri, -1)
             node_candidates.pop(node_uri, None)
 
         await self._upload_cached_lavalink_servers()

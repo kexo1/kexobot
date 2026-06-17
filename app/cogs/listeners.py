@@ -108,7 +108,7 @@ class Listeners(commands.Cog):
             return True
 
         # Check if this track matches the one in the exception probe
-        # If it does, we set the event to unblock the waiting code in the command and return early without penalizing the node.
+        # If it does, we set the event to unblock the waiting code in the command
         data = self._bot.state.get_track_exception_probe(player.guild.id)
         if data:
             track, track_failed_event = data
@@ -116,7 +116,6 @@ class Listeners(commands.Cog):
                 track_failed_event.set()
                 return True
 
-        self._bot.state.change_node_score(player.node.uri, -2)
         return False
 
     @commands.Cog.listener()

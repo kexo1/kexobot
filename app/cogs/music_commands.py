@@ -35,7 +35,6 @@ from app.utils import (
     get_guild_data,
     get_search_prefix,
     make_http_request,
-    node_health_check,
     switch_node,
 )
 
@@ -1092,7 +1091,7 @@ class MusicCommands(commands.Cog):
 
         for attempt in range(4):
             if attempt == 0:
-                if not await node_health_check(node):
+                if not await self._bot.state.node_health_check(node):
                     failed_uris.add(node.uri)
                     continue
             else:
