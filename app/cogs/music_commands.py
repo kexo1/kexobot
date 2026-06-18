@@ -1045,7 +1045,6 @@ class MusicCommands(commands.Cog):
                     bot=self._bot,
                     player=player,
                     play_after=True,
-                    send_success_message=True,
                     send_failure_message=False,
                 )
                 player.should_respond = False

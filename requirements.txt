@@ -10,7 +10,8 @@ fake-useragent
 beautifulsoup4
 deep_translator
 unidecode
-matplotlib
+# mplcyberpunk is outdated
+matplotlib==3.10.9
 mplcyberpunk
 tzdata
 psutil
