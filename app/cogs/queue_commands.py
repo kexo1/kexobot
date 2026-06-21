@@ -8,7 +8,7 @@ from discord.ext import commands
 
 from app.constants import ICON_YOUTUBE
 from app.decorators import is_joined, is_playing, is_queue_empty
-from app.response_handler import send_interaction, send_response
+from app.response_handler import make_embed, send_embed, send_interaction, send_response
 from app.utils import QueuePaginator, find_track, fix_audio_title, has_pfp
 
 if TYPE_CHECKING:
@@ -219,7 +219,7 @@ class Queue(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if len(player.queue) < 2:
-            await send_response(ctx, "CANT_SHUFFLE")
+            await send_embed(ctx, make_embed(":x: Queue has less than 2 tracks to shuffle."))
             return
 
         player.queue.shuffle()

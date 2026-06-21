@@ -23,7 +23,11 @@ from app.constants import (
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import (
+    RED,
+    YELLOW,
     defer_interaction,
+    make_embed,
+    send_embed,
     send_interaction,
     send_message,
     send_response,
@@ -159,15 +163,19 @@ async def should_move_to_channel(ctx: discord.Interaction) -> bool:
         return True
 
     if player.current:
-        await send_response(ctx, "NOT_IN_SAME_VOICE_CHANNEL_PLAYING")
+        await send_embed(
+            ctx,
+            make_embed(
+                ":x: I am playing in a different voice channel, wait till the song finishes."
+            ),
+        )
         return False
 
     await player.move_to(ctx.user.voice.channel)
-    await send_response(
+    await send_embed(
         ctx,
-        "MOVED",
+        make_embed(f":wheelchair: Moving to <#{ctx.user.voice.channel.id}>"),
         ephemeral=False,
-        channel_id=ctx.user.voice.channel.id,
     )
     player.should_respond = False
     return True
@@ -232,7 +240,13 @@ class MusicCommands(commands.Cog):
             await defer_interaction(ctx)
 
         if self._bot.node_is_switching.get(ctx.guild.id, False):
-            await send_response(ctx, "WAIT_UNTIL_NODE_SWITCHES")
+            await send_embed(
+                ctx,
+                make_embed(
+                    ":hourglass_flowing_sand: Please wait until the bot finishes switching nodes.",
+                    color=YELLOW,
+                ),
+            )
             return
 
         if not self._bot.node:
@@ -475,7 +489,7 @@ class MusicCommands(commands.Cog):
             pass
 
         player.should_respond = False
-        await send_response(ctx, "TRACK_SKIPPED", ephemeral=False)
+        await send_embed(ctx, make_embed("⏭️ Track skipped."), ephemeral=False)
 
     @music.command(name="skip-to", description="Skips to selected song in queue.")
     @app_commands.describe(
@@ -502,7 +516,7 @@ class MusicCommands(commands.Cog):
 
         track_pos = find_track(player, to_find)
         if not track_pos:
-            await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", search=to_find)
+            await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
             return
 
         track = player.queue[track_pos - 1]
@@ -517,12 +531,10 @@ class MusicCommands(commands.Cog):
 
         player.should_respond = False
 
-        await send_response(
+        await send_embed(
             ctx,
-            "TRACK_SKIPPED_TO",
+            make_embed(f"⏭️ Skipped to [{track.title}]({track.uri})"),
             ephemeral=False,
-            title=track.title,
-            uri=track.uri,
         )
 
     @music.command(name="remove", description="Removes a song from the queue")
@@ -600,11 +612,16 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if player.paused:
-            await send_response(ctx, "ALREADY_PAUSED")
+            await send_embed(ctx, make_embed(":x: Track is already paused."))
             return
 
         await player.pause()
-        await send_response(ctx, "TRACK_PAUSED", ephemeral=False, delete_after=10)
+        await send_embed(
+            ctx,
+            make_embed("⏸️ Track paused."),
+            ephemeral=False,
+            delete_after=10,
+        )
 
     @music.command(name="resume", description="Resumes paused song.")
     @app_commands.guild_only()
@@ -619,7 +636,12 @@ class MusicCommands(commands.Cog):
         """
         player: sonolink.Player = ctx.guild.voice_client
         await player.resume()
-        await send_response(ctx, "TRACK_RESUMED", ephemeral=False, delete_after=10)
+        await send_embed(
+            ctx,
+            make_embed("▶️ Track resumed."),
+            ephemeral=False,
+            delete_after=10,
+        )
 
     @music.command(name="seek", description="Seek to a position in the current track.")
     @app_commands.describe(
@@ -646,20 +668,22 @@ class MusicCommands(commands.Cog):
 
         # Check if position is within track duration
         if player.current and position_ms > player.current.length:
-            await send_response(
+            await send_embed(
                 ctx,
-                "SEEK_POSITION_INVALID",
+                make_embed(
+                    f":x: Invalid seek position. Track duration is "
+                    f"{int(player.current.length / 1000)} seconds.",
+                    color=RED,
+                ),
                 ephemeral=False,
-                duration=int(player.current.length / 1000),
             )
             return
 
         await player.seek(position_ms)
-        await send_response(
+        await send_embed(
             ctx,
-            "TRACK_SEEKED",
+            make_embed(f"⏩ Seeked to {seconds} seconds."),
             ephemeral=False,
-            position=seconds,
         )
 
     @music.command(name="previous", description="Play the previous track from history.")
@@ -678,15 +702,17 @@ class MusicCommands(commands.Cog):
         try:
             track = await player.previous()
         except sonolink.HistoryEmpty:
-            await send_response(ctx, "NO_PREVIOUS_TRACK", ephemeral=False)
+            await send_embed(
+                ctx,
+                make_embed(":x: No previous track in history."),
+                ephemeral=False,
+            )
             return
 
-        await send_response(
+        await send_embed(
             ctx,
-            "PLAYING_PREVIOUS",
+            make_embed(f"⏮️ Playing previous track [{track.title}]({track.uri})"),
             ephemeral=False,
-            title=track.title,
-            uri=track.uri,
         )
 
     @music.command(
@@ -735,7 +761,10 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if volume is None:
-            await send_response(ctx, "CURRENT_VOLUME", volume=player.volume)
+            await send_embed(
+                ctx,
+                make_embed(f"🔊 Current volume: {player.volume}"),
+            )
             return
 
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
@@ -745,7 +774,11 @@ class MusicCommands(commands.Cog):
         )
         self._bot.guild_data[ctx.guild.id] = guild_data
         await player.set_volume(volume)
-        await send_response(ctx, "VOLUME_CHANGED", ephemeral=False, volume=volume)
+        await send_embed(
+            ctx,
+            make_embed(f"🔊 Volume set to {volume}"),
+            ephemeral=False,
+        )
 
     @music.command(name="speed", description="Speeds up music.")
     @app_commands.describe(multiplier="Playback speed multiplier (1-4).")
@@ -760,8 +793,10 @@ class MusicCommands(commands.Cog):
         filters = sl_models.Filters(timescale=sl_models.Timescale(speed=multiplier))
 
         await player.set_filters(filters)
-        await send_response(
-            ctx, "SPEED_CHANGED", ephemeral=False, multiplier=multiplier
+        await send_embed(
+            ctx,
+            make_embed(f"⏩ Speed set to {multiplier}x"),
+            ephemeral=False,
         )
 
     @music.command(name="clear-effects", description="Clears all effects on player.")
@@ -771,7 +806,7 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
         filters = sl_models.Filters()
         await player.set_filters(filters)
-        await send_response(ctx, "EFFECTS_CLEARED", ephemeral=False)
+        await send_embed(ctx, make_embed("🔇 Effects cleared."), ephemeral=False)
 
     @music.command(name="queue", description="Shows the current queue")
     @app_commands.guild_only()
@@ -811,8 +846,10 @@ class MusicCommands(commands.Cog):
             await send_response(ctx, "NOT_IN_SAME_VOICE_CHANNEL")
             return
 
-        await send_response(
-            ctx, "DISCONNECTED", ephemeral=False, channel_id=player.channel.id
+        await send_embed(
+            ctx,
+            make_embed(f"Left <#{player.channel.id}>"),
+            ephemeral=False,
         )
         player.cleanup()
         await player.disconnect()
@@ -848,11 +885,10 @@ class MusicCommands(commands.Cog):
         )
 
         if not mode:
-            await send_response(
+            await send_embed(
                 ctx,
-                "CURRENT_AUTOPLAY_MODE",
+                make_embed(f"Autoplay mode: `{current_autoplay_mode}`"),
                 ephemeral=False,
-                autoplay_mode=current_autoplay_mode,
             )
             return
 
@@ -875,8 +911,10 @@ class MusicCommands(commands.Cog):
         )
         self._bot.guild_data[ctx.guild.id] = guild_data
 
-        await send_response(
-            ctx, "AUTOPLAY_MODE_CHANGED", ephemeral=False, autoplay_mode=mode
+        await send_embed(
+            ctx,
+            make_embed(f"Autoplay mode changed to `{mode}`"),
+            ephemeral=False,
         )
 
     @music.command(
@@ -921,7 +959,14 @@ class MusicCommands(commands.Cog):
                 await send_response(ctx, "NO_PERMISSIONS")
                 return
             except Exception:
-                await send_response(ctx, "NODE_UNRESPONSIVE", ephemeral=False)
+                await send_embed(
+                    ctx,
+                    make_embed(
+                        ":warning: Node is unresponsive, try `/node reconnect`.",
+                        color=YELLOW,
+                    ),
+                    ephemeral=False,
+                )
                 return
 
         player: sonolink.Player = channel.guild.voice_client
@@ -1035,9 +1080,12 @@ class MusicCommands(commands.Cog):
                         return tracks
 
             except asyncio.TimeoutError:
-                await send_response(
+                await send_embed(
                     ctx,
-                    "NODE_TIMED_OUT",
+                    make_embed(
+                        ":warning: Node timed out, switching to another node.",
+                        color=YELLOW,
+                    ),
                     ephemeral=False,
                     respond=i == 0,
                 )
@@ -1051,9 +1099,14 @@ class MusicCommands(commands.Cog):
                 continue
 
             except Exception as e:
-                await send_response(
+                await send_embed(
                     ctx,
-                    "LAVALINK_ERROR",
+                    make_embed(
+                        ":x: Failed to load tracks. You likely entered a wrong link or "
+                        "this Lavalink server lacks necessary plugins.\n"
+                        "To fix this, use command `/node reconnect`",
+                        color=RED,
+                    ),
                     ephemeral=False,
                     respond=i == 0,
                 )
@@ -1117,12 +1170,20 @@ class MusicCommands(commands.Cog):
                 # Punish the node on voice connection failure
                 self._bot.state.change_node_score(node.uri, -score)
                 logging.warning(
-                    "[Sonolink] Voice connect attempt %s failed: %s",
+                    "[Sonolink] Voice connect attempt %s failed for node %s: %s",
                     attempt + 1,
+                    node.uri,
                     e,
                 )
 
-        await send_response(ctx, "CONNECTION_TIMEOUT", ephemeral=False)
+        await send_embed(
+            ctx,
+            make_embed(
+                ":x: Failed to connect to voice channel, try again later.",
+                color=RED,
+            ),
+            ephemeral=False,
+        )
         if last_error:
             logging.error(
                 "[Sonolink] Error connecting to voice channel: %s",
@@ -1189,12 +1250,12 @@ class MusicCommands(commands.Cog):
 
         # Autoplay mode is already set at player creation time from guild data
 
-        await send_response(
+        await send_embed(
             ctx,
-            "JOINED",
+            make_embed(
+                f"Joined <#{player.channel.id}>, use <#{player.text_channel.id}> to control music."
+            ),
             ephemeral=False,
-            channel_id=player.channel.id,
-            text_channel_id=player.text_channel.id,
         )
 
     def _build_queue_embeds(

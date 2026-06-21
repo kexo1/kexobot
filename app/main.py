@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import logging
+import random
 import socket
 from datetime import datetime
 from typing import Any
@@ -342,12 +343,15 @@ class KexoBot:
 
         is_connected = False
 
-        # Try to connect to the best node based on score
         while node_candidates:
-            best_node = max(
-                node_candidates.items(),
-                key=lambda x: x[1]["score"],
-            )
+            best_score = max(item["score"] for item in node_candidates.values())
+
+            # Filter nodes with the best score
+            top_nodes = {
+                k: v for k, v in node_candidates.items() if v["score"] == best_score
+            }
+            best_node = random.choice(list(top_nodes.items()))
+
             node_uri, node_info = best_node
             existing_node = next(
                 (n for n in bot.sonolink_client.nodes if n.uri == node_uri),
@@ -361,7 +365,6 @@ class KexoBot:
                 is_connected = await bot.state.node_attempt_connection(node)
 
             if is_connected:
-                bot.state.change_node_score(node.uri, 1)
                 break
 
             node_candidates.pop(node_uri, None)

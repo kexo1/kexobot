@@ -34,7 +34,6 @@ class BotState:
 
         Notes
         -----
-        Score +1 = successful connection
         Score +1 = successful track load
         Score -1 = health check failed
         Score -1 = node closed

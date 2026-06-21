@@ -29,7 +29,13 @@ from app.constants import (
     SHITPOST_SUBREDDITS_ALL,
     Support,
 )
-from app.response_handler import defer_interaction, send_interaction, send_response
+from app.response_handler import (
+    defer_interaction,
+    make_embed,
+    send_embed,
+    send_interaction,
+    send_response,
+)
 from app.utils import (
     QueuePaginator,
     build_node,
@@ -143,7 +149,11 @@ class CommandCog(commands.Cog):
             return
 
         self._bot.node = node
-        await send_response(ctx, "NODE_CONNECT_SUCCESS", ephemeral=False, uri=node.uri)
+        await send_embed(
+            ctx,
+            make_embed(f":white_check_mark: Connected to node {node.uri}"),
+            ephemeral=False,
+        )
 
     @slash_node.command(
         name="reconnect",
@@ -177,12 +187,7 @@ class CommandCog(commands.Cog):
                 return
 
             self._bot.node = node
-            await send_response(
-                ctx,
-                "NODE_RECONNECT_TO_PLAYER_SUCCESS",
-                ephemeral=False,
-                uri=self._bot.node.uri,
-            )
+            await send_response(ctx, "RECONNECTED_NODE", node=node.uri)
             return
 
         node: sonolink.Node | None = await self._bot.connect_node(
@@ -193,12 +198,7 @@ class CommandCog(commands.Cog):
             return
 
         self._bot.node = node
-        await send_response(
-            ctx,
-            "NODE_RECONNECT_SUCCESS",
-            ephemeral=False,
-            uri=self._bot.node.uri,
-        )
+        await send_response(ctx, "RECONNECTED_NODE", node=node.uri)
 
     @slash_node.command(name="info", description="Information about connected node")
     async def node_info(self, ctx: discord.Interaction) -> None:
@@ -334,7 +334,7 @@ class CommandCog(commands.Cog):
         nodes: list[sonolink.Node] = list(self._bot.sonolink_client.nodes)
 
         if not nodes:
-            await send_response(ctx, "NO_NODES_CONNECTED")
+            await send_embed(ctx, make_embed(":x: No nodes connected."))
             return
         # Would change to dict
         server_name = []
@@ -362,7 +362,7 @@ class CommandCog(commands.Cog):
                 node_uri.append(node.uri)
 
         if not server_name:
-            await send_response(ctx, "NO_PLAYERS_CONNECTED")
+            await send_embed(ctx, make_embed(":x: No players connected."))
             return
 
         embed.add_field(name="Server:ㅤㅤㅤㅤ", value="\n".join(server_name))
@@ -387,7 +387,7 @@ class CommandCog(commands.Cog):
         """
         servers_dict, all_players = await self._sfd_servers.get_servers_info()
         if not servers_dict:
-            await send_response(ctx, "SFD_SERVERS_NOT_FOUND")
+            await send_embed(ctx, make_embed(":x: No servers found."))
             return
 
         # Cleaning up the server names and maps
@@ -452,7 +452,7 @@ class CommandCog(commands.Cog):
         """
         server = await self._sfd_servers.get_server(search)
         if not server:
-            await send_response(ctx, "SFD_SERVER_NOT_FOUND")
+            await send_embed(ctx, make_embed(":x: No server found."))
             return
 
         embed = discord.Embed(
@@ -604,7 +604,10 @@ class CommandCog(commands.Cog):
         author = ctx.user
 
         if author in host_authors:
-            await send_response(ctx, "ALREADY_HOSTING")
+            await send_embed(
+                ctx,
+                make_embed(":x: You are already hosting a server, stop hosting first."),
+            )
             return None
 
         host_authors.append(author.name)
@@ -649,14 +652,24 @@ class CommandCog(commands.Cog):
             if image.endswith((".jpg", ".jpeg", ".png", ".gif")):
                 embed.set_thumbnail(url=image)
             else:
-                await send_response(ctx, "INCORRECT_IMAGE_URL")
+                await send_embed(
+                    ctx,
+                    make_embed(
+                        ":x: Incorrect image URL, use .jpg, .jpeg, .png or .gif"
+                    ),
+                )
                 return None
 
         if ping_role:
             try:
                 await send_interaction(ctx, ping_role.mention)
             except AttributeError:
-                await send_response(ctx, "CANT_PING_ROLE")
+                await send_embed(
+                    ctx,
+                    make_embed(
+                        ":x: Can't ping role, use @role or role id instead of role name."
+                    ),
+                )
                 return None
 
         view = HostView(author=author)
@@ -942,18 +955,21 @@ class CommandCog(commands.Cog):
         collection: list = bot_config[collection_db_name]
 
         if to_upload in collection:
-            await send_response(ctx, "DB_ALREADY_IN_LIST", to_upload=to_upload)
+            await send_embed(
+                ctx,
+                make_embed(f":x: `{to_upload}` is already in the list."),
+            )
             return
 
         collection.append(to_upload)
         await self._bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
-        await send_response(
+        await send_embed(
             ctx,
-            "DB_ADDED",
-            to_upload=to_upload,
-            collection_name=collection_name,
+            make_embed(
+                f":white_check_mark: Added `{to_upload}` to {collection_name} list."
+            ),
         )
 
     async def _remove_from_bot_config(
@@ -965,18 +981,21 @@ class CommandCog(commands.Cog):
         collection: list = bot_config[collection_db_name]
 
         if to_remove not in collection:
-            await send_response(ctx, "DB_NOT_IN_LIST", to_remove=to_remove)
+            await send_embed(
+                ctx,
+                make_embed(f":x: `{to_remove}` is not in the list."),
+            )
             return
 
         collection.pop(collection.index(to_remove))
         await self._bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
-        await send_response(
+        await send_embed(
             ctx,
-            "DB_REMOVED",
-            to_remove=to_remove,
-            collection_name=collection_name,
+            make_embed(
+                f":white_check_mark: Removed `{to_remove}` from {collection_name} list."
+            ),
         )
 
 
@@ -1025,7 +1044,10 @@ class HostView(discord.ui.View):
             host_authors.pop(host_authors.index(self._author.name))
             return
 
-        await send_response(interaction, "NOT_EMBED_AUTHOR")
+        await send_embed(
+            interaction,
+            make_embed(":x: You are not the author of this embed."),
+        )
 
     async def on_timeout(self) -> None:
         """Method called when the view times out.

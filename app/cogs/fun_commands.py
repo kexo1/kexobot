@@ -15,7 +15,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from app.constants import API_DAD_JOKE, API_HUMORAPI, API_JOKEAPI, JOKE_EXCLUDED_WORDS
-from app.response_handler import defer_interaction, send_interaction, send_response
+from app.response_handler import defer_interaction, make_embed, send_embed, send_interaction, send_response
 from app.utils import get_guild_data, get_user_data, load_text_file, make_http_request
 
 if TYPE_CHECKING:
@@ -289,7 +289,12 @@ class FunCommands(commands.Cog):
 
                 is_channel_nsfw = ctx.channel.is_nsfw()
                 if submission.over_18 and not is_channel_nsfw:
-                    await send_response(ctx, "CHANNEL_NOT_NSFW")
+                    await send_embed(
+                        ctx,
+                        make_embed(
+                            ":x: This post is NSFW, use the command in an NSFW channel."
+                        ),
+                    )
                     return
 
                 embed = await self._create_reddit_embed(submission)
@@ -313,7 +318,13 @@ class FunCommands(commands.Cog):
             RequestException,
             ResponseException,
         ):
-            await send_response(ctx, "REDDIT_REQUEST_ERROR")
+            await send_embed(
+                ctx,
+                make_embed(
+                    ":x: Failed to get post from Reddit, try again later.",
+                    color=discord.Color.from_rgb(r=220, g=0, b=0),
+                ),
+            )
 
     def _update_temp_user_data(self, user_id: int, submission_url: str) -> None:
         self._temp_user_data[user_id]["reddit"]["viewed_posts"].add(submission_url)

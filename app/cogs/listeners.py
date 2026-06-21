@@ -17,7 +17,7 @@ from sonolink.gateway import (
 )
 
 from app.constants import ICON_YOUTUBE, MUSIC_TIPS
-from app.response_handler import send_response
+from app.response_handler import make_embed, send_embed, YELLOW
 from app.utils import fix_audio_title, switch_node
 
 if TYPE_CHECKING:
@@ -214,12 +214,15 @@ class Listeners(commands.Cog):
             await self._bot.connect_node()
             return
 
-        await send_response(
+        await send_embed(
             player.text_channel,
-            "NODE_WEBSOCKET_CLOSED",
+            make_embed(
+                ":warning: Node is unresponsive, trying to connect to a new node in a moment"
+                f"\n**Reason**: {payload.reason}"
+                f"\n**Caused by discord**: {payload.by_remote}",
+                color=YELLOW,
+            ),
             respond=False,
-            reason=payload.reason,
-            by_remote=payload.by_remote,
         )
 
         await switch_node(bot=self._bot, player=player)
@@ -241,12 +244,15 @@ class Listeners(commands.Cog):
         if await self._handle_track_error_probe(player, payload.track):
             return
 
-        await send_response(
+        await send_embed(
             player.text_channel,
-            "TRACK_EXCEPTION",
+            make_embed(
+                ":warning: An error occurred when playing song, trying to connect to a new node."
+                f"\n**Message**: {payload.exception.message}"
+                f"\n**Severity**: {payload.exception.severity.value[:128]}",
+                color=YELLOW,
+            ),
             respond=False,
-            message=payload.exception.message,
-            severity=payload.exception.severity.value[:128],
         )
         await switch_node(bot=self._bot, player=player)
         player.should_respond = False
@@ -267,7 +273,14 @@ class Listeners(commands.Cog):
         if await self._handle_track_error_probe(player, payload.track):
             return
 
-        await send_response(player.text_channel, "TRACK_STUCK", respond=False)
+        await send_embed(
+            player.text_channel,
+            make_embed(
+                ":warning: Track got stuck, trying to connect to a new node.",
+                color=YELLOW,
+            ),
+            respond=False,
+        )
         await switch_node(
             bot=self._bot,
             player=player,
@@ -290,11 +303,12 @@ class Listeners(commands.Cog):
         if payload.trigger == DisconnectTriggerType.INACTIVITY and hasattr(
             player, "text_channel"
         ):
-            await send_response(
+            await send_embed(
                 player.text_channel,
-                "DISCONNECTED_INACTIVITY",
+                make_embed(
+                    f"Left <#{player.channel.id}> after 10 minutes of inactivity."
+                ),
                 respond=False,
-                channel_id=player.channel.id,
             )
 
         if payload.extra_data:
@@ -336,11 +350,12 @@ class Listeners(commands.Cog):
 
         if player.channel.members[0] == player.guild.me:
             try:
-                await send_response(
+                await send_embed(
                     player.text_channel,
-                    "DISCONNECTED_NO_USERS",
+                    make_embed(
+                        f"Left <#{player.channel.id}>, no users in channel."
+                    ),
                     respond=False,
-                    channel_id=player.channel.id,
                 )
             except AttributeError:
                 pass

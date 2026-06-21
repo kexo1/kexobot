@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Any, Callable, Protocol
 
-from app.response_handler import send_response
+from app.response_handler import make_embed, send_embed, send_response
 
 
 class CommandFunc(Protocol):
@@ -23,7 +23,10 @@ def is_joined() -> Callable[[CommandFunc], CommandFunc]:
             vc = ctx.guild.voice_client
             player_channel = getattr(vc, "channel", None) if vc else None
             if not vc or not player_channel:
-                await send_response(ctx, "NOT_IN_VOICE_CHANNEL")
+                await send_embed(
+                    ctx,
+                    make_embed(":x: I'm not joined in a voice channel."),
+                )
                 return None
 
             if player_channel.id != ctx.user.voice.channel.id:
@@ -46,7 +49,12 @@ def is_playing() -> Callable[[CommandFunc], CommandFunc]:
             ctx = args[1]
             vc = ctx.guild.voice_client
             if not vc or not vc.current:
-                await send_response(ctx, "NOT_PLAYING")
+                await send_embed(
+                    ctx,
+                    make_embed(
+                        ":x: I'm not playing anything. Type `/music play` from vc."
+                    ),
+                )
                 return None
 
             if ctx.guild.voice_client.channel.id != ctx.user.voice.channel.id:
