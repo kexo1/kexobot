@@ -151,6 +151,39 @@ class BotState:
             return None
         return node_entry["score"]
 
+    def change_node_ping(self, node_uri: str, ping: int) -> None:
+        """Update the ping value for a cached Lavalink node.
+
+        Parameters
+        ----------
+        node_uri: str
+            URI of the node in the cache.
+        ping: int
+            The new ping value in milliseconds.
+        """
+        node_entry = self.bot.cached_lavalink_servers.get(node_uri)
+        if not node_entry:
+            return
+        node_entry["ping"] = ping
+
+    def get_node_ping(self, node_uri: str) -> int | None:
+        """Get cached ping of Lavalink node.
+
+        Parameters
+        ----------
+        node_uri: str
+            URI of the node in the cache.
+
+        Returns
+        -------
+        int | None
+            Node ping in ms if node is cached, otherwise ``None``.
+        """
+        node_entry = self.bot.cached_lavalink_servers.get(node_uri)
+        if not node_entry:
+            return None
+        return node_entry["ping"]
+
     def clear_joke_caches(self) -> None:
         """Clear all in-memory joke caches in-place."""
         self.bot.loaded_jokes.clear()

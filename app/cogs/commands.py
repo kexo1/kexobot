@@ -216,8 +216,6 @@ class CommandCog(commands.Cog):
             await send_response(ctx, "NO_NODE_INFO")
             return
 
-        response_time = get_url_response_time(node.uri)
-
         embed = discord.Embed(
             title=urlparse(node.uri).netloc,
             color=discord.Color.blue(),
@@ -229,7 +227,9 @@ class CommandCog(commands.Cog):
             value=self._bot.state.get_node_score(node.uri) or 0,
         )
 
-        embed.add_field(name="Ping:", value=f"{response_time} ms")
+        embed.add_field(
+            name="Ping:", value=f"{self._bot.state.get_node_ping(node.uri) or 0} ms"
+        )
         embed.add_field(
             name="Plugins:",
             value=", ".join(f"{plugin.name}: {plugin.version}" for plugin in plugins),

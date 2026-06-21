@@ -53,7 +53,12 @@ from app.state_types import (
     TempUserData,
     UserData,
 )
-from app.utils import generate_temp_guild_data, is_older_than, make_http_request
+from app.utils import (
+    generate_temp_guild_data,
+    get_url_response_time,
+    is_older_than,
+    make_http_request,
+)
 
 
 class KexoBotClient(commands.Bot):
@@ -302,6 +307,7 @@ class KexoBot:
         if weekday == 6 and now.hour == 0:
             clear_cached_jokes()
             clear_temp_guild_data()
+            await self._test_all_node_pings()
             await self._refresh_subreddit_icons()
 
         if now.hour % 6 == 0:
@@ -350,6 +356,14 @@ class KexoBot:
             top_nodes = {
                 k: v for k, v in node_candidates.items() if v["score"] == best_score
             }
+
+            if len(top_nodes) > 1:
+                # Tiebreaker: pick the node with the lowest ping among top-scoring nodes
+                best_ping = min(v["ping"] for v in top_nodes.values())
+                top_nodes = {
+                    k: v for k, v in top_nodes.items() if v["ping"] == best_ping
+                }
+
             best_node = random.choice(list(top_nodes.items()))
 
             node_uri, node_info = best_node
@@ -446,6 +460,19 @@ class KexoBot:
             {"$set": {"lavalink_servers": bot.cached_lavalink_servers}},
         )
         self.cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
+
+    async def _test_all_node_pings(self) -> None:
+        """Test ping for all cached lavalink nodes and update values.
+
+        Runs weekly on Sunday at 3 AM to refresh ping measurements
+        and persist updated values to the database.
+        """
+        for uri in list(bot.cached_lavalink_servers.keys()):
+            ping = await get_url_response_time(uri)
+            bot.state.change_node_ping(uri, ping)
+
+        await self._upload_cached_lavalink_servers()
+        logging.info("[Lavalink] Weekly ping test completed and saved to database.")
 
 
 kexobot = KexoBot()

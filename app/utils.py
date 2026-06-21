@@ -126,9 +126,8 @@ def get_url_response_time(url: str) -> int:
         start_time = time.perf_counter()
         httpx.get(url, timeout=5)
         return int((time.perf_counter() - start_time) * 1000)  # Convert to milliseconds
-    except httpx.RequestError as e:
-        logging.warning(f"[Httpx] Failed to get response time for {url}: {e}")
-        return None
+    except httpx.RequestError:
+        return 9999
 
 
 async def download_video(

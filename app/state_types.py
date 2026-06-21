@@ -48,6 +48,7 @@ class TempGuildData(TypedDict):
 class NodeCacheEntry(TypedDict):
     password: str
     score: int
+    ping: int
 
 
 TrackExceptionEntry = tuple[Any, Any]

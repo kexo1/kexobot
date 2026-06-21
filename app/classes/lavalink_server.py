@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from app.constants import API_LAVALIST, DB_CACHE, FREE_NODELINK
-from app.utils import make_http_request
+from app.utils import get_url_response_time, make_http_request
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -47,13 +47,13 @@ class LavalinkServerManager:
             self._session, FREE_NODELINK, get_json=True
         )
         if json_data_first:
-            self._parse_lavalink_servers(json_data_first)
+            await self._parse_lavalink_servers(json_data_first)
 
         json_data_second: list = await make_http_request(
             self._session, API_LAVALIST, get_json=True
         )
         if json_data_second:
-            self._parse_lavalink_servers(json_data_second)
+            await self._parse_lavalink_servers(json_data_second)
 
         # Clear old nodes if both sources are available, otherwise we might end up with an empty list of nodes.
         if json_data_first and json_data_second:
@@ -71,7 +71,7 @@ class LavalinkServerManager:
                 "[Lavalink] Lavalink servers list got updated, updating cache."
             )
 
-    def _parse_lavalink_servers(self, json_data: list) -> None:
+    async def _parse_lavalink_servers(self, json_data: list) -> None:
         for server in json_data:
             if (
                 (server.get("restVersion") not in (None, "v4"))
@@ -88,9 +88,11 @@ class LavalinkServerManager:
             if uri in self._cached_lavalink_servers_copy:
                 continue
 
+            initial_ping = await get_url_response_time(uri)
             self._cached_lavalink_servers[uri] = {
                 "password": server["password"],
                 "score": 0,
+                "ping": initial_ping,
             }
 
     def _clear_removed_nodes(self) -> None:

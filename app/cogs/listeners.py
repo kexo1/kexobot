@@ -17,7 +17,7 @@ from sonolink.gateway import (
 )
 
 from app.constants import ICON_YOUTUBE, MUSIC_TIPS
-from app.response_handler import make_embed, send_embed, YELLOW
+from app.response_handler import YELLOW, make_embed, send_embed
 from app.utils import fix_audio_title, switch_node
 
 if TYPE_CHECKING:
@@ -224,7 +224,7 @@ class Listeners(commands.Cog):
             ),
             respond=False,
         )
-
+        self._bot.state.change_node_score(player.node.uri, -5)
         await switch_node(bot=self._bot, player=player)
         player.should_respond = False
 
@@ -254,6 +254,7 @@ class Listeners(commands.Cog):
             ),
             respond=False,
         )
+        self._bot.state.change_node_score(player.node.uri, -5)
         await switch_node(bot=self._bot, player=player)
         player.should_respond = False
 
@@ -281,6 +282,7 @@ class Listeners(commands.Cog):
             ),
             respond=False,
         )
+        self._bot.state.change_node_score(player.node.uri, -5)
         await switch_node(
             bot=self._bot,
             player=player,
@@ -352,9 +354,7 @@ class Listeners(commands.Cog):
             try:
                 await send_embed(
                     player.text_channel,
-                    make_embed(
-                        f"Left <#{player.channel.id}>, no users in channel."
-                    ),
+                    make_embed(f"Left <#{player.channel.id}>, no users in channel."),
                     respond=False,
                 )
             except AttributeError:
