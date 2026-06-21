@@ -38,7 +38,7 @@ class BotState:
         Score -1 = health check failed
         Score -1 = node closed
         Score -5 = track exception or stuck
-        Score -score = failed voice connection attempt
+        Score set to -1 = failed voice connection attempt
         """
         node_entry = self.bot.cached_lavalink_servers.get(node_uri)
         if not node_entry:

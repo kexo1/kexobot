@@ -41,7 +41,6 @@ from app.utils import (
     build_node,
     get_file_age,
     get_memory_usage,
-    get_url_response_time,
     get_user_data,
     iso_to_timestamp,
     switch_node,
