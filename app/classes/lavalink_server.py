@@ -4,15 +4,12 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from app.constants import DB_CACHE
+from app.config.mongo import DB_CACHE
+from app.config.scraping import API_FREE_NODELINK, API_LAVALIST
 from app.utils import get_url_response_time, make_http_request
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
-
-# Lavalink
-API_LAVALIST = "https://lavalink-list.ajieblogs.eu.org/All"
-FREE_NODELINK = "https://free-nodelink.nyxbot.app/api/nodes"
 
 
 def get_full_node_url(host: str, port: int, secure: bool = False) -> str:
@@ -48,7 +45,7 @@ class LavalinkServerManager:
     async def fetch(self) -> None:
         """Get new Lavalink servers from Lavainfo GitHub and Lavalist."""
         json_data_first: list = await make_http_request(
-            self._session, FREE_NODELINK, get_json=True
+            self._session, API_FREE_NODELINK, get_json=True
         )
         if json_data_first:
             await self._parse_lavalink_servers(json_data_first)

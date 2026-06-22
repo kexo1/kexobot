@@ -16,47 +16,16 @@ from asyncprawcore.exceptions import (
 )
 from pymongo import AsyncMongoClient
 
-from app.constants import DB_CACHE, DB_LISTS
+from app.config.mongo import DB_CACHE, DB_LISTS
+from app.config.reddit import (
+    ICON_REDDIT_CRACKWATCH,
+    ICON_REDDIT_FREEGAMEFINDINGS,
+    REDDIT_CRACKWATCH_MAX_RESULTS,
+    REDDIT_FREEGAMEFINDINGS_EMBEDS,
+    REDDIT_FREEGAMEFINDINGS_MAX_RESULTS,
+    REDDIT_TO_REMOVE,
+)
 from app.utils import strip_text
-
-# Reddit configuration
-REDDIT_TO_REMOVE = (" *", "* ", "*", "---")
-REDDIT_FREEGAMEFINDINGS_MAX_RESULTS = 5
-REDDIT_CRACKWATCH_MAX_RESULTS = 5
-
-REDDIT_FREEGAMEFINDINGS_EMBEDS = {
-    "Default": {
-        "title": "",
-        "description": "",
-        "icon": "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png",
-    },
-    "Gleam": {
-        "title": "Gleam",
-        "description": "**Gleam** - keys from this site __disappear really fast__"
-        " so you should get it fast!",
-        "icon": "https://files.catbox.moe/or8beg.png",
-    },
-    "AlienwareArena": {
-        "title": "AlienwareArena",
-        "description": "**AlienwareArena** - "
-        "keys from this site __disappear really fast__ so you should get it fast!",
-        "icon": "https://play-lh.googleusercontent.com"
-        "/X3K4HfYdxmascX5mRFikhuv8w8BYvg1Ny_R4ndNhF1C7GgjPeIKfROvbcOcjhafFmLdl",
-    },
-    "Fanatical": {
-        "title": "Fanatical",
-        "description": "**Fanatical** - keys from this site __disappear really fast__ so you should get it fast!",
-        "icon": "https://files.catbox.moe/6hns7j.png",
-    },
-}
-
-# Icons
-ICON_REDDIT_FREEGAMEFINDINGS = (
-    "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png"
-)
-ICON_REDDIT_CRACKWATCH = (
-    "https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
-)
 
 
 def get_image_from_line(line: str) -> Optional[str]:

@@ -6,7 +6,8 @@ import sonolink
 from discord import app_commands
 from discord.ext import commands
 
-from app.constants import COLOR_BLUE, ICON_DISCORD, ICON_YOUTUBE
+from app.config.colors import COLOR_BLUE
+from app.config.discord import ICON_DISCORD, ICON_YOUTUBE
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import make_embed, send_embed, send_interaction, send_response
 from app.utils import EmbedPaginator, find_track, fix_audio_title

@@ -14,6 +14,7 @@ from asyncprawcore.exceptions import (
 from discord import app_commands
 from discord.ext import commands
 
+from app.config.scraping import API_DAD_JOKE, API_HUMORAPI, API_JOKEAPI
 from app.response_handler import (
     defer_interaction,
     make_embed,
@@ -22,11 +23,6 @@ from app.response_handler import (
     send_response,
 )
 from app.utils import get_guild_data, get_user_data, load_text_file, make_http_request
-
-# Joke APIs
-API_JOKEAPI = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark?amount=10"
-API_HUMORAPI = "https://api.humorapi.com/jokes/search?number=10&include-tags="
-API_DAD_JOKE = "https://icanhazdadjoke.com/search?limit=10"
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient

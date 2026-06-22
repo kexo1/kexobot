@@ -124,6 +124,7 @@ class BotState:
                 logging.info(
                     f"[Sonolink] Node failed health check when attempting to connect: ({node.uri})"
                 )
+                self.change_node_score(node.uri, -1)
                 return False
             return True
 

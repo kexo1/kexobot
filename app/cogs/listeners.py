@@ -16,27 +16,11 @@ from sonolink.gateway import (
     WebSocketClosedEvent,
 )
 
-from app.constants import COLOR_YELLOW, ICON_YOUTUBE
+from app.config.colors import COLOR_YELLOW
+from app.config.discord import ICON_YOUTUBE
+from app.config.music import MUSIC_TIPS
 from app.response_handler import make_embed, send_embed
 from app.utils import fix_audio_title, switch_node
-
-MUSIC_TIPS: dict[int, str] = {
-    3: (
-        "-# Not happy with the current node performance?\n"
-        "-# You can switch between {node_count} nodes "
-        "by using /node reconnect."
-    ),
-    10: (
-        "-# Use the /music autoplay_mode command and\n"
-        "-# set the mode to populated to enable automatic queuing of "
-        "similar tracks."
-    ),
-    15: (
-        "-# Would you like to see which platforms are supported by this "
-        "node? Use the /node supported_platforms."
-    ),
-}
-
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient

@@ -14,16 +14,13 @@ from sonolink import models as sl_models
 from sonolink.gateway.errors import QueueEmpty
 from sonolink.models import AutoPlaySettings, HistorySettings
 
-from app.constants import (
+from app.config.colors import COLOR_BLUE, COLOR_GREEN, COLOR_RED, COLOR_YELLOW
+from app.config.discord import ICON_YOUTUBE
+from app.config.music import (
     API_RADIOGARDEN_LISTEN,
     API_RADIOGARDEN_PAGE,
     API_RADIOGARDEN_PLACES,
     API_RADIOGARDEN_SEARCH,
-    COLOR_BLUE,
-    COLOR_GREEN,
-    COLOR_RED,
-    COLOR_YELLOW,
-    ICON_YOUTUBE,
     MUSIC_SOURCES,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty

@@ -9,7 +9,8 @@ import matplotlib
 from bs4 import BeautifulSoup
 from pymongo import AsyncMongoClient
 
-from app.constants import DB_SFD_ACTIVITY, TIMEZONES
+from app.config.mongo import DB_SFD_ACTIVITY
+from app.config.sfd import API_SFD_SERVER, SFD_HEADERS, SFD_REQUEST, TIMEZONES
 from app.utils import average, is_older_than, make_http_request
 
 matplotlib.use("agg")
@@ -17,22 +18,6 @@ import matplotlib.pyplot as plt
 import mplcyberpunk
 
 plt.style.use("cyberpunk")
-
-# SFD server request details
-API_SFD_SERVER = "https://mythologicinteractive.com/SFDGameServices.asmx"
-SFD_REQUEST = """<?xml version='1.0' encoding='utf-8'?>
-    <soap12:Envelope xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
-     xmlns:xsd='http://www.w3.org/2001/XMLSchema' xmlns:soap12='http://www.w3.org/2003/05/soap-envelope'>
-        <soap12:Body>
-            <GetGameServers xmlns='https://mythologicinteractive.com/Games/SFD/'>
-                <validationToken></validationToken>
-            </GetGameServers>
-        </soap12:Body>
-    </soap12:Envelope>"""
-SFD_HEADERS = {
-    "Content-Type": "application/soap+xml; charset=utf-8",
-    "SOAPAction": "https://mythologicinteractive.com/Games/SFD/GetGameServers",
-}
 
 
 def generate_lines_and_effects(

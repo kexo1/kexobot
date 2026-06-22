@@ -24,28 +24,30 @@ from app.classes.content_monitor import ContentMonitor
 from app.classes.lavalink_server import LavalinkServerManager
 from app.classes.reddit_fetcher import RedditFetcher
 from app.classes.sfd_servers import SFDServers
-from app.constants import (
-    API_WORDNIK,
+from app.config.colors import COLOR_ORANGE_LIGHT, COLOR_RED
+from app.config.discord import (
     CHANNEL_ID_FREE_STUFF_CHANNEL,
     CHANNEL_ID_GAME_CRACKS_CHANNEL,
     CHANNEL_ID_GAME_UPDATES_CHANNEL,
     CHANNEL_ID_KEXO_SERVER,
-    COLOR_ORANGE_LIGHT,
-    COLOR_RED,
-    DB_CACHE,
+)
+from app.config.env import (
+    API_WORDNIK,
     ENV_API_DB,
     ENV_DISCORD_TOKEN,
     ENV_HUMOR_KEY,
+    LOCAL_MACHINE_NAME,
+    USER_AGENT,
+)
+from app.config.mongo import DB_CACHE
+from app.config.reddit import (
     ENV_REDDIT_CLIENT_ID,
     ENV_REDDIT_PASSWORD,
     ENV_REDDIT_SECRET,
     ENV_REDDIT_USER_AGENT,
     ENV_REDDIT_USERNAME,
-    ENV_WORDNIK_KEY,
     ICON_REDDIT,
-    LOCAL_MACHINE_NAME,
     SHITPOST_SUBREDDITS_ALL,
-    USER_AGENT,
 )
 from app.response_handler import send_interaction
 from app.state_types import (
@@ -61,6 +63,7 @@ from app.utils import (
     is_older_than,
     make_http_request,
 )
+
 
 class KexoBotClient(commands.Bot):
     node: sonolink.Node | None
@@ -395,8 +398,7 @@ class KexoBot:
 
     async def wordnik_presence(self) -> None:
         """Fetches the word of the day from Wordnik API."""
-        url = API_WORDNIK + ENV_WORDNIK_KEY
-        json_data = await make_http_request(self.session, url, get_json=True)
+        json_data = await make_http_request(self.session, API_WORDNIK, get_json=True)
         if not json_data:
             logging.warning("[API] Wordnik API returned no data.")
             return

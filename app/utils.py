@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import time
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable
@@ -15,12 +14,9 @@ import sonolink
 import sonolink.models as sl_models
 from sonolink.models import CacheSettings, InactivitySettings
 
-from app.constants import (
-    COLOR_GREEN,
-    COLOR_RED,
-    MUSIC_TO_REMOVE,
-    SHITPOST_SUBREDDITS_DEFAULT,
-)
+from app.config.colors import COLOR_GREEN, COLOR_RED
+from app.config.music import MUSIC_TO_REMOVE
+from app.config.reddit import SHITPOST_SUBREDDITS_DEFAULT
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -232,7 +228,7 @@ async def switch_node(
 
     original_autoplay_mode = player.autoplay
 
-    def _resume_track() -> sonolink.Playable | None:
+    def _resume_track() -> sonolink.models.Playable | None:
         return getattr(player, "temp_current", None) or player.current
 
     async def _try_move_and_resume(target_node: sonolink.Node) -> bool:

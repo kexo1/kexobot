@@ -19,7 +19,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy and install Python requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+RUN pip install --no-cache-dir --upgrade -r requirements.txt && \
+    pip install --no-cache-dir -U "sonolink @ git+https://github.com/sonolink/sonolink"
 
 FROM python:3.13.13-alpine
 

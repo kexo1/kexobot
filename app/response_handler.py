@@ -2,7 +2,7 @@ from typing import Any, Callable
 
 import discord
 
-from app.constants import COLOR_BLUE, COLOR_RED
+from app.config.colors import COLOR_BLUE, COLOR_RED
 
 ResponseBuilder = Callable[..., discord.Embed]
 

@@ -19,20 +19,22 @@ from pymongo import AsyncMongoClient
 
 from app.__init__ import __version__
 from app.classes.sfd_servers import SFDServers
-from app.constants import (
-    CHANNEL_ID_KEXO_SERVER,
+from app.config.colors import (
     COLOR_BLUE,
     COLOR_GREEN,
     COLOR_GREEN_SUCCESS,
+    COLOR_RED,
     COLOR_RED_DARK,
-    DB_CHOICES,
-    DB_LISTS,
+)
+from app.config.discord import CHANNEL_ID_KEXO_SERVER
+from app.config.mongo import DB_CHOICES, DB_LISTS
+from app.config.music import (
     PLATFORM_EMOJIS,
     PLUGIN_PLATFORM_REGISTRY,
-    SFD_TIMEZONE_CHOICE,
-    SHITPOST_SUBREDDITS_ALL,
     AudioSourceSupport,
 )
+from app.config.reddit import SHITPOST_SUBREDDITS_ALL
+from app.config.sfd import SFD_TIMEZONE_CHOICE
 from app.response_handler import (
     defer_interaction,
     make_embed,
@@ -623,8 +625,8 @@ class CommandCog(commands.Cog):
             The scripts enabled on the server.
         slots: int
             The number of slots on the server (default is 8).
-        ping_role: bool
-            Whether to ping role or not (default is None).
+        ping_role: discord.Role
+            The role to ping for the hosting announcement
         image: str
             The URL of the image to be used in the embed.
         """
@@ -687,22 +689,19 @@ class CommandCog(commands.Cog):
                 )
                 return None
 
-        if ping_role:
-            try:
-                await send_interaction(ctx, ping_role.mention)
-            except AttributeError:
-                await send_embed(
-                    ctx,
-                    make_embed(
-                        ":x: Can't ping role, use @role or role id instead of role name."
-                    ),
-                )
-                return None
+        try:
+            await send_interaction(ctx, ping_role.mention)
+        except Exception:
+            await send_embed(
+                ctx,
+                make_embed(":x: Can't ping role, I don't have permission to do so."),
+                color=COLOR_RED,
+                ephemeral=False,
+            )
+            return None
 
         view = HostView(author=author)
         response = await send_interaction(ctx, embed=embed, view=view)
-        if response is None:
-            response = await ctx.original_response()
         view.message = response
         return None
 
