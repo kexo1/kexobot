@@ -30,6 +30,8 @@ from app.constants import (
     CHANNEL_ID_GAME_CRACKS_CHANNEL,
     CHANNEL_ID_GAME_UPDATES_CHANNEL,
     CHANNEL_ID_KEXO_SERVER,
+    COLOR_ORANGE_LIGHT,
+    COLOR_RED,
     DB_CACHE,
     ENV_API_DB,
     ENV_DISCORD_TOKEN,
@@ -59,7 +61,6 @@ from app.utils import (
     is_older_than,
     make_http_request,
 )
-
 
 class KexoBotClient(commands.Bot):
     node: sonolink.Node | None
@@ -588,7 +589,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
             title="",
             description=f"🚫 You're sending too much!,"
             f" try again in `{round(error.retry_after, 1)}s`.",
-            color=discord.Color.from_rgb(r=220, g=0, b=0),
+            color=COLOR_RED,
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await send_interaction(ctx, embed=embed, ephemeral=True, delete_after=20)
@@ -599,7 +600,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
             title="",
             description=f"🚫 You don't have the required permissions to use this command."
             f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
-            color=discord.Color.from_rgb(r=220, g=0, b=0),
+            color=COLOR_RED,
         )
         await send_interaction(ctx, embed=embed, ephemeral=True)
         return
@@ -609,7 +610,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
             title="",
             description=f"🚫 I don't have the required permissions to use this command."
             f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
-            color=discord.Color.from_rgb(r=220, g=0, b=0),
+            color=COLOR_RED,
         )
         await send_interaction(ctx, embed=embed)
         return
@@ -619,7 +620,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
             title="",
             description=f"🚫 You don't have the required role to use this command."
             f"\nRequired role: `{error.missing_role}`",
-            color=discord.Color.from_rgb(r=220, g=0, b=0),
+            color=COLOR_RED,
         )
         await send_interaction(ctx, embed=embed, ephemeral=True)
         return
@@ -630,7 +631,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
         embed = discord.Embed(
             title="",
             description="⚠️ Discord API is not responding. Please try again in a minute.",
-            color=discord.Color.from_rgb(r=220, g=165, b=0),
+            color=COLOR_ORANGE_LIGHT,
         )
         try:
             await ctx.channel.send(embed=embed, delete_after=20)
@@ -642,7 +643,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
         embed = discord.Embed(
             title="",
             description="🚫 This command is available only to owner of this bot.",
-            color=discord.Color.from_rgb(r=220, g=0, b=0),
+            color=COLOR_RED,
         )
         await send_interaction(ctx, embed=embed, ephemeral=True)
         return

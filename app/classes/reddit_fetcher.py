@@ -1,3 +1,4 @@
+import copy
 import logging
 import re
 from datetime import datetime
@@ -15,17 +16,47 @@ from asyncprawcore.exceptions import (
 )
 from pymongo import AsyncMongoClient
 
-from app.constants import (
-    DB_CACHE,
-    DB_LISTS,
-    ICON_REDDIT_CRACKWATCH,
-    ICON_REDDIT_FREEGAMEFINDINGS,
-    REDDIT_CRACKWATCH_MAX_RESULTS,
-    REDDIT_FREEGAMEFINDINGS_EMBEDS,
-    REDDIT_FREEGAMEFINDINGS_MAX_RESULTS,
-    REDDIT_TO_REMOVE,
-)
+from app.constants import DB_CACHE, DB_LISTS
 from app.utils import strip_text
+
+# Reddit configuration
+REDDIT_TO_REMOVE = (" *", "* ", "*", "---")
+REDDIT_FREEGAMEFINDINGS_MAX_RESULTS = 5
+REDDIT_CRACKWATCH_MAX_RESULTS = 5
+
+REDDIT_FREEGAMEFINDINGS_EMBEDS = {
+    "Default": {
+        "title": "",
+        "description": "",
+        "icon": "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png",
+    },
+    "Gleam": {
+        "title": "Gleam",
+        "description": "**Gleam** - keys from this site __disappear really fast__"
+        " so you should get it fast!",
+        "icon": "https://files.catbox.moe/or8beg.png",
+    },
+    "AlienwareArena": {
+        "title": "AlienwareArena",
+        "description": "**AlienwareArena** - "
+        "keys from this site __disappear really fast__ so you should get it fast!",
+        "icon": "https://play-lh.googleusercontent.com"
+        "/X3K4HfYdxmascX5mRFikhuv8w8BYvg1Ny_R4ndNhF1C7GgjPeIKfROvbcOcjhafFmLdl",
+    },
+    "Fanatical": {
+        "title": "Fanatical",
+        "description": "**Fanatical** - keys from this site __disappear really fast__ so you should get it fast!",
+        "icon": "https://files.catbox.moe/6hns7j.png",
+    },
+}
+
+# Icons
+ICON_REDDIT_FREEGAMEFINDINGS = (
+    "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png"
+)
+ICON_REDDIT_CRACKWATCH = (
+    "https://b.thumbs.redditmedia.com/zmVhOJSaEBYGMsE__QEZuBPSNM25gerc2hak9bQyePI.png"
+)
 
 
 def get_image_from_line(line: str) -> Optional[str]:
@@ -279,9 +310,10 @@ class RedditFetcher:
         elif "alienwarearena" in submission.url:
             await self._alienwarearena(submission.url)
         else:
+            default_freegame_embed = copy.deepcopy(freegame_embeds["Default"])
             title_stripped = re.sub(r"\[.*?]|\(.*?\)", "", submission.title).strip()
-            freegame_embeds["Default"]["title"] = title_stripped
-            await self._create_embed(freegame_embeds["Default"], submission.url)
+            default_freegame_embed["title"] = title_stripped
+            await self._create_embed(default_freegame_embed, submission.url)
 
     async def _alienwarearena(self, url) -> None:
         # There might be an occurence where giveaway is not showing in alienwarearena.com
@@ -291,8 +323,7 @@ class RedditFetcher:
             if reddit_path in cached_url:
                 return
 
-        freegame_embeds: dict = REDDIT_FREEGAMEFINDINGS_EMBEDS
-        await self._create_embed(freegame_embeds["AlienwareArena"], url)
+        await self._create_embed(REDDIT_FREEGAMEFINDINGS_EMBEDS["AlienwareArena"], url)
 
     async def _create_embed(self, embed_dict: dict, url: str) -> None:
         url_obj = urlparse(url)

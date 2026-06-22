@@ -2,16 +2,15 @@ from typing import Any, Callable
 
 import discord
 
-ResponseBuilder = Callable[..., discord.Embed]
+from app.constants import COLOR_BLUE, COLOR_RED
 
-RED = discord.Color.from_rgb(r=220, g=0, b=0)
-YELLOW = discord.Color.yellow()
+ResponseBuilder = Callable[..., discord.Embed]
 
 
 def make_embed(
     description: str,
     *,
-    color: discord.Color = discord.Color.blue(),
+    color: discord.Color = COLOR_BLUE,
     footer: str | None = None,
 ) -> discord.Embed:
     """Build a simple embed for one-off command responses."""
@@ -34,28 +33,33 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         " Type `/music queue` to see the list of tracks."
     ),
     "NO_PERMISSIONS": make_embed(
-        ":x: I don't have permissions to join your channel.", color=RED
+        ":x: I don't have permissions to join your channel.", color=COLOR_RED
     ),
-    "NO_NODE_INFO": make_embed(":x: Failed to get node info.", color=RED),
-    "NODE_CONNECT_FAILURE": make_embed(":x: Failed to reconnect node.", color=RED),
+    "NO_NODE_INFO": make_embed(":x: Failed to get node info.", color=COLOR_RED),
+    "NODE_CONNECT_FAILURE": make_embed(
+        ":x: Failed to reconnect node.", color=COLOR_RED
+    ),
     "NODE_NOT_FOUND": make_embed(
         ":x: Couldn't find node to play this music, try switching to a different node "
         "with `/node reconnect`, or use Youtube links instead of Spotify/Deezer/Apple Music.",
-        color=RED,
+        color=COLOR_RED,
     ),
     "NO_TRACKS_FOUND": lambda **kwargs: make_embed(
         f":x: No tracks were found for `{kwargs.get('search')}`."
     ),
     "NO_TRACKS_IN_QUEUE": make_embed("Queue is empty."),
     "RADIOMAP_ERROR": make_embed(
-        ":x: Failed to get response from RadioMap API, try again later.", color=RED
+        ":x: Failed to get response from RadioMap API, try again later.",
+        color=COLOR_RED,
     ),
     "RADIOMAP_NO_STATION_FOUND": lambda **kwargs: make_embed(
         f":x: No station found with name {kwargs.get('search')}."
     ),
-    "JOKE_TIMEOUT": make_embed(":x: Failed to get joke, try again later.", color=RED),
+    "JOKE_TIMEOUT": make_embed(
+        ":x: Failed to get joke, try again later.", color=COLOR_RED
+    ),
     "NO_MORE_JOKES": make_embed(
-        ":x: You've seen all available jokes for now.", color=RED
+        ":x: You've seen all available jokes for now.", color=COLOR_RED
     ),
     "QUEUE_CLEARED": make_embed(":wastebasket: Queue has been cleared."),
     "QUEUE_TRACK_REMOVED": lambda **kwargs: make_embed(

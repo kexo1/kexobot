@@ -14,9 +14,19 @@ from asyncprawcore.exceptions import (
 from discord import app_commands
 from discord.ext import commands
 
-from app.constants import API_DAD_JOKE, API_HUMORAPI, API_JOKEAPI, JOKE_EXCLUDED_WORDS
-from app.response_handler import defer_interaction, make_embed, send_embed, send_interaction, send_response
+from app.response_handler import (
+    defer_interaction,
+    make_embed,
+    send_embed,
+    send_interaction,
+    send_response,
+)
 from app.utils import get_guild_data, get_user_data, load_text_file, make_http_request
+
+# Joke APIs
+API_JOKEAPI = "https://v2.jokeapi.dev/joke/Miscellaneous,Dark?amount=10"
+API_HUMORAPI = "https://api.humorapi.com/jokes/search?number=10&include-tags="
+API_DAD_JOKE = "https://icanhazdadjoke.com/search?limit=10"
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -446,9 +456,6 @@ class FunCommands(commands.Cog):
             if not joke_text or joke_text in self._loaded_jokes:
                 continue
 
-            if any(word in joke_text.lower().split() for word in JOKE_EXCLUDED_WORDS):
-                continue
-
             fetched_jokes.append(joke_text)
 
         return fetched_jokes
@@ -480,9 +487,6 @@ class FunCommands(commands.Cog):
             for joke in jokes.get("jokes", []):
                 text = joke.get("joke")
                 if not text or text in self._loaded_jokes:
-                    continue
-
-                if any(k in text.lower().split() for k in JOKE_EXCLUDED_WORDS):
                     continue
 
                 fetched_jokes.append(text)

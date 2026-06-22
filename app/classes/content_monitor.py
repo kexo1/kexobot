@@ -12,20 +12,51 @@ from bs4 import BeautifulSoup, Tag
 from deep_translator import GoogleTranslator
 from pymongo import AsyncMongoClient
 
-from app.constants import (
-    ALIENWAREARENA_MAX_RESULTS,
-    ALIENWAREARENA_TO_REMOVE,
-    DB_CACHE,
-    DB_LISTS,
-    GAME3RB_TO_REMOVE,
-    ICON_GAME3RB,
-    ICON_ONLINEFIX,
-    ONLINEFIX_MAX_RESULTS,
-    SITE_URL_ALIENWAREARENA,
-    SITE_URL_GAME3RB,
-    SITE_URL_ONLINEFIX,
-)
+from app.constants import DB_CACHE, DB_LISTS
 from app.utils import make_http_request, strip_text
+
+# Game3rb
+SITE_URL_GAME3RB = "https://game3rb.com/category/games-online/"
+GAME3RB_TO_REMOVE = (
+    "Download ",
+    " + OnLine",
+    "-P2P",
+    " Build",
+    " + Update Only",
+    " + Update",
+    " + Online",
+    " + 5 DLCs-FitGirl Repack",
+    " Hotfix 1",
+    ")-FitGirl Repack",
+    " + Bonus Content DLC",
+    " Hotfix 2 Hotfix",
+    " rc",
+    "\u200b",
+    "-GOG",
+    "-Repack",
+    " VR",
+    "/Denuvoless",
+    " (Build",
+    "-FitGirl Repack",
+    "[Frankenpack]",
+    "™",
+    ")",
+)
+
+# Online-Fix
+ONLINEFIX_MAX_RESULTS = 10
+SITE_URL_ONLINEFIX = "https://online-fix.me/chat.php"
+
+# AlienwareArena
+ALIENWAREARENA_MAX_RESULTS = 3
+SITE_URL_ALIENWAREARENA = (
+    "https://eu.alienwarearena.com/esi/featured-tile-data/Giveaway"
+)
+ALIENWAREARENA_TO_REMOVE = ("Key", "Giveaway", "Steam Game")
+
+# Icons
+ICON_GAME3RB = "https://files.catbox.moe/oj3jso.png"
+ICON_ONLINEFIX = "https://files.catbox.moe/o361yb.png"
 
 
 def get_onlinefix_messages(chat_log: str) -> list:

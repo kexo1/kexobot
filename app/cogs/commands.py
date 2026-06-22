@@ -21,13 +21,17 @@ from app.__init__ import __version__
 from app.classes.sfd_servers import SFDServers
 from app.constants import (
     CHANNEL_ID_KEXO_SERVER,
+    COLOR_BLUE,
+    COLOR_GREEN,
+    COLOR_GREEN_SUCCESS,
+    COLOR_RED_DARK,
     DB_CHOICES,
     DB_LISTS,
     PLATFORM_EMOJIS,
     PLUGIN_PLATFORM_REGISTRY,
     SFD_TIMEZONE_CHOICE,
     SHITPOST_SUBREDDITS_ALL,
-    Support,
+    AudioSourceSupport,
 )
 from app.response_handler import (
     defer_interaction,
@@ -36,18 +40,35 @@ from app.response_handler import (
     send_interaction,
     send_response,
 )
-from app.utils import (
-    QueuePaginator,
-    build_node,
-    get_file_age,
-    get_memory_usage,
-    get_user_data,
-    iso_to_timestamp,
-    switch_node,
-)
+from app.utils import EmbedPaginator, build_node, get_user_data, switch_node
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
+
+
+def iso_to_timestamp(iso_time: str) -> datetime.datetime:
+    """Convert an ISO 8601 formatted string to a datetime object."""
+    timestamp = datetime.datetime.fromisoformat(iso_time.replace("Z", "+00:00"))
+    return timestamp
+
+
+def get_file_age(file_path: str) -> float:
+    """Get the age of a file in seconds."""
+    if os.path.exists(file_path):
+        file_time = os.path.getmtime(file_path)
+        current_time = datetime.datetime.now().timestamp()
+        return current_time - file_time
+    return 0.0
+
+
+def get_memory_usage() -> float:
+    """Get the current memory usage of the process in MB."""
+    import psutil
+
+    process = psutil.Process(os.getpid())
+    mem_info = process.memory_info()
+    return mem_info.rss / (1024 * 1024)
+
 
 host_authors = []
 
@@ -217,7 +238,7 @@ class CommandCog(commands.Cog):
 
         embed = discord.Embed(
             title=urlparse(node.uri).netloc,
-            color=discord.Color.blue(),
+            color=COLOR_BLUE,
         )
         plugins: sonolink.PluginResponsePayload = node_info.plugins
         unix_timestamp = int(iso_to_timestamp(str(node_info.build_time)).timestamp())
@@ -256,16 +277,19 @@ class CommandCog(commands.Cog):
 
         def resolve_platform_support(
             plugins: list[sonolink.PluginResponsePayload],
-        ) -> dict[str, Support]:
+        ) -> dict[str, AudioSourceSupport]:
             """Merge all plugin platform support, preferring LIKELY over UNLIKELY."""
-            merged: dict[str, Support] = {}
+            merged: dict[str, AudioSourceSupport] = {}
 
             for plugin in plugins:
                 name = plugin.name.lower()
                 for fragment, platforms in PLUGIN_PLATFORM_REGISTRY.items():
                     if fragment.lower() in name:
                         for platform, support in platforms.items():
-                            if platform not in merged or support == Support.LIKELY:
+                            if (
+                                platform not in merged
+                                or support == AudioSourceSupport.LIKELY
+                            ):
                                 merged[platform] = support
 
             return merged
@@ -288,7 +312,7 @@ class CommandCog(commands.Cog):
 
         embed = discord.Embed(
             title=urlparse(node.uri).netloc,
-            color=discord.Color.blue(),
+            color=COLOR_BLUE,
         )
 
         if not platform_support:
@@ -296,8 +320,12 @@ class CommandCog(commands.Cog):
             await send_interaction(ctx, embed=embed)
             return
 
-        likely = [p for p, s in platform_support.items() if s == Support.LIKELY]
-        unlikely = [p for p, s in platform_support.items() if s == Support.UNLIKELY]
+        likely = [
+            p for p, s in platform_support.items() if s == AudioSourceSupport.LIKELY
+        ]
+        unlikely = [
+            p for p, s in platform_support.items() if s == AudioSourceSupport.UNLIKELY
+        ]
 
         no_search_warning = (
             "" if has_search else " _(no search plugin, only direct links)_"
@@ -351,7 +379,7 @@ class CommandCog(commands.Cog):
 
             embed = discord.Embed(
                 title="Node Players",
-                color=discord.Color.blue(),
+                color=COLOR_BLUE,
             )
 
             for player in players:
@@ -402,7 +430,7 @@ class CommandCog(commands.Cog):
 
             embed = discord.Embed(
                 title="Available Servers",
-                color=discord.Color.blue(),
+                color=COLOR_BLUE,
             )
             embed.set_footer(text=f"Total players: {all_players}")
             additional_char = i - stopped_at
@@ -429,7 +457,7 @@ class CommandCog(commands.Cog):
         if len(pages) == 1:
             await send_interaction(ctx, embed=embed)
         else:
-            view = QueuePaginator(pages)
+            view = EmbedPaginator(pages)
             await send_interaction(ctx, embed=pages[0], view=view)
 
     @slash_sfd.command(name="server_info", description="Find searched server.")
@@ -457,7 +485,7 @@ class CommandCog(commands.Cog):
         embed = discord.Embed(
             title=server.server_name,
             description=server.description,
-            color=discord.Color.blue(),
+            color=COLOR_BLUE,
         )
         embed.set_footer(text=f"Version: {server.version}")
         embed.add_field(name="Players:ㅤㅤ", value=server.players)
@@ -567,7 +595,7 @@ class CommandCog(commands.Cog):
         password: Optional[str] = None,
         region: Optional[str] = None,
         scripts: Optional[str] = None,
-        slots: app_commands.Range[int, 1, 16] = 8,
+        slots: app_commands.Range[int, 2, 16] = 8,
         image: Optional[str] = None,
     ) -> None:
         """Method to create a hosting embed for SFD servers.
@@ -613,7 +641,7 @@ class CommandCog(commands.Cog):
 
         embed = discord.Embed(
             title=server_name,
-            color=discord.Color.from_rgb(r=0, g=200, b=0),
+            color=COLOR_GREEN_SUCCESS,
         )
 
         embed.set_author(
@@ -688,7 +716,7 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        embed = discord.Embed(title="KexoBOT Info", color=discord.Color.blue())
+        embed = discord.Embed(title="KexoBOT Info", color=COLOR_BLUE)
         embed.add_field(
             name="Run time:ㅤㅤ",
             value=f"{str(datetime.timedelta(seconds=round(int(time.time()) - self._run_time)))}",
@@ -928,7 +956,7 @@ class CommandCog(commands.Cog):
             title="Select Subreddits",
             description="Select the subreddits you want to see in shitpost command."
             " Currently selected subreddits are pre-checked.",
-            color=discord.Color.blue(),
+            color=COLOR_BLUE,
         )
 
         await send_interaction(ctx, embed=embed, view=view, ephemeral=True)
@@ -938,7 +966,7 @@ class CommandCog(commands.Cog):
         collection_name = collection
         collection: list = bot_config[DB_CHOICES[collection]]
 
-        embed = discord.Embed(title=collection_name, color=discord.Color.blue())
+        embed = discord.Embed(title=collection_name, color=COLOR_BLUE)
         embed.add_field(
             name=f"_{len(collection)} items_",
             value="\n".join(
@@ -1032,7 +1060,7 @@ class HostView(discord.ui.View):
 
         Parameters
         ----------
-        button: :class:`discord.Button`
+        button: :class:`discord.ui.Button`
             The button that was clicked.
         interaction: :class:`discord.Interaction`
             The interaction that triggered the button click.
@@ -1058,9 +1086,7 @@ class HostView(discord.ui.View):
         embed = await self._disable_embed()
         await self.message.edit(embed=embed, view=None)
         await self._author.send(
-            f"You forgot to click button in {self.message.jump_url} you {
-                random.choice(('dumbass', 'retard', 'prick', 'cunt', 'shitling'))
-            }."
+            f"You forgot to click button in {self.message.jump_url} you {random.choice(('dumbass', 'retard', 'prick', 'cunt', 'shitling'))}."
             "\nhttps://tenor.com/view/zombie-screaming-gif-12431778992096703656"
         )
         host_authors.pop(host_authors.index(self._author.name))
@@ -1073,7 +1099,7 @@ class HostView(discord.ui.View):
             icon_url=self._author.avatar.url,
             name=f"{self._author.name} is no longer hosting.",
         )
-        embed.color = discord.Color.from_rgb(r=200, g=0, b=0)
+        embed.color = COLOR_RED_DARK
         embed.set_field_at(
             0,
             name="Status:ㅤㅤ",
@@ -1189,7 +1215,7 @@ class SubredditSelectorView(discord.ui.View):
             title="Changes Saved",
             description="Successfully updated your subreddit list"
             f" to `{len(self.selected_subreddits)}` subreddits.",
-            color=discord.Color.green(),
+            color=COLOR_GREEN,
         )
         embed.set_footer(text="Message will be deleted in 20 seconds.")
         await interaction.response.edit_message(embed=embed, view=None, delete_after=20)

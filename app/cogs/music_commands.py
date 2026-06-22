@@ -19,12 +19,15 @@ from app.constants import (
     API_RADIOGARDEN_PAGE,
     API_RADIOGARDEN_PLACES,
     API_RADIOGARDEN_SEARCH,
+    COLOR_BLUE,
+    COLOR_GREEN,
+    COLOR_RED,
+    COLOR_YELLOW,
     ICON_YOUTUBE,
+    MUSIC_SOURCES,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import (
-    RED,
-    YELLOW,
     defer_interaction,
     make_embed,
     send_embed,
@@ -33,17 +36,24 @@ from app.response_handler import (
     send_response,
 )
 from app.utils import (
-    QueuePaginator,
+    EmbedPaginator,
     find_track,
     fix_audio_title,
     get_guild_data,
-    get_search_prefix,
     make_http_request,
     switch_node,
 )
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
+
+
+def get_search_prefix(query: str) -> str | None:
+    """Get the search prefix for a given query."""
+    for pattern, prefix in MUSIC_SOURCES:
+        if pattern.search(query):
+            return prefix
+    return None
 
 
 async def is_owner(interaction: discord.Interaction) -> bool:
@@ -145,7 +155,7 @@ async def _handle_playlist(
     embed = discord.Embed(
         title="",
         description=f"Added the playlist **`{playlist.name}`** ({song_count} songs) to the queue.",
-        color=discord.Color.blue(),
+        color=COLOR_BLUE,
     )
 
     if player.should_respond:
@@ -185,7 +195,7 @@ def queue_embed(track: sl_models.Playable) -> discord.Embed:
     return discord.Embed(
         title="",
         description=f"**Added to queue:\n [{fix_audio_title(track)}]({track.uri})**",
-        color=discord.Color.blue(),
+        color=COLOR_BLUE,
     )
 
 
@@ -195,7 +205,7 @@ def playing_embed(track: sl_models.Playable, bot: "KexoBotClient") -> discord.Em
     embed = discord.Embed(
         title="Now playing",
         description=f"[**{fix_audio_title(track)}**]({track.uri})",
-        color=discord.Colour.green(),
+        color=COLOR_GREEN,
     )
     embed.set_footer(
         text=f"Requested by {get_track_requester_name(track, bot)}", icon_url=author_pfp
@@ -244,7 +254,7 @@ class MusicCommands(commands.Cog):
                 ctx,
                 make_embed(
                     ":hourglass_flowing_sand: Please wait until the bot finishes switching nodes.",
-                    color=YELLOW,
+                    color=COLOR_YELLOW,
                 ),
             )
             return
@@ -673,7 +683,7 @@ class MusicCommands(commands.Cog):
                 make_embed(
                     f":x: Invalid seek position. Track duration is "
                     f"{int(player.current.length / 1000)} seconds.",
-                    color=RED,
+                    color=COLOR_RED,
                 ),
                 ephemeral=False,
             )
@@ -819,7 +829,7 @@ class MusicCommands(commands.Cog):
         if len(pages) == 1:
             await send_interaction(ctx, embed=pages[0])
         else:
-            view = QueuePaginator(pages)
+            view = EmbedPaginator(pages)
             await send_interaction(ctx, embed=pages[0], view=view)
 
     @music.command(name="playing", description="What track is currently playing")
@@ -947,7 +957,7 @@ class MusicCommands(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description="Invalid channel ID or the channel is not a voice channel.",
-                color=discord.Color.red(),
+                color=COLOR_RED,
             )
             await send_interaction(ctx, embed=embed, ephemeral=True)
             return
@@ -963,7 +973,7 @@ class MusicCommands(commands.Cog):
                     ctx,
                     make_embed(
                         ":warning: Node is unresponsive, try `/node reconnect`.",
-                        color=YELLOW,
+                        color=COLOR_YELLOW,
                     ),
                     ephemeral=False,
                 )
@@ -998,7 +1008,7 @@ class MusicCommands(commands.Cog):
             title="",
             description=f"Joined the channel `{channel.name}`"
             f" and started playing `{track.title}`",
-            color=discord.Color.blue(),
+            color=COLOR_BLUE,
         )
         await send_interaction(ctx, embed=embed, ephemeral=True)
 
@@ -1084,7 +1094,7 @@ class MusicCommands(commands.Cog):
                     ctx,
                     make_embed(
                         ":warning: Node timed out, switching to another node.",
-                        color=YELLOW,
+                        color=COLOR_YELLOW,
                     ),
                     ephemeral=False,
                     respond=i == 0,
@@ -1105,7 +1115,7 @@ class MusicCommands(commands.Cog):
                         ":x: Failed to load tracks. You likely entered a wrong link or "
                         "this Lavalink server lacks necessary plugins.\n"
                         "To fix this, use command `/node reconnect`",
-                        color=RED,
+                        color=COLOR_RED,
                     ),
                     ephemeral=False,
                     respond=i == 0,
@@ -1181,7 +1191,7 @@ class MusicCommands(commands.Cog):
             ctx,
             make_embed(
                 ":x: Failed to connect to voice channel, try again later.",
-                color=RED,
+                color=COLOR_RED,
             ),
             ephemeral=False,
         )
@@ -1266,7 +1276,7 @@ class MusicCommands(commands.Cog):
             embed = discord.Embed(
                 title="",
                 description="Queue is currently empty.",
-                color=discord.Color.blue(),
+                color=COLOR_BLUE,
             )
             return [embed]
 
@@ -1301,7 +1311,7 @@ class MusicCommands(commands.Cog):
                 embed = discord.Embed(
                     title=f"Queue for {ctx.guild.name}",
                     description=current_description,
-                    color=discord.Color.blue(),
+                    color=COLOR_BLUE,
                 )
                 embed.set_footer(text=f"{len(player.queue)} songs in queue")
                 pages.append(embed)
@@ -1312,7 +1322,7 @@ class MusicCommands(commands.Cog):
         embed = discord.Embed(
             title=f"Queue for {ctx.guild.name}",
             description=current_description,
-            color=discord.Color.blue(),
+            color=COLOR_BLUE,
         )
         embed.set_footer(text=f"{len(player.queue)} songs in queue")
         pages.append(embed)

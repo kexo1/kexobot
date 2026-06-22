@@ -4,11 +4,15 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from app.constants import API_LAVALIST, DB_CACHE, FREE_NODELINK
+from app.constants import DB_CACHE
 from app.utils import get_url_response_time, make_http_request
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
+
+# Lavalink
+API_LAVALIST = "https://lavalink-list.ajieblogs.eu.org/All"
+FREE_NODELINK = "https://free-nodelink.nyxbot.app/api/nodes"
 
 
 def get_full_node_url(host: str, port: int, secure: bool = False) -> str:

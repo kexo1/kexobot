@@ -11,14 +11,13 @@ import asyncpraw.models
 import asyncprawcore
 import discord
 import httpx
-import psutil
 import sonolink
 import sonolink.models as sl_models
 from sonolink.models import CacheSettings, InactivitySettings
 
 from app.constants import (
-    ICON_DISCORD,
-    MUSIC_SOURCES,
+    COLOR_GREEN,
+    COLOR_RED,
     MUSIC_TO_REMOVE,
     SHITPOST_SUBREDDITS_DEFAULT,
 )
@@ -41,43 +40,6 @@ def load_text_file(name: str) -> list[str]:
         return f.read().splitlines()
 
 
-def iso_to_timestamp(iso_time: str) -> datetime:
-    """Convert an ISO 8601 formatted string to a datetime object.
-
-    Parameters
-    ----------
-    iso_time: str
-        The ISO 8601 formatted string to convert.
-
-    Returns
-    -------
-    :class:`datetime.datetime`
-        The converted datetime object.
-    """
-    timestamp = datetime.fromisoformat(iso_time.replace("Z", "+00:00"))
-    return timestamp
-
-
-def get_file_age(file_path: str) -> float:
-    """Get the age of a file in seconds.
-
-    Parameters
-    ----------
-    file_path: str
-        The path to the file.
-
-    Returns
-    -------
-    float
-        The age of the file in seconds.
-    """
-    if os.path.exists(file_path):
-        file_time = os.path.getmtime(file_path)
-        current_time = datetime.now().timestamp()
-        return current_time - file_time
-    return 0.0
-
-
 def average(numbers: list[float | int]) -> float:
     """Calculate the average of a list of numbers.
 
@@ -94,19 +56,6 @@ def average(numbers: list[float | int]) -> float:
     if not numbers:
         return 0.0
     return sum(numbers) / len(numbers)
-
-
-def get_memory_usage():
-    """Get the current memory usage of the process in MB.
-
-    Returns
-    -------
-    float
-        The current memory usage of the process in MB.
-    """
-    process = psutil.Process(os.getpid())
-    mem_info = process.memory_info()
-    return mem_info.rss / (1024 * 1024)
 
 
 def get_url_response_time(url: str) -> int:
@@ -128,46 +77,6 @@ def get_url_response_time(url: str) -> int:
         return int((time.perf_counter() - start_time) * 1000)  # Convert to milliseconds
     except httpx.RequestError:
         return 9999
-
-
-async def download_video(
-    session: httpx.AsyncClient, url: str, nsfw: bool
-) -> discord.File | None:
-    """Download a video from a given URL and return it as a discord.File.
-
-    Parameters
-    ----------
-    session: :class:`httpx.AsyncClient`
-        The httpx client session to use for the request.
-    url: str
-        The URL of the video to download.
-    nsfw: bool
-        Whether the video is NSFW (not safe for work).
-
-    Returns
-    -------
-    :class:`discord.File`
-        The downloaded video as a discord.File.
-    """
-    video_folder = os.path.join(os.getcwd(), "video")
-    os.makedirs(video_folder, exist_ok=True)
-    video_path = os.path.join(video_folder, "video.mp4")
-
-    try:
-        async with session.stream("GET", url) as response:
-            with open(video_path, "wb") as f:
-                async for chunk in response.aiter_bytes(1024):
-                    f.write(chunk)
-        if nsfw:
-            return discord.File(video_path, spoiler=True)
-        return discord.File(video_path)
-
-    except httpx.ReadTimeout:
-        logging.error("[Httpx] Request timed out while downloading the video.")
-        return None
-    except httpx.ConnectError:
-        logging.error("[Httpx] Failed to connect to the server.")
-        return None
 
 
 def build_node(bot: "KexoBotClient", uri: str, password: str) -> sonolink.Node:
@@ -250,25 +159,6 @@ def is_older_than(hours: int, custom_datetime: datetime) -> bool:
     return time_difference.total_seconds() > hours * 3600
 
 
-def get_search_prefix(query: str) -> str | None:
-    """Get the search prefix for a given query.
-
-    Parameters
-    ----------
-    query: str
-        The query to check.
-
-    Returns
-    -------
-    str | None
-        The search prefix if found, None otherwise.
-    """
-    for pattern, prefix in MUSIC_SOURCES:
-        if pattern.search(query):
-            return prefix
-    return None
-
-
 def find_track(player: sonolink.Player, to_find: str) -> int | None:
     """Find a track in the player's queue by title or index.
 
@@ -300,31 +190,6 @@ def find_track(player: sonolink.Player, to_find: str) -> int | None:
             return None
 
     return to_find
-
-
-def has_pfp(member: discord.Member) -> str:
-    """Check if a member has a profile picture and return its URL.
-
-    If not, return a default discord icon URL.
-
-    Parameters
-    ----------
-    member: :class:`discord.Member`
-        The member to check.
-
-    Returns
-    -------
-    str
-        The URL of the member's profile picture or a default icon.
-    """
-    if hasattr(member.avatar, "url"):
-        return member.display_avatar.url
-    return ICON_DISCORD
-
-
-def resume_track(player: sonolink.Player):
-    """Track to resume after node switch, if any."""
-    return getattr(player, "temp_current", None) or player.current
 
 
 async def switch_node(
@@ -367,12 +232,15 @@ async def switch_node(
 
     original_autoplay_mode = player.autoplay
 
+    def _resume_track() -> sonolink.Playable | None:
+        return getattr(player, "temp_current", None) or player.current
+
     async def _try_move_and_resume(target_node: sonolink.Node) -> bool:
         try:
             # Stop the inactivity timer on previous node to prevent it from disconnecting
             player._stop_inactivity_timer()
             await player.move_to(target_node)
-            track = resume_track(player)
+            track = _resume_track()
             # Only when we didn't even get to play the track, moving won't play it, so we have to do it manually here.
             if play_after and track:
                 await player.play(track)
@@ -389,7 +257,7 @@ async def switch_node(
             return False
 
         # Test only if we were playing something before
-        track = resume_track(player)
+        track = _resume_track()
         if not track:
             return False
 
@@ -428,7 +296,7 @@ async def switch_node(
                 embed = discord.Embed(
                     title="",
                     description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
-                    color=discord.Color.green(),
+                    color=COLOR_GREEN,
                 )
                 await player.text_channel.send(embed=embed)
 
@@ -438,7 +306,7 @@ async def switch_node(
             embed = discord.Embed(
                 title="",
                 description=":x: Failed to find node to play requested track.",
-                color=discord.Color.from_rgb(r=220, g=0, b=0),
+                color=COLOR_RED,
             )
             await player.text_channel.send(embed=embed)
 
@@ -766,11 +634,11 @@ async def make_http_request(
 
 
 # noinspection PyUnusedLocal
-class QueuePaginator(discord.ui.View):
-    """A paginator for the queue command.
+class EmbedPaginator(discord.ui.View):
+    """A paginator for displaying embeds that are too long for Discord.
 
     This view creates two buttons, "Previous" and "Next",
-    that allow the user to navigate through the pages of the queue.
+    that allow the user to navigate through the pages of embeds.
 
     Parameters
     ----------

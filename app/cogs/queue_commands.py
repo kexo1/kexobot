@@ -6,13 +6,21 @@ import sonolink
 from discord import app_commands
 from discord.ext import commands
 
-from app.constants import ICON_YOUTUBE
+from app.constants import COLOR_BLUE, ICON_DISCORD, ICON_YOUTUBE
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import make_embed, send_embed, send_interaction, send_response
-from app.utils import QueuePaginator, find_track, fix_audio_title, has_pfp
+from app.utils import EmbedPaginator, find_track, fix_audio_title
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
+
+
+def has_pfp(member: discord.Member) -> str:
+    """Check if a member has a profile picture and return its URL.
+    If not, return a default discord icon URL."""
+    if hasattr(member.avatar, "url"):
+        return member.display_avatar.url
+    return ICON_DISCORD
 
 
 def get_queue_status(queue_mode: sonolink.QueueMode) -> tuple[str, str]:
@@ -52,7 +60,7 @@ def get_queue_embeds(
             embed = discord.Embed(
                 title=f"Queue for {ctx.guild.name}",
                 description=current_description,
-                color=discord.Color.blue(),
+                color=COLOR_BLUE,
             )
             embed.set_footer(text=f"\n{footer}{len(player.queue)} songs in queue")
             pages.append(embed)
@@ -63,7 +71,7 @@ def get_queue_embeds(
     embed = discord.Embed(
         title=f"Queue for {ctx.guild.name}",
         description=current_description,
-        color=discord.Color.blue(),
+        color=COLOR_BLUE,
     )
     embed.set_footer(text=f"\n{footer}{len(player.queue)} songs in queue")
     pages.append(embed)
@@ -77,7 +85,7 @@ def get_playing_embed(
 
     embed = discord.Embed(
         title="Now playing",
-        colour=discord.Colour.blue(),
+        colour=COLOR_BLUE,
         timestamp=datetime.datetime.now(datetime.timezone.utc),
     )
     embed.set_author(name="Playback Information")
@@ -150,7 +158,7 @@ class Queue(commands.Cog):
         if len(pages) == 1:
             await send_interaction(ctx, embed=pages[0])
         else:
-            view = QueuePaginator(pages)
+            view = EmbedPaginator(pages)
             await send_interaction(ctx, embed=pages[0], view=view)
 
     @app_commands.command(name="playing", description="What track is currently playing")
@@ -219,7 +227,9 @@ class Queue(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if len(player.queue) < 2:
-            await send_embed(ctx, make_embed(":x: Queue has less than 2 tracks to shuffle."))
+            await send_embed(
+                ctx, make_embed(":x: Queue has less than 2 tracks to shuffle.")
+            )
             return
 
         player.queue.shuffle()
