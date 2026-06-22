@@ -1166,7 +1166,7 @@ class MusicCommands(commands.Cog):
 
             try:
                 player_cls = self._build_player_class(node, autoplay_mode)
-                await channel.connect(cls=player_cls)
+                await channel.connect(cls=player_cls, timeout=10)
                 return True
 
             except (discord.Forbidden, discord.ClientException):

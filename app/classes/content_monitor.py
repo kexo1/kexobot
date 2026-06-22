@@ -206,7 +206,7 @@ class ContentMonitor:
                     continue
 
             game_title = " ".join(game_title)
-            carts = []
+            carts = set()
             if game_title.lower() not in game_list.lower():
                 article = article.find_next("article")
                 continue
@@ -214,7 +214,7 @@ class ContentMonitor:
             for cart in article.find_all(id="cart"):
                 if not cart:
                     break
-                carts.append(cart.text)
+                carts.add(cart.text)
 
             game_info.append(
                 {
@@ -290,7 +290,7 @@ class ContentMonitor:
                 )
                 embed.add_field(name="Update links:", value=game_update, inline=False)
             embed.set_footer(
-                text=", ".join(game["carts"]),
+                text=", ".join(sorted(game["carts"])),
                 icon_url=ICON_GAME3RB,
             )
             embed.set_image(url=game["image"])

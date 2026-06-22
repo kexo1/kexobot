@@ -43,7 +43,7 @@ class LavalinkServerManager:
         self._cached_lavalink_servers_copy = copy.deepcopy(
             self._cached_lavalink_servers
         )
-        self._fresh_nodes: list[str] = []
+        self._fresh_nodes: set[str] = set()
 
     async def fetch(self) -> None:
         """Get new Lavalink servers from Lavainfo GitHub and Lavalist."""
@@ -87,7 +87,7 @@ class LavalinkServerManager:
             uri = get_full_node_url(
                 server["host"], server["port"], server.get("secure", False)
             )
-            self._fresh_nodes.append(uri)
+            self._fresh_nodes.add(uri)
 
             if uri in self._cached_lavalink_servers_copy:
                 continue
@@ -101,7 +101,6 @@ class LavalinkServerManager:
 
     def _clear_removed_nodes(self) -> None:
         """Method to clear old nodes from the cached lavalink servers."""
-        fresh_set = set(self._fresh_nodes)
         for uri in list(self._cached_lavalink_servers.keys()):
-            if uri not in fresh_set:
+            if uri not in self._fresh_nodes:
                 self._cached_lavalink_servers.pop(uri, None)

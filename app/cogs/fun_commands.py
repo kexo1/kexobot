@@ -88,9 +88,9 @@ class FunCommands(commands.Cog):
         self._reddit_agent = self._bot.reddit_agent
         self._session: httpx.AsyncClient = self._bot.session
 
-        self._loaded_jokes: list[str] = self._bot.loaded_jokes
-        self._loaded_dad_jokes: list[str] = self._bot.loaded_dad_jokes
-        self._loaded_yo_mama_jokes: list[str] = self._bot.loaded_yo_mama_jokes
+        self._loaded_jokes: set[str] = self._bot.loaded_jokes
+        self._loaded_dad_jokes: set[str] = self._bot.loaded_dad_jokes
+        self._loaded_yo_mama_jokes: set[str] = self._bot.loaded_yo_mama_jokes
 
         self._topstropscreenshot = load_text_file("topstropscreenshot")
         self._kotrmelce = load_text_file("kotrmelec")
@@ -151,8 +151,7 @@ class FunCommands(commands.Cog):
                 await send_response(ctx, "JOKE_TIMEOUT")
                 return
 
-            self._loaded_jokes.extend(jokes)
-            random.shuffle(self._loaded_jokes)
+            self._loaded_jokes.update(jokes)
 
         joke = None
         for joke in self._loaded_jokes:
@@ -193,8 +192,7 @@ class FunCommands(commands.Cog):
                 await send_response(ctx, "JOKE_TIMEOUT")
                 return
 
-            self._loaded_dad_jokes.extend(jokes)
-            random.shuffle(self._loaded_dad_jokes)
+            self._loaded_dad_jokes.update(jokes)
 
         joke = None
         for joke in self._loaded_dad_jokes:
@@ -239,8 +237,7 @@ class FunCommands(commands.Cog):
                 await send_response(ctx, "JOKE_TIMEOUT")
                 return
 
-            self._loaded_yo_mama_jokes.extend(jokes)
-            random.shuffle(self._loaded_yo_mama_jokes)
+            self._loaded_yo_mama_jokes.update(jokes)
 
         joke = None
         for joke in self._loaded_yo_mama_jokes:
@@ -365,18 +362,18 @@ class FunCommands(commands.Cog):
         embed.timestamp = datetime.fromtimestamp(submission.created_utc)
         return embed
 
-    async def _get_jokes(self) -> Optional[list[str]]:
-        fetched_jokes: list[str] = []
+    async def _get_jokes(self) -> Optional[set[str]]:
+        fetched_jokes: set[str] = set()
         jokes = await self._get_humor_api_jokes()
-        fetched_jokes.extend(jokes)
+        fetched_jokes.update(jokes)
 
         jokes = await self._get_joke_api_jokes()
-        fetched_jokes.extend(jokes)
+        fetched_jokes.update(jokes)
 
         return fetched_jokes
 
-    async def _get_dad_jokes(self) -> Optional[list[str]]:
-        fetched_jokes: list[str] = []
+    async def _get_dad_jokes(self) -> Optional[set[str]]:
+        fetched_jokes: set[str] = set()
         response = await make_http_request(
             self._session,
             API_DAD_JOKE,
@@ -396,12 +393,12 @@ class FunCommands(commands.Cog):
             if joke in self._loaded_dad_jokes:
                 continue
 
-            fetched_jokes.append(joke)
+            fetched_jokes.add(joke)
         return fetched_jokes
 
-    async def _get_yo_mama_jokes(self) -> Optional[list[str]]:
+    async def _get_yo_mama_jokes(self) -> Optional[set[str]]:
         token = self._load_humor_api_token()
-        fetched_jokes: list[str] = []
+        fetched_jokes: set[str] = set()
         if not token or self._bot.humor_api_tokens[token]["exhausted"]:
             return None
 
@@ -426,26 +423,26 @@ class FunCommands(commands.Cog):
             if not text or text in self._loaded_yo_mama_jokes:
                 continue
 
-            fetched_jokes.append(text)
+            fetched_jokes.add(text)
 
         return fetched_jokes
 
-    async def _get_joke_api_jokes(self) -> list[str]:
-        fetched_jokes: list[str] = []
+    async def _get_joke_api_jokes(self) -> set[str]:
+        fetched_jokes: set[str] = set()
         response = await make_http_request(
             self._session,
             API_JOKEAPI,
             get_json=True,
         )
         if not response:
-            return []
+            return set()
 
         if response.get("error"):
-            return []
+            return set()
 
         jokes = response.get("jokes")
         if not jokes:
-            return []
+            return set()
 
         for joke in jokes:
             joke_text: str = (
@@ -456,12 +453,12 @@ class FunCommands(commands.Cog):
             if not joke_text or joke_text in self._loaded_jokes:
                 continue
 
-            fetched_jokes.append(joke_text)
+            fetched_jokes.add(joke_text)
 
         return fetched_jokes
 
-    async def _get_humor_api_jokes(self) -> list[str]:
-        fetched_jokes: list[str] = []
+    async def _get_humor_api_jokes(self) -> set[str]:
+        fetched_jokes: set[str] = set()
 
         for joke_type in ["racist", "jewish", "nsfw"]:
             token = self._load_humor_api_token()
@@ -489,7 +486,7 @@ class FunCommands(commands.Cog):
                 if not text or text in self._loaded_jokes:
                     continue
 
-                fetched_jokes.append(text)
+                fetched_jokes.add(text)
 
         return fetched_jokes
 

@@ -77,9 +77,9 @@ class KexoBotClient(commands.Bot):
     reddit_agent: asyncpraw.Reddit
     humor_api_tokens: dict[str, dict[str, bool]]
     track_requesters: dict[str, dict[str, str]]
-    loaded_jokes: list[str]
-    loaded_dad_jokes: list[str]
-    loaded_yo_mama_jokes: list[str]
+    loaded_jokes: set[str]
+    loaded_dad_jokes: set[str]
+    loaded_yo_mama_jokes: set[str]
     session: httpx.AsyncClient | None
     state: BotState
 
@@ -188,9 +188,9 @@ class KexoBot:
         bot.node_is_switching = {}
         bot.track_exceptions = {}
         bot.track_requesters = {}
-        bot.loaded_jokes = []
-        bot.loaded_dad_jokes = []
-        bot.loaded_yo_mama_jokes = []
+        bot.loaded_jokes = set()
+        bot.loaded_dad_jokes = set()
+        bot.loaded_yo_mama_jokes = set()
 
     async def initialize(self) -> None:
         """Initialize the _bot and fetch all channels and users."""

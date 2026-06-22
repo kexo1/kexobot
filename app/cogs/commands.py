@@ -70,7 +70,7 @@ def get_memory_usage() -> float:
     return mem_info.rss / (1024 * 1024)
 
 
-host_authors = []
+host_authors: set[str] = set()
 
 
 async def is_owner(interaction: discord.Interaction) -> bool:
@@ -637,7 +637,7 @@ class CommandCog(commands.Cog):
             )
             return None
 
-        host_authors.append(author.name)
+        host_authors.add(author.name)
 
         embed = discord.Embed(
             title=server_name,
@@ -1068,7 +1068,7 @@ class HostView(discord.ui.View):
         if interaction.user.name in host_authors:
             embed = await self._disable_embed()
             await interaction.response.edit_message(embed=embed, view=None)
-            host_authors.pop(host_authors.index(self._author.name))
+            host_authors.discard(self._author.name)
             return
 
         await send_embed(
@@ -1089,7 +1089,7 @@ class HostView(discord.ui.View):
             f"You forgot to click button in {self.message.jump_url} you {random.choice(('dumbass', 'retard', 'prick', 'cunt', 'shitling'))}."
             "\nhttps://tenor.com/view/zombie-screaming-gif-12431778992096703656"
         )
-        host_authors.pop(host_authors.index(self._author.name))
+        host_authors.discard(self._author.name)
 
     async def _disable_embed(self) -> discord.Embed:
         self.stop()
