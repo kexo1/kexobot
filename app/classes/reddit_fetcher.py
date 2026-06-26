@@ -261,14 +261,14 @@ class RedditFetcher:
         if url_obj.scheme not in {"http", "https"}:
             return False
 
+        if any(token in submission.url for token in to_filter):
+            return False
+        
         # Allow Epic Games giveaways, but only mobile games
         if (
             "epic games" in submission_title_lower
             and "mobile" not in submission_title_lower
         ):
-            return False
-
-        if any(token in submission.url for token in to_filter):
             return False
 
         return True

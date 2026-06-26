@@ -257,7 +257,7 @@ class Listeners(commands.Cog):
             respond=False,
         )
         self._bot.state.change_node_score(player.node.uri, -5)
-        await switch_node(bot=self._bot, player=player)
+        await switch_node(bot=self._bot, player=player, play_after=True)
         player.should_respond = False
 
     @commands.Cog.listener()
@@ -288,8 +288,6 @@ class Listeners(commands.Cog):
         await switch_node(
             bot=self._bot,
             player=player,
-            send_success_message=False,
-            send_failure_message=False,
         )
         player.should_respond = False
 

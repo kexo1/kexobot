@@ -249,8 +249,8 @@ async def switch_node(
             return False
 
     async def _playback_probe_failed(target_node: sonolink.Node) -> bool:
-        if not play_after:
-            return False
+        # if not play_after:
+        #    return False
 
         # Test only if we were playing something before
         track = _resume_track()
