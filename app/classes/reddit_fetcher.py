@@ -252,14 +252,20 @@ class RedditFetcher:
         if submission.url in cache:
             return False
 
-        if "[PSA]" in submission.title and "Amazon" not in submission.title:
-            return False
+        submission_title_lower = submission.title.lower()
 
-        if "(Game)" not in submission.title:
+        if "(game)" not in submission_title_lower:
             return False
 
         url_obj = urlparse(submission.url)
         if url_obj.scheme not in {"http", "https"}:
+            return False
+
+        # Allow Epic Games giveaways, but only mobile games
+        if (
+            "epic games" in submission_title_lower
+            and "mobile" not in submission_title_lower
+        ):
             return False
 
         if any(token in submission.url for token in to_filter):

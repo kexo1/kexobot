@@ -56,21 +56,22 @@ class LavalinkServerManager:
         if json_data_second:
             await self._parse_lavalink_servers(json_data_second)
 
-        # Clear old nodes if both sources are available, otherwise we might end up with an empty list of nodes.
+        # Only update cache and clear removed nodes if both sources are available.
+        # Otherwise we might end up with an empty or incomplete list of nodes.
         if json_data_first and json_data_second:
             self._clear_removed_nodes()
 
-        if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
-            await self._bot.bot_config.update_one(
-                DB_CACHE,
-                {"$set": {"lavalink_servers": self._cached_lavalink_servers}},
-            )
-            self._cached_lavalink_servers_copy = copy.deepcopy(
-                self._cached_lavalink_servers
-            )
-            logging.info(
-                "[Lavalink] Lavalink servers list got updated, updating cache."
-            )
+            if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
+                await self._bot.bot_config.update_one(
+                    DB_CACHE,
+                    {"$set": {"lavalink_servers": self._cached_lavalink_servers}},
+                )
+                self._cached_lavalink_servers_copy = copy.deepcopy(
+                    self._cached_lavalink_servers
+                )
+                logging.info(
+                    "[Lavalink] Lavalink servers list got updated, updating cache."
+                )
 
     async def _parse_lavalink_servers(self, json_data: list) -> None:
         for server in json_data:
