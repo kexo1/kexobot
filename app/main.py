@@ -86,6 +86,30 @@ class KexoBotClient(commands.Bot):
     session: httpx.AsyncClient | None
     state: BotState
 
+    async def setup_hook(self) -> None:
+        """Initialize sonolink client, fetch cached nodes, connect node, load cogs.
+
+        Runs once after login, before any events are processed.
+        Only wordnik_presence (needs fully loaded bot) stays in on_ready.
+        """
+        await kexobot.initialize()
+        node = await kexobot.connect_node()
+        if not node:
+            logging.warning(
+                "[Sonolink] Setup hook connect failed, refreshing node cache."
+            )
+            await kexobot._lavalink_server_manager.fetch()
+            node = await kexobot.connect_node()
+
+        if not node:
+            logging.error("[Sonolink] Node is not connected after setup hook attempts.")
+
+        await setup_cogs()
+        await self.sonolink_client.start()
+
+        main_loop_task.start()
+        hourly_loop_task.start()
+
 
 intents = discord.Intents.default()
 intents.message_content = False
@@ -196,7 +220,7 @@ class KexoBot:
         bot.loaded_yo_mama_jokes = set()
 
     async def initialize(self) -> None:
-        """Initialize the _bot and fetch all channels and users."""
+        """Initialize classes and fetch all channels and users."""
         self._create_reddit_agent()
         await self._fetch_users()
         await self._fetch_channels()
@@ -531,47 +555,13 @@ async def before_hourly_loop() -> None:
     await bot.wait_until_ready()
 
 
-async def bot_loader(main: KexoBot) -> None:
-    """This function asynchronously loads the bot and main functions.
-    It initializes the bot and starts the main loop and hourly loop.
-    It also connects to the lavalink server and sets the presence.
-
-    Parameters
-    ----------
-    main: KexoBot
-        The KexoBot instance to load.
-    """
-
-    await main.initialize()
-
-    node = await main.connect_node()
-    if not node:
-        logging.warning("[Sonolink] Startup connect failed, refreshing node cache.")
-        await main._lavalink_server_manager.fetch()
-        node = await main.connect_node()
-
-    if not node:
-        logging.error("[Sonolink] Node is not connected after startup attempts.")
-
-    await setup_cogs()
-
-    main_loop_task.start()
-    hourly_loop_task.start()
-
-    while not main.session:
-        await asyncio.sleep(1)
-    await main.wordnik_presence()
-
-
 @bot.event
 async def on_ready() -> None:
     """Event that runs when the bot is ready.
-    This event is responsible for initializing the bot and
-    connecting to the lavalink server.
-    It also starts the main loop and the hourly loop.
+    setup_hook handled initialization, node connection, cogs, and loops.
+    on_ready only handles presence.
     """
-    logging.info(f"[Starter] Logged in as {bot.user}")
-    await bot_loader(kexobot)
+    await kexobot.wordnik_presence()
     logging.info("[Starter] Bot is ready.")
 
 
