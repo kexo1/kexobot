@@ -12,7 +12,7 @@ import discord
 import httpx
 import sonolink
 import sonolink.models as sl_models
-from sonolink.models import CacheSettings, InactivitySettings
+from sonolink.models import AutoPlaySettings, CacheSettings, InactivitySettings
 
 from app.config.colors import COLOR_GREEN, COLOR_RED
 from app.config.music import MUSIC_TO_REMOVE
@@ -227,6 +227,11 @@ async def switch_node(
     excluded_nodes.add(player.node.uri) if player.node else None
 
     original_autoplay_mode = player.autoplay
+    await player.update(
+        autoplay_settings=AutoPlaySettings(
+            mode=sonolink.AutoPlayMode.DISABLED,
+        )
+    )
 
     def _resume_track() -> sonolink.models.Playable | None:
         return getattr(player, "temp_current", None) or player.current
@@ -270,8 +275,6 @@ async def switch_node(
 
     try:
         for attempt in range(10):
-            player.autoplay = sonolink.AutoPlayMode.DISABLED
-
             node: sonolink.Node | None = await bot.connect_node(
                 exclude_nodes=excluded_nodes
             )
@@ -308,7 +311,11 @@ async def switch_node(
 
         return None
     finally:
-        player.autoplay = original_autoplay_mode
+        await player.update(
+            autoplay_settings=AutoPlaySettings(
+                mode=original_autoplay_mode,
+            )
+        )
         switching_map[guild_id] = False
 
 

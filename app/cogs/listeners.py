@@ -153,7 +153,7 @@ class Listeners(commands.Cog):
             self._bot.state.change_node_score(node.uri, -1)
             await self._bot.connect_node()
 
-    @commands.Cog.listener()  # noinspection PyUnusedLocal
+    @commands.Cog.listener()
     async def on_sonolink_track_start(
         self, player: sonolink.Player, payload: TrackStartEvent
     ) -> None:
@@ -250,8 +250,8 @@ class Listeners(commands.Cog):
             player.text_channel,
             make_embed(
                 ":warning: An error occurred when playing song, trying to connect to a new node."
-                f"\n**Message**: {payload.exception.message}"
-                f"\n**Severity**: {payload.exception.severity.value[:128]}",
+                f"\n**Message**: {payload.exception.message[:128]}"
+                f"\n**Severity**: {payload.exception.severity.value}",
                 color=COLOR_YELLOW,
             ),
             respond=False,
