@@ -1,7 +1,6 @@
 import asyncio
 import copy
 import logging
-import random
 import socket
 from datetime import datetime
 from typing import Any
@@ -49,7 +48,7 @@ from app.config.reddit import (
     ICON_REDDIT,
     SHITPOST_SUBREDDITS_ALL,
 )
-from app.response_handler import send_interaction
+from app.response_handler import make_embed, send
 from app.state_types import (
     GuildData,
     NodeCacheEntry,
@@ -392,7 +391,7 @@ class KexoBot:
                     k: v for k, v in top_nodes.items() if v["ping"] == best_ping
                 }
 
-            best_node = random.choice(list(top_nodes.items()))
+            best_node = next(iter(top_nodes.items()))
 
             node_uri, node_info = best_node
             existing_node = next(
@@ -577,52 +576,47 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
         The error that occurred.
     """
     if isinstance(error, (commands.CommandOnCooldown, app_commands.CommandOnCooldown)):
-        embed = discord.Embed(
-            title="",
-            description=f"🚫 You're sending too much!,"
+        embed = make_embed(
+            f"🚫 You're sending too much!,"
             f" try again in `{round(error.retry_after, 1)}s`.",
             color=COLOR_RED,
+            footer="Message will be deleted in 20 seconds.",
         )
-        embed.set_footer(text="Message will be deleted in 20 seconds.")
-        await send_interaction(ctx, embed=embed, ephemeral=True, delete_after=20)
+        await send(ctx, embed=embed, ephemeral=True, delete_after=20)
         return
 
     if isinstance(error, commands.MissingPermissions):
-        embed = discord.Embed(
-            title="",
-            description=f"🚫 You don't have the required permissions to use this command."
+        embed = make_embed(
+            f"🚫 You don't have the required permissions to use this command."
             f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=COLOR_RED,
         )
-        await send_interaction(ctx, embed=embed, ephemeral=True)
+        await send(ctx, embed=embed, ephemeral=True)
         return
 
     if isinstance(error, commands.BotMissingPermissions):
-        embed = discord.Embed(
-            title="",
-            description=f"🚫 I don't have the required permissions to use this command."
+        embed = make_embed(
+            f"🚫 I don't have the required permissions to use this command."
             f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=COLOR_RED,
         )
-        await send_interaction(ctx, embed=embed)
+        await send(ctx, embed=embed)
         return
 
     if isinstance(error, commands.BotMissingRole):
-        embed = discord.Embed(
-            title="",
-            description=f"🚫 You don't have the required role to use this command."
+        embed = make_embed(
+            f"🚫 You don't have the required role to use this command."
             f"\nRequired role: `{error.missing_role}`",
             color=COLOR_RED,
         )
-        await send_interaction(ctx, embed=embed, ephemeral=True)
+        await send(ctx, embed=embed, ephemeral=True)
         return
 
     if isinstance(error, discord.errors.NotFound) and "Unknown interaction" in str(
         error
     ):
-        embed = discord.Embed(
-            title="",
-            description="⚠️ Discord API is not responding. Please try again in a minute.",
+        embed = make_embed(
+            "⚠️ Discord API is not responding. Please try again in a minute.",
             color=COLOR_ORANGE_LIGHT,
         )
         try:
@@ -632,12 +626,11 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
         return
 
     if isinstance(error, discord.ext.commands.NotOwner):
-        embed = discord.Embed(
-            title="",
-            description="🚫 This command is available only to owner of this bot.",
+        embed = make_embed(
+            "🚫 This command is available only to owner of this bot.",
             color=COLOR_RED,
         )
-        await send_interaction(ctx, embed=embed, ephemeral=True)
+        await send(ctx, embed=embed, ephemeral=True)
         return
 
     raise error

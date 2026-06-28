@@ -18,9 +18,7 @@ from app.config.scraping import API_DAD_JOKE, API_HUMORAPI, API_JOKEAPI
 from app.response_handler import (
     defer_interaction,
     make_embed,
-    send_embed,
-    send_interaction,
-    send_response,
+    send,
 )
 from app.utils import get_guild_data, get_user_data, load_text_file, make_http_request
 
@@ -51,12 +49,12 @@ async def send_multiple_images(
     ctx: discord.Interaction, submission: asyncpraw.reddit.Submission
 ) -> None:
     for image in submission.gallery_data["items"]:
-        await send_interaction(ctx, f"https://i.redd.it/{image['media_id']}.jpg")
+        await send(ctx, f"https://i.redd.it/{image['media_id']}.jpg")
 
 
 async def post_video(ctx: discord.Interaction, submission_url: str) -> None:
     video_url = submission_url.split("/")[4]
-    await send_interaction(ctx, f"https://rxddit.com/{video_url}/", suppress=False)
+    await send(ctx, f"https://rxddit.com/{video_url}/", suppress=False)
 
 
 class FunCommands(commands.Cog):
@@ -105,7 +103,7 @@ class FunCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        await send_interaction(ctx, random.choice(self._kotrmelce))
+        await send(ctx, random.choice(self._kotrmelce))
 
     @app_commands.command(
         name="topstropscreenshot",
@@ -121,7 +119,7 @@ class FunCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        await send_interaction(ctx, random.choice(self._topstropscreenshot))
+        await send(ctx, random.choice(self._topstropscreenshot))
 
     # -------------------- Joke commands -------------------- #
     @app_commands.command(name="joke", description="Fetches random joke.")
@@ -144,7 +142,7 @@ class FunCommands(commands.Cog):
             await defer_interaction(ctx)
             jokes = await self._get_jokes()
             if not jokes:
-                await send_response(ctx, "JOKE_TIMEOUT")
+                await send(ctx, code="JOKE_TIMEOUT")
                 return
 
             self._loaded_jokes.update(jokes)
@@ -156,14 +154,14 @@ class FunCommands(commands.Cog):
             break
 
         if not joke:
-            await send_response(ctx, "NO_MORE_JOKES")
+            await send(ctx, code="NO_MORE_JOKES")
             return
 
         temp_guild_data["jokes"]["viewed_jokes"].append(joke)
         self._temp_guild_data[ctx.guild.id] = temp_guild_data
 
         joke = discord.utils.escape_markdown(joke)
-        await send_interaction(ctx, joke)
+        await send(ctx, joke)
 
     @app_commands.command(name="dad_joke", description="Fetches random dad joke.")
     @app_commands.checks.cooldown(1, 3, key=lambda i: i.user.id)
@@ -185,7 +183,7 @@ class FunCommands(commands.Cog):
             await defer_interaction(ctx)
             jokes = await self._get_dad_jokes()
             if not jokes:
-                await send_response(ctx, "JOKE_TIMEOUT")
+                await send(ctx, code="JOKE_TIMEOUT")
                 return
 
             self._loaded_dad_jokes.update(jokes)
@@ -197,14 +195,14 @@ class FunCommands(commands.Cog):
             break
 
         if not joke:
-            await send_response(ctx, "NO_MORE_JOKES")
+            await send(ctx, code="NO_MORE_JOKES")
             return
 
         temp_guild_data["jokes"]["viewed_dad_jokes"].append(joke)
         self._temp_guild_data[ctx.guild.id] = temp_guild_data
 
         joke = discord.utils.escape_markdown(joke)
-        await send_interaction(ctx, joke)
+        await send(ctx, joke)
 
     @app_commands.command(
         name="yo_mama",
@@ -230,7 +228,7 @@ class FunCommands(commands.Cog):
             await defer_interaction(ctx)
             jokes = await self._get_yo_mama_jokes()
             if not jokes:
-                await send_response(ctx, "JOKE_TIMEOUT")
+                await send(ctx, code="JOKE_TIMEOUT")
                 return
 
             self._loaded_yo_mama_jokes.update(jokes)
@@ -242,7 +240,7 @@ class FunCommands(commands.Cog):
             break
 
         if not joke:
-            await send_response(ctx, "NO_MORE_JOKES")
+            await send(ctx, code="NO_MORE_JOKES")
             return
 
         temp_guild_data["jokes"]["viewed_yo_mama_jokes"].append(joke)
@@ -255,7 +253,7 @@ class FunCommands(commands.Cog):
         if self._bot.user and member.id == self._bot.user.id:
             target = ctx.user
 
-        await send_interaction(ctx, f"{target.mention} {joke}")
+        await send(ctx, f"{target.mention} {joke}")
 
     @app_commands.command(
         name="shitpost",
@@ -279,7 +277,7 @@ class FunCommands(commands.Cog):
         user_data, temp_user_data = await self._load_user_data(ctx)
 
         if not temp_user_data.get("multireddit"):
-            await send_interaction(ctx, "REDDIT_CANT_LOAD_MULTIREDDIT")
+            await send(ctx, "REDDIT_CANT_LOAD_MULTIREDDIT")
 
         multireddit: asyncpraw.models.Multireddit = temp_user_data["multireddit"]
         limit = temp_user_data["search_limit"]
@@ -292,9 +290,9 @@ class FunCommands(commands.Cog):
 
                 is_channel_nsfw = ctx.channel.is_nsfw()
                 if submission.over_18 and not is_channel_nsfw:
-                    await send_embed(
+                    await send(
                         ctx,
-                        make_embed(
+                        embed=make_embed(
                             ":x: This post is NSFW, use the command in an NSFW channel."
                         ),
                     )
@@ -303,15 +301,15 @@ class FunCommands(commands.Cog):
                 embed = await self._create_reddit_embed(submission)
 
                 if submission.media:
-                    await send_interaction(ctx, embed=embed)
+                    await send(ctx, embed=embed)
                     await post_video(ctx, submission.permalink)
                 # If it has multiple images
                 elif hasattr(submission, "gallery_data"):
-                    await send_interaction(ctx, embed=embed)
+                    await send(ctx, embed=embed)
                     await send_multiple_images(ctx, submission)
                 else:
                     embed.set_image(url=submission.url)
-                    await send_interaction(ctx, embed=embed)
+                    await send(ctx, embed=embed)
 
                 self._update_temp_user_data(user_id, submission.permalink)
                 break
@@ -321,9 +319,9 @@ class FunCommands(commands.Cog):
             RequestException,
             ResponseException,
         ):
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(
+                embed=make_embed(
                     ":x: Failed to get post from Reddit, try again later.",
                     color=discord.Color.from_rgb(r=220, g=0, b=0),
                 ),

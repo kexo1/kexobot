@@ -19,7 +19,7 @@ from sonolink.gateway import (
 from app.config.colors import COLOR_YELLOW
 from app.config.discord import ICON_YOUTUBE
 from app.config.music import MUSIC_TIPS
-from app.response_handler import make_embed, send_embed
+from app.response_handler import make_embed, send
 from app.utils import fix_audio_title, switch_node
 
 if TYPE_CHECKING:
@@ -181,8 +181,11 @@ class Listeners(commands.Cog):
         ):
             current_track.data.user_data = dict(temp_current.data.user_data)
 
-        if not player.should_respond:
-            await player.text_channel.send(embed=playing_embed(self._bot, payload))
+        # Skip now-playing message if the command already sent it (e.g., /play on empty queue)
+        if getattr(player, "_now_playing_sent", False):
+            player._now_playing_sent = False
+        else:
+            await send(player.text_channel, embed=playing_embed(self._bot, payload))
 
         if player.autoplay != sonolink.AutoPlayMode.ENABLED:
             history_count = len(player.queue.history)
@@ -216,15 +219,14 @@ class Listeners(commands.Cog):
             await self._bot.connect_node()
             return
 
-        await send_embed(
+        await send(
             player.text_channel,
-            make_embed(
+            embed=make_embed(
                 ":warning: Node is unresponsive, trying to connect to a new node in a moment"
                 f"\n**Reason**: {payload.reason}"
                 f"\n**Caused by discord**: {payload.by_remote}",
                 color=COLOR_YELLOW,
             ),
-            respond=False,
         )
         self._bot.state.change_node_score(player.node.uri, -5)
         await switch_node(bot=self._bot, player=player)
@@ -246,15 +248,14 @@ class Listeners(commands.Cog):
         if await self._handle_track_error_probe(player, payload.track):
             return
 
-        await send_embed(
+        await send(
             player.text_channel,
-            make_embed(
+            embed=make_embed(
                 ":warning: An error occurred when playing song, trying to connect to a new node."
                 f"\n**Message**: {payload.exception.message[:128]}"
                 f"\n**Severity**: {payload.exception.severity.value}",
                 color=COLOR_YELLOW,
             ),
-            respond=False,
         )
         self._bot.state.change_node_score(player.node.uri, -5)
         await switch_node(bot=self._bot, player=player, play_after=True)
@@ -276,13 +277,12 @@ class Listeners(commands.Cog):
         if await self._handle_track_error_probe(player, payload.track):
             return
 
-        await send_embed(
+        await send(
             player.text_channel,
-            make_embed(
+            embed=make_embed(
                 ":warning: Track got stuck, trying to connect to a new node.",
                 color=COLOR_YELLOW,
             ),
-            respond=False,
         )
         self._bot.state.change_node_score(player.node.uri, -5)
         await switch_node(
@@ -305,12 +305,11 @@ class Listeners(commands.Cog):
         if payload.trigger == DisconnectTriggerType.INACTIVITY and hasattr(
             player, "text_channel"
         ):
-            await send_embed(
+            await send(
                 player.text_channel,
-                make_embed(
+                embed=make_embed(
                     f"Left <#{player.channel.id}> after 10 minutes of inactivity."
                 ),
-                respond=False,
             )
 
         if payload.extra_data:
@@ -352,10 +351,9 @@ class Listeners(commands.Cog):
 
         if player.channel.members[0] == player.guild.me:
             try:
-                await send_embed(
+                await send(
                     player.text_channel,
-                    make_embed(f"Left <#{player.channel.id}>, no users in channel."),
-                    respond=False,
+                    embed=make_embed(f"Left <#{player.channel.id}>, no users in channel."),
                 )
             except AttributeError:
                 pass

@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Callable
 
 import discord
@@ -22,6 +23,7 @@ def make_embed(
 
 # Only messages reused in multiple places belong here.
 RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
+    # ──────────────────────────── Music errors ───────────────────────────── #
     "NO_VOICE_CHANNEL": make_embed(
         ":x: You're not in a voice channel. Type `/music play` from vc."
     ),
@@ -80,76 +82,6 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
 }
 
 
-async def send_embed(
-    ctx: discord.Interaction | discord.TextChannel,
-    embed: discord.Embed,
-    *,
-    respond: bool = True,
-    ephemeral: bool = True,
-    delete_after: int | None = None,
-) -> None:
-    """Send a one-off embed without using a response code."""
-    if respond and isinstance(ctx, discord.Interaction):
-        await send_interaction(
-            ctx,
-            embed=embed,
-            ephemeral=ephemeral,
-            delete_after=delete_after,
-        )
-        return
-
-    if isinstance(ctx, discord.Interaction):
-        await send_interaction(ctx, embed=embed, delete_after=delete_after)
-    else:
-        await send_message(ctx, embed=embed, delete_after=delete_after)
-
-
-async def send_response(
-    ctx: discord.Interaction | discord.TextChannel,
-    response_code: str,
-    respond: bool = True,
-    ephemeral: bool = True,
-    delete_after: int | None = None,
-    **kwargs: Any,
-) -> None:
-    """This method sends a response to the user based on the response code.
-
-    Parameters
-    ----------
-    ctx: :class:`discord.Interaction`
-        The context of the command.
-    response_code: :class:`str`
-        The response code to determine the type of response.
-    respond: :class:`bool`
-        Whether to respond to the user or send a message in the channel.
-    ephemeral: :class:`bool`
-        Whether the response should be ephemeral (only visible to the user).
-    delete_after: :class:`int`
-        The time in seconds after which the response should be deleted.
-    kwargs: :class:`Any`
-        Additional keyword arguments to pass to the response handler.
-
-    Raises
-    ------
-    ValueError
-        If the response code is not recognized.
-    """
-    if response_code not in RESPONSE_CODES:
-        raise ValueError(f"Unknown response code: {response_code}")
-
-    response = RESPONSE_CODES[response_code]
-    if callable(response):
-        response = response(**kwargs)
-
-    await send_embed(
-        ctx,
-        response,
-        respond=respond,
-        ephemeral=ephemeral,
-        delete_after=delete_after,
-    )
-
-
 async def defer_interaction(
     interaction: discord.Interaction, ephemeral: bool = False
 ) -> None:
@@ -158,80 +90,107 @@ async def defer_interaction(
     await interaction.response.defer(ephemeral=ephemeral)
 
 
-async def send_interaction(
-    interaction: discord.Interaction,
+async def send(
+    target: discord.Interaction | discord.abc.Messageable,
     content: str | None = None,
     *,
+    code: str | None = None,
     embed: discord.Embed | None = None,
     embeds: list[discord.Embed] | None = None,
     view: discord.ui.View | None = None,
     files: list[discord.File] | None = None,
     delete_after: float | None = None,
-    suppress: bool | None = None,
     ephemeral: bool = False,
+    suppress: bool | None = None,
+    **kwargs: Any,
 ) -> discord.Message | None:
-    payload: dict[str, Any] = {"ephemeral": ephemeral}
+    """Unified send function — the one entry point for all bot messages.
 
+    Parameters
+    ----------
+    target: :class:`discord.Interaction` | :class:`discord.abc.Messageable`
+        Where to send. If an ``Interaction`` it will try ``response.send_message``
+        → ``followup.send`` → ``channel.send`` (auto-detects ``is_done()``).
+    content: :class:`str` | ``None``
+        Plain text content.
+    code: :class:`str` | ``None``
+        A key from ``RESPONSE_CODES``.  When given, the resolved embed takes
+        precedence over ``embed`` / ``embeds`` (*you would not pass both*).
+    embed, embeds, view, files, delete_after, suppress, ephemeral:
+        Forwarded to the underlying Discord send method.
+    **kwargs
+        Any extra keyword arguments are passed to callable response builders.
+
+    Returns
+    -------
+    :class:`discord.Message` | ``None``
+        The sent message when available (interaction followups or channel
+        sends), ``None`` when the interaction was a fresh response.
+    """
+    # ── 1. Resolve response code ───────────────────────────────────────────
+    resolved_embed: discord.Embed | None = embed
+    if code is not None:
+        if code not in RESPONSE_CODES:
+            raise ValueError(f"Unknown response code: {code}")
+        response = RESPONSE_CODES[code]
+        if callable(response):
+            response = response(**kwargs)
+        resolved_embed = response  # type: ignore[assignment]
+
+    # ── 2. Build the payload that both interaction + channel paths need ─────
+    payload: dict[str, Any] = {}
     if content is not None:
         payload["content"] = content
     if view is not None:
         payload["view"] = view
-
-    # discord.py rejects sending both "embed" and "embeds" together.
     if embeds is not None:
         payload["embeds"] = embeds
-    elif embed is not None:
-        payload["embed"] = embed
-
+    elif resolved_embed is not None:
+        payload["embed"] = resolved_embed
     if files is not None:
         payload["files"] = files
     if suppress is not None:
         payload["suppress_embeds"] = suppress
 
+    # ── 3. Route to the correct backend ────────────────────────────────────
     message: discord.Message | None = None
-    channel_payload = {
-        key: value for key, value in payload.items() if key != "ephemeral"
-    }
-    if interaction.response.is_done():
-        try:
-            message = await interaction.followup.send(**payload, wait=True)
-        except discord.NotFound:
-            if not ephemeral and interaction.channel:
-                message = await interaction.channel.send(**channel_payload)
-    else:
-        try:
-            await interaction.response.send_message(**payload)
-        except discord.NotFound:
-            if not ephemeral and interaction.channel:
-                message = await interaction.channel.send(**channel_payload)
+
+    if isinstance(target, discord.Interaction):
+        # --- Interaction path ---
+        interaction_payload: dict[str, Any] = {**payload, "ephemeral": ephemeral}
+
+        if target.response.is_done():
+            try:
+                message = await target.followup.send(**interaction_payload, wait=True)
+            except discord.NotFound:
+                if not ephemeral and target.channel:
+                    channel_payload = {k: v for k, v in payload.items() if k != "ephemeral"}
+                    try:
+                        message = await target.channel.send(**channel_payload)
+                    except discord.HTTPException:
+                        pass
         else:
             try:
-                message = await interaction.original_response()
+                await target.response.send_message(**interaction_payload)
             except discord.NotFound:
-                message = None
+                if not ephemeral and target.channel:
+                    try:
+                        message = await target.channel.send(**payload)
+                    except discord.HTTPException:
+                        pass
+            else:
+                try:
+                    message = await target.original_response()
+                except discord.NotFound:
+                    message = None
+    else:
+        # --- Channel / Messageable path ---
+        try:
+            message = await target.send(**payload)
+        except discord.HTTPException:
+            pass
 
-    if message and delete_after:
+    if message and delete_after is not None:
         await message.delete(delay=delete_after)
+
     return message
-
-
-async def send_message(
-    ctx: discord.TextChannel,
-    embed: discord.Embed | None = None,
-    embeds: list[discord.Embed] | None = None,
-    view: discord.ui.View | None = None,
-    files: list[discord.File] | None = None,
-    delete_after: int | None = None,
-) -> None:
-    """Sends a message to the channel, not as an interaction."""
-
-    try:
-        await ctx.send(
-            embed=embed,
-            embeds=embeds,
-            view=view,
-            files=files,
-            delete_after=delete_after,
-        )
-    except discord.HTTPException:
-        pass

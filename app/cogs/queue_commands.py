@@ -9,7 +9,7 @@ from discord.ext import commands
 from app.config.colors import COLOR_BLUE
 from app.config.discord import ICON_DISCORD, ICON_YOUTUBE
 from app.decorators import is_joined, is_playing, is_queue_empty
-from app.response_handler import make_embed, send_embed, send_interaction, send_response
+from app.response_handler import make_embed, send
 from app.utils import EmbedPaginator, find_track, fix_audio_title
 
 if TYPE_CHECKING:
@@ -157,10 +157,10 @@ class Queue(commands.Cog):
         pages = get_queue_embeds(ctx, player)
 
         if len(pages) == 1:
-            await send_interaction(ctx, embed=pages[0])
+            await send(ctx, embed=pages[0])
         else:
             view = EmbedPaginator(pages)
-            await send_interaction(ctx, embed=pages[0], view=view)
+            await send(ctx, embed=pages[0], view=view)
 
     @app_commands.command(name="playing", description="What track is currently playing")
     @app_commands.guild_only()
@@ -173,7 +173,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        await send_interaction(ctx, embed=get_playing_embed(ctx))
+        await send(ctx, embed=get_playing_embed(ctx))
 
     @app_commands.command(name="remove", description="Removes a song from the queue")
     @app_commands.describe(to_find="Song name or queue index to remove.")
@@ -197,14 +197,14 @@ class Queue(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
         track_pos = find_track(player, to_find)
         if track_pos is None:
-            await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
+            await send(ctx, code="NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
             return
 
         track = player.queue[track_pos - 1]
         player.queue.pop(track_pos - 1)
-        await send_response(
+        await send(
             ctx,
-            "QUEUE_TRACK_REMOVED",
+            code="QUEUE_TRACK_REMOVED",
             ephemeral=False,
             title=track.title,
             uri=track.uri,
@@ -228,13 +228,13 @@ class Queue(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if len(player.queue) < 2:
-            await send_embed(
-                ctx, make_embed(":x: Queue has less than 2 tracks to shuffle.")
+            await send(
+                ctx, embed=make_embed(":x: Queue has less than 2 tracks to shuffle.")
             )
             return
 
         player.queue.shuffle()
-        await send_response(ctx, "QUEUE_SHUFFLED", ephemeral=False)
+        await send(ctx, code="QUEUE_SHUFFLED", ephemeral=False)
 
     @app_commands.command(
         name="loop-queue",
@@ -255,13 +255,13 @@ class Queue(commands.Cog):
 
         if player.queue.mode == sonolink.QueueMode.LOOP_ALL:
             player.queue.mode = sonolink.QueueMode.NORMAL
-            await send_response(ctx, "QUEUE_LOOP_DISABLED")
+            await send(ctx, code="QUEUE_LOOP_DISABLED")
             return
 
         player.queue.mode = sonolink.QueueMode.LOOP_ALL
-        await send_response(
+        await send(
             ctx,
-            "QUEUE_LOOP_ENABLED",
+            code="QUEUE_LOOP_ENABLED",
             ephemeral=False,
             count=len(player.queue),
         )
@@ -284,13 +284,13 @@ class Queue(commands.Cog):
 
         if player.queue.mode == sonolink.QueueMode.LOOP:
             player.queue.mode = sonolink.QueueMode.NORMAL
-            await send_response(ctx, "TRACK_LOOP_DISABLED")
+            await send(ctx, code="TRACK_LOOP_DISABLED")
             return
 
         player.queue.mode = sonolink.QueueMode.LOOP
-        await send_response(
+        await send(
             ctx,
-            "TRACK_LOOP_ENABLED",
+            code="TRACK_LOOP_ENABLED",
             ephemeral=False,
             title=player.current.title,
             uri=player.current.uri,
@@ -309,7 +309,7 @@ class Queue(commands.Cog):
         """
         player: sonolink.Player = ctx.guild.voice_client
         player.queue.clear()
-        await send_response(ctx, "QUEUE_CLEARED", ephemeral=False)
+        await send(ctx, code="QUEUE_CLEARED", ephemeral=False)
 
 
 async def setup(bot: "KexoBotClient") -> None:

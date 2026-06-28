@@ -38,9 +38,7 @@ from app.config.sfd import SFD_TIMEZONE_CHOICE
 from app.response_handler import (
     defer_interaction,
     make_embed,
-    send_embed,
-    send_interaction,
-    send_response,
+    send,
 )
 from app.utils import EmbedPaginator, build_node, get_user_data, switch_node
 
@@ -167,13 +165,13 @@ class CommandCog(commands.Cog):
         is_connected: bool = await self._bot.state.node_attempt_connection(node)
 
         if not is_connected:
-            await send_response(ctx, "NODE_CONNECT_FAILURE", uri=uri)
+            await send(ctx, code="NODE_CONNECT_FAILURE", uri=uri)
             return
 
         self._bot.node = node
-        await send_embed(
+        await send(
             ctx,
-            make_embed(f":white_check_mark: Connected to node {node.uri}"),
+            embed=make_embed(f":white_check_mark: Connected to node {node.uri}"),
             ephemeral=False,
         )
 
@@ -205,22 +203,22 @@ class CommandCog(commands.Cog):
                 send_success_message=False,
             )
             if not node:
-                await send_response(ctx, "NODE_CONNECT_FAILURE")
+                await send(ctx, code="NODE_CONNECT_FAILURE")
                 return
 
             self._bot.node = node
-            await send_response(ctx, "RECONNECTED_NODE", node=node.uri)
+            await send(ctx, code="RECONNECTED_NODE", node=node.uri)
             return
 
         node: sonolink.Node | None = await self._bot.connect_node(
             exclude_nodes=[self._bot.node.uri] if self._bot.node else None
         )
         if not node:
-            await send_response(ctx, "NODE_CONNECT_FAILURE")
+            await send(ctx, code="NODE_CONNECT_FAILURE")
             return
 
         self._bot.node = node
-        await send_response(ctx, "RECONNECTED_NODE", node=node.uri)
+        await send(ctx, code="RECONNECTED_NODE", node=node.uri)
 
     @slash_node.command(name="info", description="Information about connected node")
     async def node_info(self, ctx: discord.Interaction) -> None:
@@ -235,7 +233,7 @@ class CommandCog(commands.Cog):
         try:
             node_info: sonolink.InfoResponsePayload = await node.fetch_info()
         except Exception:
-            await send_response(ctx, "NO_NODE_INFO")
+            await send(ctx, code="NO_NODE_INFO")
             return
 
         embed = discord.Embed(
@@ -262,7 +260,7 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Build time:", value=f"<t:{unix_timestamp}:D>")
         embed.add_field(name="Filters:", value=", ".join(node_info.filters))
 
-        await send_interaction(ctx, embed=embed)
+        await send(ctx, embed=embed)
 
     @slash_node.command(
         name="supported_platforms",
@@ -301,7 +299,7 @@ class CommandCog(commands.Cog):
         try:
             node_info: sonolink.InfoResponsePayload = await node.fetch_info()
         except Exception:
-            await send_response(ctx, "NO_NODE_INFO")
+            await send(ctx, code="NO_NODE_INFO")
             return
 
         platform_support = resolve_platform_support(node_info.plugins)
@@ -319,7 +317,7 @@ class CommandCog(commands.Cog):
 
         if not platform_support:
             embed.description = "No platforms supported"
-            await send_interaction(ctx, embed=embed)
+            await send(ctx, embed=embed)
             return
 
         likely = [
@@ -349,7 +347,7 @@ class CommandCog(commands.Cog):
                 inline=False,
             )
 
-        await send_interaction(ctx, embed=embed)
+        await send(ctx, embed=embed)
 
     @slash_node.command(name="players", description="Information about node players.")
     async def node_players(self, ctx: discord.Interaction) -> None:
@@ -363,7 +361,7 @@ class CommandCog(commands.Cog):
         nodes: list[sonolink.Node] = list(self._bot.sonolink_client.nodes)
 
         if not nodes:
-            await send_embed(ctx, make_embed(":x: No nodes connected."))
+            await send(ctx, embed=make_embed(":x: No nodes connected."))
             return
         # Would change to dict
         server_name = []
@@ -391,7 +389,7 @@ class CommandCog(commands.Cog):
                 node_uri.append(node.uri)
 
         if not server_name:
-            await send_embed(ctx, make_embed(":x: No players connected."))
+            await send(ctx, embed=make_embed(":x: No players connected."))
             return
 
         embed.add_field(name="Server:ㅤㅤㅤㅤ", value="\n".join(server_name))
@@ -399,7 +397,7 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Node:", value="\n".join(node_uri))
 
         embed.set_footer(text=f"Total players: {len(players)}")
-        await send_interaction(ctx, embed=embed)
+        await send(ctx, embed=embed)
 
     # -------------------- SFD Servers -------------------- #
     @slash_sfd.command(
@@ -416,7 +414,7 @@ class CommandCog(commands.Cog):
         """
         servers_dict, all_players = await self._sfd_servers.get_servers_info()
         if not servers_dict:
-            await send_embed(ctx, make_embed(":x: No servers found."))
+            await send(ctx, embed=make_embed(":x: No servers found."))
             return
 
         # Cleaning up the server names and maps
@@ -457,10 +455,10 @@ class CommandCog(commands.Cog):
                 pages.append(embed)
 
         if len(pages) == 1:
-            await send_interaction(ctx, embed=embed)
+            await send(ctx, embed=embed)
         else:
             view = EmbedPaginator(pages)
-            await send_interaction(ctx, embed=pages[0], view=view)
+            await send(ctx, embed=pages[0], view=view)
 
     @slash_sfd.command(name="server_info", description="Find searched server.")
     @app_commands.describe(search="Server name to search for.")
@@ -481,7 +479,7 @@ class CommandCog(commands.Cog):
         """
         server = await self._sfd_servers.get_server(search)
         if not server:
-            await send_embed(ctx, make_embed(":x: No server found."))
+            await send(ctx, embed=make_embed(":x: No server found."))
             return
 
         embed = discord.Embed(
@@ -496,7 +494,7 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Map Name:ㅤㅤ", value=server.map_name)
         embed.add_field(name="Has Password:ㅤㅤ", value=server.has_password)
         embed.add_field(name="Game Mode:ㅤㅤ", value=server.game_mode)
-        await send_interaction(ctx, embed=embed)
+        await send(ctx, embed=embed)
 
     @slash_sfd.command(
         name="activity",
@@ -549,7 +547,7 @@ class CommandCog(commands.Cog):
             await generator(timezone)
 
         file = discord.File(image_location, filename=filename)
-        await send_interaction(ctx, files=[file], embed=None)
+        await send(ctx, files=[file], embed=None)
 
     # -------------------- SFD Hosting -------------------- #
     @slash_sfd.command(
@@ -633,9 +631,9 @@ class CommandCog(commands.Cog):
         author = ctx.user
 
         if author in host_authors:
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(":x: You are already hosting a server, stop hosting first."),
+                embed=make_embed(":x: You are already hosting a server, stop hosting first."),
             )
             return None
 
@@ -681,27 +679,26 @@ class CommandCog(commands.Cog):
             if image.endswith((".jpg", ".jpeg", ".png", ".gif")):
                 embed.set_thumbnail(url=image)
             else:
-                await send_embed(
+                await send(
                     ctx,
-                    make_embed(
+                    embed=make_embed(
                         ":x: Incorrect image URL, use .jpg, .jpeg, .png or .gif"
                     ),
                 )
                 return None
 
         try:
-            await send_interaction(ctx, ping_role.mention)
+            await send(ctx, ping_role.mention)
         except Exception:
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(":x: Can't ping role, I don't have permission to do so."),
-                color=COLOR_RED,
+                embed=make_embed(":x: Can't ping role, I don't have permission to do so.", color=COLOR_RED),
                 ephemeral=False,
             )
             return None
 
         view = HostView(author=author)
-        response = await send_interaction(ctx, embed=embed, view=view)
+        response = await send(ctx, embed=embed, view=view)
         view.message = response
         return None
 
@@ -734,7 +731,7 @@ class CommandCog(commands.Cog):
             value=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         )
         embed.set_footer(text="Bot owner: _kexo")
-        await send_interaction(ctx, embed=embed)
+        await send(ctx, embed=embed)
 
     @app_commands.command(
         name="random_number", description="Choose number between intervals."
@@ -759,7 +756,7 @@ class CommandCog(commands.Cog):
         """
         if integer1 > integer2:
             integer2, integer1 = integer1, integer2
-        await send_interaction(ctx, f"I chose `{random.randint(integer1, integer2)}`")
+        await send(ctx, f"I chose `{random.randint(integer1, integer2)}`")
 
     @app_commands.command(
         name="pick",
@@ -779,7 +776,7 @@ class CommandCog(commands.Cog):
             The list of words separated by spaces.
         """
         words = words.split()
-        await send_interaction(ctx, "I chose " + "`" + str(random.choice(words)) + "`")
+        await send(ctx, "I chose " + "`" + str(random.choice(words)) + "`")
 
     @app_commands.command(
         name="clear-messages", description="Clears messages, max 50 (Admin)"
@@ -801,7 +798,7 @@ class CommandCog(commands.Cog):
         integer: int
             The number of messages to clear (max 50).
         """
-        await send_interaction(
+        await send(
             ctx, f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=True
         )
         await ctx.channel.purge(limit=integer)
@@ -826,14 +823,14 @@ class CommandCog(commands.Cog):
         target_channel: discord.abc.Messageable = channel or ctx.channel
 
         if channel is not None:
-            await send_interaction(
+            await send(
                 ctx,
                 f"Spamming `{word}` in {channel.mention}",
                 ephemeral=True,
             )
             repeat_count = integer
         else:
-            await send_interaction(ctx, word)
+            await send(ctx, word)
             repeat_count = integer - 1
 
         for _ in range(repeat_count):
@@ -958,7 +955,7 @@ class CommandCog(commands.Cog):
             color=COLOR_BLUE,
         )
 
-        await send_interaction(ctx, embed=embed, view=view, ephemeral=True)
+        await send(ctx, embed=embed, view=view, ephemeral=True)
 
     async def _show_bot_config(self, ctx, collection: str) -> None:
         bot_config: dict = await self._bot_config.find_one(DB_LISTS)
@@ -972,7 +969,7 @@ class CommandCog(commands.Cog):
                 f"{i + 1}. {collection[i]}" for i in range(len(collection))
             ),
         )
-        await send_interaction(ctx, embed=embed)
+        await send(ctx, embed=embed)
 
     async def _add_to_bot_config(self, ctx, collection: str, to_upload: str) -> None:
         bot_config: dict = await self._bot_config.find_one(DB_LISTS)
@@ -981,9 +978,9 @@ class CommandCog(commands.Cog):
         collection: list = bot_config[collection_db_name]
 
         if to_upload in collection:
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(f":x: `{to_upload}` is already in the list."),
+                embed=make_embed(f":x: `{to_upload}` is already in the list."),
             )
             return
 
@@ -991,9 +988,9 @@ class CommandCog(commands.Cog):
         await self._bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
-        await send_embed(
+        await send(
             ctx,
-            make_embed(
+            embed=make_embed(
                 f":white_check_mark: Added `{to_upload}` to {collection_name} list."
             ),
         )
@@ -1007,9 +1004,9 @@ class CommandCog(commands.Cog):
         collection: list = bot_config[collection_db_name]
 
         if to_remove not in collection:
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(f":x: `{to_remove}` is not in the list."),
+                embed=make_embed(f":x: `{to_remove}` is not in the list."),
             )
             return
 
@@ -1017,9 +1014,9 @@ class CommandCog(commands.Cog):
         await self._bot_config.update_one(
             DB_LISTS, {"$set": {collection_db_name: collection}}
         )
-        await send_embed(
+        await send(
             ctx,
-            make_embed(
+            embed=make_embed(
                 f":white_check_mark: Removed `{to_remove}` from {collection_name} list."
             ),
         )
@@ -1070,9 +1067,9 @@ class HostView(discord.ui.View):
             host_authors.discard(self._author.name)
             return
 
-        await send_embed(
+        await send(
             interaction,
-            make_embed(":x: You are not the author of this embed."),
+            embed=make_embed(":x: You are not the author of this embed."),
         )
 
     async def on_timeout(self) -> None:

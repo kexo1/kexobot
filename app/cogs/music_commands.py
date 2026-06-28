@@ -24,14 +24,7 @@ from app.config.music import (
     MUSIC_SOURCES,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
-from app.response_handler import (
-    defer_interaction,
-    make_embed,
-    send_embed,
-    send_interaction,
-    send_message,
-    send_response,
-)
+from app.response_handler import defer_interaction, make_embed, send
 from app.utils import (
     EmbedPaginator,
     find_track,
@@ -140,9 +133,6 @@ async def _handle_playlist(
     player: sonolink.Player,
     playlist: sl_models.Playlist,
 ) -> sl_models.Playable:
-    if player.current:
-        player.should_respond = True
-
     for track in playlist:
         set_track_requester(track, ctx.user, ctx.client)
 
@@ -155,11 +145,7 @@ async def _handle_playlist(
         color=COLOR_BLUE,
     )
 
-    if player.should_respond:
-        await send_interaction(ctx, embed=embed)
-        player.should_respond = False
-    else:
-        await send_message(ctx.channel, embed=embed)
+    await send(ctx.channel, embed=embed)
 
     return first_track
 
@@ -170,21 +156,20 @@ async def should_move_to_channel(ctx: discord.Interaction) -> bool:
         return True
 
     if player.current:
-        await send_embed(
+        await send(
             ctx,
-            make_embed(
+            embed=make_embed(
                 ":x: I am playing in a different voice channel, wait till the song finishes."
             ),
         )
         return False
 
     await player.move_to(ctx.user.voice.channel)
-    await send_embed(
+    await send(
         ctx,
-        make_embed(f":wheelchair: Moving to <#{ctx.user.voice.channel.id}>"),
+        embed=make_embed(f":wheelchair: Moving to <#{ctx.user.voice.channel.id}>"),
         ephemeral=False,
     )
-    player.should_respond = False
     return True
 
 
@@ -243,13 +228,12 @@ class MusicCommands(commands.Cog):
         play_next: bool = False,
     ) -> None:
         """Shared play flow used by /music play and radio commands."""
-        if not ctx.response.is_done():
-            await defer_interaction(ctx)
+        await defer_interaction(ctx)
 
         if self._bot.node_is_switching.get(ctx.guild.id, False):
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(
+                embed=make_embed(
                     ":hourglass_flowing_sand: Please wait until the bot finishes switching nodes.",
                     color=COLOR_YELLOW,
                 ),
@@ -257,7 +241,7 @@ class MusicCommands(commands.Cog):
             return
 
         if not self._bot.node:
-            await send_response(ctx, "NODE_NOT_FOUND", ephemeral=False)
+            await send(ctx, code="NODE_NOT_FOUND", ephemeral=False)
             return
 
         if not ctx.guild.voice_client:
@@ -278,13 +262,6 @@ class MusicCommands(commands.Cog):
         if not tracks:
             return
 
-        if len(player.queue) == 0:
-            player.should_respond = True
-
-        if player.just_joined:
-            player.should_respond = False
-            player.just_joined = False
-
         track = await fetch_first_track(ctx, tracks)
         if not track:
             return
@@ -297,21 +274,12 @@ class MusicCommands(commands.Cog):
             else:
                 player.queue.put(track)
 
-            # If its playlist, we already responded to playlist message
-            if tracks and not isinstance(tracks.result, sl_models.Playlist):
-                await send_interaction(ctx, embed=queue_embed(track))
-            else:
-                await send_message(ctx.channel, embed=queue_embed(track))
+            await send(ctx, embed=queue_embed(track))
             return
 
-        playing: bool = await self._play_track(ctx, track)
-        if not playing:
-            return
-
-        # Send playing embed via slash command if should_respond is True
-        if player.should_respond:
-            await send_interaction(ctx, embed=playing_embed(track, self._bot))
-            player.should_respond = False
+        player._now_playing_sent = True  # Prevent listener from duplicating
+        await send(ctx, embed=playing_embed(track, self._bot))
+        await self._play_track(ctx, track)
 
     @music.command(name="play", description="Plays song.")
     @app_commands.describe(
@@ -363,7 +331,7 @@ class MusicCommands(commands.Cog):
 
         place_ids = await self._get_radiomap_data()
         if not place_ids:
-            await send_response(ctx, "RADIOMAP_ERROR")
+            await send(ctx, code="RADIOMAP_ERROR")
             return
 
         place_id = random.choice(place_ids)
@@ -374,7 +342,7 @@ class MusicCommands(commands.Cog):
             headers={"accept": "application/json"},
         )
         if not response:
-            await send_response(ctx, "RADIOMAP_ERROR")
+            await send(ctx, code="RADIOMAP_ERROR")
             return
 
         try:
@@ -383,7 +351,7 @@ class MusicCommands(commands.Cog):
                 "/"
             )[-1]
         except (KeyError, IndexError, ValueError):
-            await send_response(ctx, "RADIOMAP_ERROR")
+            await send(ctx, code="RADIOMAP_ERROR")
             return
         response = await make_http_request(
             self._session,
@@ -391,7 +359,7 @@ class MusicCommands(commands.Cog):
             headers={"accept": "application/json"},
         )
         if not response:
-            await send_response(ctx, "RADIOMAP_ERROR")
+            await send(ctx, code="RADIOMAP_ERROR")
             return
 
         response_text = response.text
@@ -399,7 +367,7 @@ class MusicCommands(commands.Cog):
             r'(?:href="|Redirecting to )(https?://[^"\s]+)', response_text
         )
         if not url_match:
-            await send_response(ctx, "RADIOMAP_ERROR")
+            await send(ctx, code="RADIOMAP_ERROR")
             return
 
         station = url_match.group(1)
@@ -443,13 +411,13 @@ class MusicCommands(commands.Cog):
             headers={"accept": "application/json"},
         )
         if not response:
-            await send_response(ctx, "RADIOMAP_ERROR")
+            await send(ctx, code="RADIOMAP_ERROR")
             return
 
         try:
             data = response.json()
             if not data["hits"]["hits"]:
-                await send_response(ctx, "RADIOMAP_NO_STATION_FOUND", search=station)
+                await send(ctx, code="RADIOMAP_NO_STATION_FOUND", search=station)
                 return
 
             for station_data in data["hits"]["hits"]:
@@ -472,9 +440,9 @@ class MusicCommands(commands.Cog):
                 await self._execute_play(ctx, stream_url, play_next)
                 return
 
-            await send_response(ctx, "RADIOMAP_NO_STATION_FOUND", search=station)
+            await send(ctx, code="RADIOMAP_NO_STATION_FOUND", search=station)
         except (KeyError, ValueError):
-            await send_response(ctx, "RADIOMAP_ERROR")
+            await send(ctx, code="RADIOMAP_ERROR")
 
     @music.command(name="skip", description="Skip playing song.")
     @app_commands.guild_only()
@@ -495,8 +463,7 @@ class MusicCommands(commands.Cog):
         except QueueEmpty:
             pass
 
-        player.should_respond = False
-        await send_embed(ctx, make_embed("⏭️ Track skipped."), ephemeral=False)
+        await send(ctx, embed=make_embed("⏭️ Track skipped."), ephemeral=False)
 
     @music.command(name="skip-to", description="Skips to selected song in queue.")
     @app_commands.describe(
@@ -523,7 +490,7 @@ class MusicCommands(commands.Cog):
 
         track_pos = find_track(player, to_find)
         if not track_pos:
-            await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
+            await send(ctx, code="NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
             return
 
         track = player.queue[track_pos - 1]
@@ -536,11 +503,9 @@ class MusicCommands(commands.Cog):
         except QueueEmpty:
             pass
 
-        player.should_respond = False
-
-        await send_embed(
+        await send(
             ctx,
-            make_embed(f"⏭️ Skipped to [{track.title}]({track.uri})"),
+            embed=make_embed(f"⏭️ Skipped to [{track.title}]({track.uri})"),
             ephemeral=False,
         )
 
@@ -557,14 +522,14 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
         track_pos = find_track(player, to_find)
         if track_pos is None:
-            await send_response(ctx, "NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
+            await send(ctx, code="NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
             return
 
         track = player.queue[track_pos - 1]
         self._queue_remove_at(player, track_pos - 1)
-        await send_response(
+        await send(
             ctx,
-            "QUEUE_TRACK_REMOVED",
+            code="QUEUE_TRACK_REMOVED",
             ephemeral=False,
             title=track.title,
             uri=track.uri,
@@ -577,7 +542,7 @@ class MusicCommands(commands.Cog):
     async def shuffle(self, ctx: discord.Interaction) -> None:
         player: sonolink.Player = ctx.guild.voice_client
         player.queue.shuffle()
-        await send_response(ctx, "QUEUE_SHUFFLED", ephemeral=False)
+        await send(ctx, code="QUEUE_SHUFFLED", ephemeral=False)
 
     @music.command(
         name="loop-queue",
@@ -589,18 +554,18 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if len(player.queue) == 0 and player.queue.mode != sonolink.QueueMode.LOOP_ALL:
-            await send_response(ctx, "NO_TRACKS_IN_QUEUE")
+            await send(ctx, code="NO_TRACKS_IN_QUEUE")
             return
 
         if player.queue.mode == sonolink.QueueMode.LOOP_ALL:
             await player.update(queue_mode=sonolink.QueueMode.NORMAL)
-            await send_response(ctx, "QUEUE_LOOP_DISABLED", ephemeral=False)
+            await send(ctx, code="QUEUE_LOOP_DISABLED", ephemeral=False)
             return
 
         await player.update(queue_mode=sonolink.QueueMode.LOOP_ALL)
-        await send_response(
+        await send(
             ctx,
-            "QUEUE_LOOP_ENABLED",
+            code="QUEUE_LOOP_ENABLED",
             ephemeral=False,
             count=len(player.queue),
         )
@@ -619,13 +584,13 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if player.paused:
-            await send_embed(ctx, make_embed(":x: Track is already paused."))
+            await send(ctx, embed=make_embed(":x: Track is already paused."))
             return
 
         await player.pause()
-        await send_embed(
+        await send(
             ctx,
-            make_embed("⏸️ Track paused."),
+            embed=make_embed("⏸️ Track paused."),
             ephemeral=False,
             delete_after=10,
         )
@@ -643,9 +608,9 @@ class MusicCommands(commands.Cog):
         """
         player: sonolink.Player = ctx.guild.voice_client
         await player.resume()
-        await send_embed(
+        await send(
             ctx,
-            make_embed("▶️ Track resumed."),
+            embed=make_embed("▶️ Track resumed."),
             ephemeral=False,
             delete_after=10,
         )
@@ -675,9 +640,9 @@ class MusicCommands(commands.Cog):
 
         # Check if position is within track duration
         if player.current and position_ms > player.current.length:
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(
+                embed=make_embed(
                     f":x: Invalid seek position. Track duration is "
                     f"{int(player.current.length / 1000)} seconds.",
                     color=COLOR_RED,
@@ -687,9 +652,9 @@ class MusicCommands(commands.Cog):
             return
 
         await player.seek(position_ms)
-        await send_embed(
+        await send(
             ctx,
-            make_embed(f"⏩ Seeked to {seconds} seconds."),
+            embed=make_embed(f"⏩ Seeked to {seconds} seconds."),
             ephemeral=False,
         )
 
@@ -709,16 +674,16 @@ class MusicCommands(commands.Cog):
         try:
             track = await player.previous()
         except sonolink.HistoryEmpty:
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(":x: No previous track in history."),
+                embed=make_embed(":x: No previous track in history."),
                 ephemeral=False,
             )
             return
 
-        await send_embed(
+        await send(
             ctx,
-            make_embed(f"⏮️ Playing previous track [{track.title}]({track.uri})"),
+            embed=make_embed(f"⏮️ Playing previous track [{track.title}]({track.uri})"),
             ephemeral=False,
         )
 
@@ -733,13 +698,13 @@ class MusicCommands(commands.Cog):
 
         if player.queue.mode == sonolink.QueueMode.LOOP:
             await player.update(queue_mode=sonolink.QueueMode.NORMAL)
-            await send_response(ctx, "TRACK_LOOP_DISABLED", ephemeral=False)
+            await send(ctx, code="TRACK_LOOP_DISABLED", ephemeral=False)
             return
 
         await player.update(queue_mode=sonolink.QueueMode.LOOP)
-        await send_response(
+        await send(
             ctx,
-            "TRACK_LOOP_ENABLED",
+            code="TRACK_LOOP_ENABLED",
             ephemeral=False,
             title=player.current.title,
             uri=player.current.uri,
@@ -752,7 +717,7 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
         player.queue.clear()
         player.queue.clear_history()
-        await send_response(ctx, "QUEUE_CLEARED", ephemeral=False)
+        await send(ctx, code="QUEUE_CLEARED", ephemeral=False)
 
     @music.command(name="volume", description="Sets audio volume.")
     @app_commands.describe(
@@ -768,9 +733,9 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if volume is None:
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(f"🔊 Current volume: {player.volume}"),
+                embed=make_embed(f"🔊 Current volume: {player.volume}"),
             )
             return
 
@@ -781,9 +746,9 @@ class MusicCommands(commands.Cog):
         )
         self._bot.guild_data[ctx.guild.id] = guild_data
         await player.set_volume(volume)
-        await send_embed(
+        await send(
             ctx,
-            make_embed(f"🔊 Volume set to {volume}"),
+            embed=make_embed(f"🔊 Volume set to {volume}"),
             ephemeral=False,
         )
 
@@ -800,9 +765,9 @@ class MusicCommands(commands.Cog):
         filters = sl_models.Filters(timescale=sl_models.Timescale(speed=multiplier))
 
         await player.set_filters(filters)
-        await send_embed(
+        await send(
             ctx,
-            make_embed(f"⏩ Speed set to {multiplier}x"),
+            embed=make_embed(f"⏩ Speed set to {multiplier}x"),
             ephemeral=False,
         )
 
@@ -813,7 +778,7 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
         filters = sl_models.Filters()
         await player.set_filters(filters)
-        await send_embed(ctx, make_embed("🔇 Effects cleared."), ephemeral=False)
+        await send(ctx, embed=make_embed("🔇 Effects cleared."), ephemeral=False)
 
     @music.command(name="queue", description="Shows the current queue")
     @app_commands.guild_only()
@@ -824,17 +789,17 @@ class MusicCommands(commands.Cog):
         pages = self._build_queue_embeds(ctx, player)
 
         if len(pages) == 1:
-            await send_interaction(ctx, embed=pages[0])
+            await send(ctx, embed=pages[0])
         else:
             view = EmbedPaginator(pages)
-            await send_interaction(ctx, embed=pages[0], view=view)
+            await send(ctx, embed=pages[0], view=view)
 
     @music.command(name="playing", description="What track is currently playing")
     @app_commands.guild_only()
     @is_playing()
     async def playing_command(self, ctx: discord.Interaction) -> None:
         player: sonolink.Player = ctx.guild.voice_client
-        await send_interaction(ctx, embed=self._build_playing_embed(player))
+        await send(ctx, embed=self._build_playing_embed(player))
 
     @music.command(name="leave", description="Leaves voice channel.")
     @app_commands.guild_only()
@@ -850,12 +815,12 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if player.channel.id != ctx.user.voice.channel.id:
-            await send_response(ctx, "NOT_IN_SAME_VOICE_CHANNEL")
+            await send(ctx, code="NOT_IN_SAME_VOICE_CHANNEL")
             return
 
-        await send_embed(
+        await send(
             ctx,
-            make_embed(f"Left <#{player.channel.id}>"),
+            embed=make_embed(f"Left <#{player.channel.id}>"),
             ephemeral=False,
         )
         player.cleanup()
@@ -892,9 +857,9 @@ class MusicCommands(commands.Cog):
         )
 
         if not mode:
-            await send_embed(
+            await send(
                 ctx,
-                make_embed(f"Autoplay mode: `{current_autoplay_mode}`"),
+                embed=make_embed(f"Autoplay mode: `{current_autoplay_mode}`"),
                 ephemeral=False,
             )
             return
@@ -918,9 +883,9 @@ class MusicCommands(commands.Cog):
         )
         self._bot.guild_data[ctx.guild.id] = guild_data
 
-        await send_embed(
+        await send(
             ctx,
-            make_embed(f"Autoplay mode changed to `{mode}`"),
+            embed=make_embed(f"Autoplay mode changed to `{mode}`"),
             ephemeral=False,
         )
 
@@ -956,19 +921,19 @@ class MusicCommands(commands.Cog):
                 description="Invalid channel ID or the channel is not a voice channel.",
                 color=COLOR_RED,
             )
-            await send_interaction(ctx, embed=embed, ephemeral=True)
+            await send(ctx, embed=embed, ephemeral=True)
             return
 
         if not channel.guild.voice_client:
             try:
                 await self._connect_voice_channel(channel)
             except (discord.Forbidden, discord.ClientException):
-                await send_response(ctx, "NO_PERMISSIONS")
+                await send(ctx, code="NO_PERMISSIONS")
                 return
             except Exception:
-                await send_embed(
+                await send(
                     ctx,
-                    make_embed(
+                    embed=make_embed(
                         ":warning: Node is unresponsive, try `/node reconnect`.",
                         color=COLOR_YELLOW,
                     ),
@@ -978,7 +943,6 @@ class MusicCommands(commands.Cog):
 
         player: sonolink.Player = channel.guild.voice_client
         player.text_channel = ctx.channel
-        player.should_respond = True
         player.is_troll = True
 
         search_result = await self._bot.sonolink_client.search_track(search)
@@ -987,13 +951,13 @@ class MusicCommands(commands.Cog):
             or search_result.is_empty()
             or not search_result.result
         ):
-            await send_response(ctx, "NO_TRACKS_FOUND")
+            await send(ctx, code="NO_TRACKS_FOUND")
             return
 
         result = search_result.result
         if isinstance(result, sl_models.Playlist):
             if len(result) == 0:
-                await send_response(ctx, "NO_TRACKS_FOUND")
+                await send(ctx, code="NO_TRACKS_FOUND")
                 return
             track = result[0]
         elif isinstance(result, list):
@@ -1007,7 +971,7 @@ class MusicCommands(commands.Cog):
             f" and started playing `{track.title}`",
             color=COLOR_BLUE,
         )
-        await send_interaction(ctx, embed=embed, ephemeral=True)
+        await send(ctx, embed=embed, ephemeral=True)
 
         if player.current:
             self._queue_insert_front(player, track)
@@ -1059,8 +1023,6 @@ class MusicCommands(commands.Cog):
             spotify_search = False
 
         player: sonolink.Player = ctx.guild.voice_client
-        # If nothing is found
-        player.should_respond = True
 
         for i in range(2):
             try:
@@ -1087,14 +1049,13 @@ class MusicCommands(commands.Cog):
                         return tracks
 
             except asyncio.TimeoutError:
-                await send_embed(
+                await send(
                     ctx,
-                    make_embed(
-                        ":warning: Node timed out, switching to another node.",
+                    embed=make_embed(
+                        ":warning: Node timed out finding tracks, switching to another node.",
                         color=COLOR_YELLOW,
                     ),
                     ephemeral=False,
-                    respond=i == 0,
                 )
                 await switch_node(
                     bot=self._bot,
@@ -1102,38 +1063,33 @@ class MusicCommands(commands.Cog):
                     play_after=True,
                     send_failure_message=False,
                 )
-                player.should_respond = False
                 continue
 
             except Exception as e:
-                await send_embed(
+                await send(
                     ctx,
-                    make_embed(
+                    embed=make_embed(
                         ":x: Failed to load tracks. You likely entered a wrong link or "
                         "this Lavalink server lacks necessary plugins.\n"
-                        "To fix this, use command `/node reconnect`",
+                        "Try using command `/node reconnect`",
                         color=COLOR_RED,
                     ),
                     ephemeral=False,
-                    respond=i == 0,
                 )
-                player.should_respond = False
                 logging.error("[sonolink] Error searching for tracks: %s", e)
                 return None
 
-        await send_response(
+        await send(
             ctx,
-            "NO_TRACKS_FOUND",
+            code="NO_TRACKS_FOUND",
             ephemeral=False,
-            respond=player.should_respond,
             search=search,
         )
-        player.should_respond = False
         return None
 
     async def _join_channel(self, ctx: discord.Interaction) -> bool:
         if not ctx.user.voice or not ctx.user.voice.channel:
-            await send_response(ctx, "NO_VOICE_CHANNEL")
+            await send(ctx, code="NO_VOICE_CHANNEL")
             return False
 
         channel = ctx.user.voice.channel
@@ -1158,7 +1114,7 @@ class MusicCommands(commands.Cog):
                     exclude_nodes=list(failed_uris),
                 )
             if not node:
-                await send_response(ctx, "NODE_NOT_FOUND", ephemeral=False)
+                await send(ctx, code="NODE_NOT_FOUND", ephemeral=False)
                 return False
 
             try:
@@ -1167,7 +1123,7 @@ class MusicCommands(commands.Cog):
                 return True
 
             except (discord.Forbidden, discord.ClientException):
-                await send_response(ctx, "NO_PERMISSIONS", ephemeral=False)
+                await send(ctx, code="NO_PERMISSIONS", ephemeral=False)
                 return False
 
             except Exception as e:
@@ -1184,9 +1140,9 @@ class MusicCommands(commands.Cog):
                     e,
                 )
 
-        await send_embed(
+        await send(
             ctx,
-            make_embed(
+            embed=make_embed(
                 ":x: Failed to connect to voice channel, try again later.",
                 color=COLOR_RED,
             ),
@@ -1236,8 +1192,6 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         player.text_channel = ctx.channel
-        player.should_respond = False
-        player.just_joined = True
         player.is_troll = False
 
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
@@ -1257,10 +1211,9 @@ class MusicCommands(commands.Cog):
             await player.set_volume(volume)
 
         # Autoplay mode is already set at player creation time from guild data
-
-        await send_embed(
+        await send(
             ctx,
-            make_embed(
+            embed=make_embed(
                 f"Joined <#{player.channel.id}>, use <#{player.text_channel.id}> to control music."
             ),
             ephemeral=False,
