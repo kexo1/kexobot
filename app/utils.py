@@ -15,6 +15,7 @@ import sonolink.models as sl_models
 from sonolink.models import AutoPlaySettings, CacheSettings, InactivitySettings
 
 from app.config.colors import COLOR_GREEN, COLOR_RED
+from app.config.discord import ICON_YOUTUBE
 from app.config.music import MUSIC_TO_REMOVE
 from app.config.reddit import SHITPOST_SUBREDDITS_DEFAULT
 
@@ -130,6 +131,57 @@ def fix_audio_title(track: sl_models.Playable) -> str:
     for char in MUSIC_TO_REMOVE:
         title = title.replace(char, "")
     return title.strip()
+
+
+def make_now_playing_embed(
+    track: sl_models.Playable, bot: "KexoBotClient"
+) -> discord.Embed:
+    """Create a 'Now playing' embed for a given track.
+
+    Parameters
+    ----------
+    track: :class:`sonolink.Playable`
+        The track to create the embed for.
+    bot: :class:`KexoBotClient`
+        The bot instance.
+
+    Returns
+    -------
+    :class:`discord.Embed`
+        The embed to send.
+    """
+    embed = discord.Embed(
+        color=COLOR_GREEN,
+        title="Now playing",
+        description=f"[**{fix_audio_title(track)}**]({track.uri})",
+    )
+
+    requester_name = None
+    requester_avatar = None
+
+    if track.data.user_data:
+        requester_name = track.data.user_data.get("requester_name")
+        requester_avatar = track.data.user_data.get("requester_avatar")
+
+    if not requester_name:
+        cached = bot.state.get_track_requester(track.encoded)
+        if cached:
+            requester_name = cached.get("name")
+            requester_avatar = cached.get("avatar")
+
+    if requester_name:
+        embed.set_footer(
+            text=f"Requested by {requester_name}",
+            icon_url=requester_avatar,
+        )
+    else:
+        embed.set_footer(
+            text="YouTube Autoplay",
+            icon_url=ICON_YOUTUBE,
+        )
+
+    embed.set_thumbnail(url=track.artwork)
+    return embed
 
 
 def is_older_than(hours: int, custom_datetime: datetime) -> bool:

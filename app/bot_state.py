@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import sonolink
 
+from app.config.music import TRACK_REQUESTER_MAXSIZE
+
 if TYPE_CHECKING:
     from app.main import KexoBotClient
 
@@ -194,6 +196,8 @@ class BotState:
     def cache_track_requester(self, track_encoded: str, name: str, avatar: str) -> None:
         """Cache requester metadata by encoded track ID.
 
+        Evicts the oldest entries when the cache exceeds ``TRACK_REQUESTER_MAXSIZE``.
+
         Parameters
         ----------
         track_encoded: str
@@ -203,7 +207,18 @@ class BotState:
         avatar: str
             Requesting user's avatar URL. May be empty string.
         """
-        self.bot.track_requesters[track_encoded] = {"name": name, "avatar": avatar}
+        requesters = self.bot.track_requesters
+        if (
+            track_encoded not in requesters
+            and len(requesters) >= TRACK_REQUESTER_MAXSIZE
+        ):
+            # Evict the oldest entry (first inserted key)
+            try:
+                oldest_key = next(iter(requesters))
+                del requesters[oldest_key]
+            except StopIteration:
+                pass
+        requesters[track_encoded] = {"name": name, "avatar": avatar}
 
     def get_track_requester(self, track_encoded: str) -> dict[str, str] | None:
         """Get cached requester metadata for encoded track.

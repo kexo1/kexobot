@@ -1,4 +1,3 @@
-import logging
 from typing import Any, Callable
 
 import discord
@@ -164,7 +163,9 @@ async def send(
                 message = await target.followup.send(**interaction_payload, wait=True)
             except discord.NotFound:
                 if not ephemeral and target.channel:
-                    channel_payload = {k: v for k, v in payload.items() if k != "ephemeral"}
+                    channel_payload = {
+                        k: v for k, v in payload.items() if k != "ephemeral"
+                    }
                     try:
                         message = await target.channel.send(**channel_payload)
                     except discord.HTTPException:

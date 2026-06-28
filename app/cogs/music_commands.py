@@ -14,7 +14,7 @@ from sonolink import models as sl_models
 from sonolink.gateway.errors import QueueEmpty
 from sonolink.models import AutoPlaySettings, HistorySettings
 
-from app.config.colors import COLOR_BLUE, COLOR_GREEN, COLOR_RED, COLOR_YELLOW
+from app.config.colors import COLOR_BLUE, COLOR_RED, COLOR_YELLOW
 from app.config.discord import ICON_YOUTUBE
 from app.config.music import (
     API_RADIOGARDEN_LISTEN,
@@ -31,6 +31,7 @@ from app.utils import (
     fix_audio_title,
     get_guild_data,
     make_http_request,
+    make_now_playing_embed,
     switch_node,
 )
 
@@ -44,10 +45,6 @@ def get_search_prefix(query: str) -> str | None:
         if pattern.search(query):
             return prefix
     return None
-
-
-async def is_owner(interaction: discord.Interaction) -> bool:
-    return await interaction.client.is_owner(interaction.user)
 
 
 def set_track_requester(
@@ -145,8 +142,7 @@ async def _handle_playlist(
         color=COLOR_BLUE,
     )
 
-    await send(ctx.channel, embed=embed)
-
+    await send(ctx, embed=embed)
     return first_track
 
 
@@ -173,27 +169,12 @@ async def should_move_to_channel(ctx: discord.Interaction) -> bool:
     return True
 
 
-def queue_embed(track: sl_models.Playable) -> discord.Embed:
+def make_added_to_queue_embed(track: sl_models.Playable) -> discord.Embed:
     return discord.Embed(
         title="",
         description=f"**Added to queue:\n [{fix_audio_title(track)}]({track.uri})**",
         color=COLOR_BLUE,
     )
-
-
-def playing_embed(track: sl_models.Playable, bot: "KexoBotClient") -> discord.Embed:
-    author_pfp = get_track_requester_avatar(track, bot)
-
-    embed = discord.Embed(
-        title="Now playing",
-        description=f"[**{fix_audio_title(track)}**]({track.uri})",
-        color=COLOR_GREEN,
-    )
-    embed.set_footer(
-        text=f"Requested by {get_track_requester_name(track, bot)}", icon_url=author_pfp
-    )
-    embed.set_thumbnail(url=track.artwork)
-    return embed
 
 
 class MusicCommands(commands.Cog):
@@ -274,11 +255,11 @@ class MusicCommands(commands.Cog):
             else:
                 player.queue.put(track)
 
-            await send(ctx, embed=queue_embed(track))
+            await send(ctx, embed=make_added_to_queue_embed(track))
             return
 
         player._now_playing_sent = True  # Prevent listener from duplicating
-        await send(ctx, embed=playing_embed(track, self._bot))
+        await send(ctx, embed=make_now_playing_embed(track, self._bot))
         await self._play_track(ctx, track)
 
     @music.command(name="play", description="Plays song.")
@@ -889,96 +870,6 @@ class MusicCommands(commands.Cog):
             ephemeral=False,
         )
 
-    @music.command(
-        name="play_troll",
-        description="Play music bot into typed channel.",
-    )
-    @app_commands.describe(
-        channel_id="Voice channel ID where troll playback should start.",
-        search="Song query or URL to play in that channel.",
-    )
-    @app_commands.checks.check(is_owner)
-    async def play_troll(
-        self,
-        ctx: discord.Interaction,
-        channel_id: Range[int, 1],
-        search: str,
-    ) -> None:
-        """Play a troll music bot into the specified channel.
-
-        Parameters:
-        -----------
-        ctx: :class:`discord.Interaction`
-            The context of the command.
-        channel_id: int
-            The ID of the channel to play music in.
-        """
-
-        channel = self._bot.get_channel(channel_id)
-        if not channel or not isinstance(channel, discord.VoiceChannel):
-            embed = discord.Embed(
-                title="",
-                description="Invalid channel ID or the channel is not a voice channel.",
-                color=COLOR_RED,
-            )
-            await send(ctx, embed=embed, ephemeral=True)
-            return
-
-        if not channel.guild.voice_client:
-            try:
-                await self._connect_voice_channel(channel)
-            except (discord.Forbidden, discord.ClientException):
-                await send(ctx, code="NO_PERMISSIONS")
-                return
-            except Exception:
-                await send(
-                    ctx,
-                    embed=make_embed(
-                        ":warning: Node is unresponsive, try `/node reconnect`.",
-                        color=COLOR_YELLOW,
-                    ),
-                    ephemeral=False,
-                )
-                return
-
-        player: sonolink.Player = channel.guild.voice_client
-        player.text_channel = ctx.channel
-        player.is_troll = True
-
-        search_result = await self._bot.sonolink_client.search_track(search)
-        if (
-            search_result.is_error()
-            or search_result.is_empty()
-            or not search_result.result
-        ):
-            await send(ctx, code="NO_TRACKS_FOUND")
-            return
-
-        result = search_result.result
-        if isinstance(result, sl_models.Playlist):
-            if len(result) == 0:
-                await send(ctx, code="NO_TRACKS_FOUND")
-                return
-            track = result[0]
-        elif isinstance(result, list):
-            track = result[0]
-        else:
-            track = result
-
-        embed = discord.Embed(
-            title="",
-            description=f"Joined the channel `{channel.name}`"
-            f" and started playing `{track.title}`",
-            color=COLOR_BLUE,
-        )
-        await send(ctx, embed=embed, ephemeral=True)
-
-        if player.current:
-            self._queue_insert_front(player, track)
-        else:
-            playing_track = await player.play(track)
-            set_track_requester(playing_track, ctx.user, self._bot)
-
     # ----------------------- Helper functions ------------------------ #
     def _queue_insert_front(
         self, player: sonolink.Player, track: sl_models.Playable
@@ -1190,9 +1081,7 @@ class MusicCommands(commands.Cog):
 
     async def _prepare_sonolink(self, ctx: discord.Interaction) -> None:
         player: sonolink.Player = ctx.guild.voice_client
-
         player.text_channel = ctx.channel
-        player.is_troll = False
 
         guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
         volume = guild_data["music"]["volume"]

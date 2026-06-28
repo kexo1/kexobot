@@ -17,10 +17,9 @@ from sonolink.gateway import (
 )
 
 from app.config.colors import COLOR_YELLOW
-from app.config.discord import ICON_YOUTUBE
 from app.config.music import MUSIC_TIPS
 from app.response_handler import make_embed, send
-from app.utils import fix_audio_title, switch_node
+from app.utils import make_now_playing_embed, switch_node
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -28,47 +27,6 @@ if TYPE_CHECKING:
 
 def is_bot_node_connected(bot: "KexoBotClient") -> bool:
     return bool(getattr(bot, "node", None))
-
-
-def resolve_requester(
-    bot: "KexoBotClient", track: sl_models.Playable
-) -> tuple[str | None, str | None]:
-    requester_name = None
-    requester_avatar = None
-    if track.data.user_data:
-        requester_name = track.data.user_data.get("requester_name")
-        requester_avatar = track.data.user_data.get("requester_avatar")
-    if requester_name:
-        return requester_name, requester_avatar
-
-    cached = bot.state.get_track_requester(track.encoded)
-    if cached:
-        cached_avatar = cached.get("avatar") or None
-        return cached.get("name"), cached_avatar
-
-    return None, None
-
-
-def playing_embed(bot: "KexoBotClient", payload: TrackStartEvent) -> discord.Embed:
-    embed = discord.Embed(
-        color=discord.Colour.green(),
-        title="Now playing",
-        description=f"[**{fix_audio_title(payload.track)}**]({payload.track.uri})",
-    )
-    track = payload.track
-    requester_name, requester_avatar = resolve_requester(bot, track)
-    if requester_name:
-        embed.set_footer(
-            text=f"Requested by {requester_name}",
-            icon_url=requester_avatar,
-        )
-    else:
-        embed.set_footer(
-            text="YouTube Autoplay",
-            icon_url=ICON_YOUTUBE,
-        )
-    embed.set_thumbnail(url=payload.track.artwork)
-    return embed
 
 
 def is_same_track(track: sl_models.Playable, payload_track: sl_models.Playable) -> bool:
@@ -185,7 +143,10 @@ class Listeners(commands.Cog):
         if getattr(player, "_now_playing_sent", False):
             player._now_playing_sent = False
         else:
-            await send(player.text_channel, embed=playing_embed(self._bot, payload))
+            await send(
+                player.text_channel,
+                embed=make_now_playing_embed(payload.track, self._bot, player=player),
+            )
 
         if player.autoplay != sonolink.AutoPlayMode.ENABLED:
             history_count = len(player.queue.history)
@@ -353,7 +314,9 @@ class Listeners(commands.Cog):
             try:
                 await send(
                     player.text_channel,
-                    embed=make_embed(f"Left <#{player.channel.id}>, no users in channel."),
+                    embed=make_embed(
+                        f"Left <#{player.channel.id}>, no users in channel."
+                    ),
                 )
             except AttributeError:
                 pass
