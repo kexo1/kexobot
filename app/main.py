@@ -16,7 +16,6 @@ import sonolink
 from discord import app_commands
 from discord.ext import commands, tasks
 from pymongo import AsyncMongoClient
-from sonolink.models import CacheSettings, InactivitySettings
 
 from app.bot_state import BotState
 from app.classes.content_monitor import ContentMonitor
@@ -56,12 +55,7 @@ from app.state_types import (
     TempUserData,
     UserData,
 )
-from app.utils import (
-    generate_temp_guild_data,
-    get_url_response_time,
-    is_older_than,
-    make_http_request,
-)
+from app.utils import get_url_response_time, is_older_than, make_http_request
 
 
 class KexoBotClient(commands.Bot):
@@ -117,21 +111,6 @@ intents.members = False
 bot = KexoBotClient(command_prefix=commands.when_mentioned, intents=intents)
 
 
-# Doesnt work with utils idk why
-def build_node(uri: str, password: str) -> sonolink.Node:
-    return bot.sonolink_client.create_node(
-        uri=uri,
-        password=password,
-        retries=1,
-        resume_timeout=60,
-        inactivity_settings=InactivitySettings(
-            timeout=600,
-            mode=sonolink.InactivityMode.ALL_BOTS,
-        ),
-        cache_settings=CacheSettings(enabled=True, max_items=1000),
-    )
-
-
 def load_humor_api_tokens() -> None:
     """Load the humor API tokens."""
     bot.humor_api_tokens = {token: {"exhausted": False} for token in ENV_HUMOR_KEY}
@@ -148,7 +127,7 @@ def clear_temp_reddit_data() -> None:
 
 def clear_temp_guild_data() -> None:
     """Clear the temporary guild data."""
-    bot.state.reset_temp_guild_data(generate_temp_guild_data)
+    bot.state.reset_temp_guild_data(bot.state.generate_temp_guild_data)
 
 
 def clear_cached_jokes() -> None:
@@ -402,7 +381,7 @@ class KexoBot:
                 is_connected = await bot.state.node_health_check(existing_node)
                 node = existing_node
             else:
-                node = build_node(node_uri, node_info["password"])
+                node = bot.state.build_node(node_uri, node_info["password"])
                 is_connected = await bot.state.node_attempt_connection(node)
 
             if is_connected:

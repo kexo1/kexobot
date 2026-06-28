@@ -3,26 +3,15 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
-import asyncpraw
-import asyncpraw.models
-import asyncprawcore
 import discord
 import httpx
 import sonolink
 import sonolink.models as sl_models
-from sonolink.models import AutoPlaySettings, CacheSettings, InactivitySettings
 
-from app.config.colors import COLOR_GREEN, COLOR_RED
-from app.config.discord import ICON_YOUTUBE
 from app.config.music import MUSIC_TO_REMOVE
 from app.config.reddit import SHITPOST_SUBREDDITS_DEFAULT
-
-if TYPE_CHECKING:
-    from app.main import KexoBotClient
-
-from app.response_handler import defer_interaction
 
 
 def load_text_file(name: str) -> list[str]:
@@ -76,20 +65,6 @@ def get_url_response_time(url: str) -> int:
         return 9999
 
 
-def build_node(bot: "KexoBotClient", uri: str, password: str) -> sonolink.Node:
-    return bot.sonolink_client.create_node(
-        uri=uri,
-        password=password,
-        retries=1,
-        resume_timeout=60,
-        inactivity_settings=InactivitySettings(
-            timeout=600,
-            mode=sonolink.InactivityMode.ALL_BOTS,
-        ),
-        cache_settings=CacheSettings(enabled=True, max_items=100),
-    )
-
-
 def strip_text(text: str, to_strip: tuple[str, ...]) -> str:
     """Strip unwanted characters from a string.
 
@@ -131,57 +106,6 @@ def fix_audio_title(track: sl_models.Playable) -> str:
     for char in MUSIC_TO_REMOVE:
         title = title.replace(char, "")
     return title.strip()
-
-
-def make_now_playing_embed(
-    track: sl_models.Playable, bot: "KexoBotClient"
-) -> discord.Embed:
-    """Create a 'Now playing' embed for a given track.
-
-    Parameters
-    ----------
-    track: :class:`sonolink.Playable`
-        The track to create the embed for.
-    bot: :class:`KexoBotClient`
-        The bot instance.
-
-    Returns
-    -------
-    :class:`discord.Embed`
-        The embed to send.
-    """
-    embed = discord.Embed(
-        color=COLOR_GREEN,
-        title="Now playing",
-        description=f"[**{fix_audio_title(track)}**]({track.uri})",
-    )
-
-    requester_name = None
-    requester_avatar = None
-
-    if track.data.user_data:
-        requester_name = track.data.user_data.get("requester_name")
-        requester_avatar = track.data.user_data.get("requester_avatar")
-
-    if not requester_name:
-        cached = bot.state.get_track_requester(track.encoded)
-        if cached:
-            requester_name = cached.get("name")
-            requester_avatar = cached.get("avatar")
-
-    if requester_name:
-        embed.set_footer(
-            text=f"Requested by {requester_name}",
-            icon_url=requester_avatar,
-        )
-    else:
-        embed.set_footer(
-            text="YouTube Autoplay",
-            icon_url=ICON_YOUTUBE,
-        )
-
-    embed.set_thumbnail(url=track.artwork)
-    return embed
 
 
 def is_older_than(hours: int, custom_datetime: datetime) -> bool:
@@ -240,137 +164,6 @@ def find_track(player: sonolink.Player, to_find: str) -> int | None:
     return to_find
 
 
-async def switch_node(
-    bot: "KexoBotClient",
-    player: sonolink.Player,
-    play_after: bool = False,
-    send_success_message: bool = True,
-    send_failure_message: bool = True,
-) -> sonolink.Node | None:
-    """
-    Attempt to switch to a new node for audio playback.
-
-    Parameters:
-    ----------
-    bot: :class:`discord.Bot`
-        The discord bot instance.
-    player: :class:`sonolink.Player`
-        The sonolink Player instance to switch the node for.
-    play_after: bool
-        Whether to play the current track after switching nodes.
-    send_success_message: bool
-        Whether to send a success message in the text channel upon successful node switch.
-    send_failure_message: bool
-        Whether to send a failure message in the text channel if no suitable node is found.
-
-    Returns
-    -------
-    :class:`sonolink.Node` | None
-        The new sonolink.Node instance if successful, None otherwise.
-    """
-    guild_id = player.guild.id
-    switching_map = bot.node_is_switching
-    if switching_map.get(guild_id):
-        return None
-
-    # Set switching to True for guild
-    switching_map[guild_id] = True
-    excluded_nodes = set()
-    excluded_nodes.add(player.node.uri) if player.node else None
-
-    original_autoplay_mode = player.autoplay
-    await player.update(
-        autoplay_settings=AutoPlaySettings(
-            mode=sonolink.AutoPlayMode.DISABLED,
-        )
-    )
-
-    def _resume_track() -> sonolink.models.Playable | None:
-        return getattr(player, "temp_current", None) or player.current
-
-    async def _try_move_and_resume(target_node: sonolink.Node) -> bool:
-        try:
-            # Stop the inactivity timer on previous node to prevent it from disconnecting
-            player._stop_inactivity_timer()
-            await player.move_to(target_node)
-            track = _resume_track()
-            # Only when we didn't even get to play the track, moving won't play it, so we have to do it manually here.
-            if play_after and track:
-                await player.play(track)
-
-            # Check for inactivity after moving to the new node
-            player._check_inactivity()
-            return True
-        except Exception:
-            bot.state.change_node_score(target_node.uri, -5)
-            return False
-
-    async def _playback_probe_failed(target_node: sonolink.Node) -> bool:
-        # if not play_after:
-        #    return False
-
-        # Test only if we were playing something before
-        track = _resume_track()
-        if not track:
-            return False
-
-        track_failed_event = asyncio.Event()
-        bot.state.set_track_exception_probe(guild_id, track, track_failed_event)
-        try:
-            await asyncio.wait_for(track_failed_event.wait(), timeout=3)
-            bot.state.change_node_score(target_node.uri, -5)
-            return True
-        except asyncio.TimeoutError:
-            return False
-        finally:
-            bot.state.clear_track_exception_probe(guild_id)
-
-    try:
-        for attempt in range(10):
-            node: sonolink.Node | None = await bot.connect_node(
-                exclude_nodes=excluded_nodes
-            )
-            excluded_nodes.add(node.uri) if node else None
-
-            if not node:
-                continue
-
-            is_moved = await _try_move_and_resume(node)
-            if not is_moved:
-                continue
-
-            if await _playback_probe_failed(node):
-                continue
-
-            logging.info(f"[Sonolink] {attempt + 1}. Node switched ({node.uri})")
-            if send_success_message:
-                embed = discord.Embed(
-                    title="",
-                    description=f"**:white_check_mark: Successfully connected to `{node.uri}`**",
-                    color=COLOR_GREEN,
-                )
-                await player.text_channel.send(embed=embed)
-
-            return node
-
-        if send_failure_message:
-            embed = discord.Embed(
-                title="",
-                description=":x: Failed to find node to play requested track.",
-                color=COLOR_RED,
-            )
-            await player.text_channel.send(embed=embed)
-
-        return None
-    finally:
-        await player.update(
-            autoplay_settings=AutoPlaySettings(
-                mode=original_autoplay_mode,
-            )
-        )
-        switching_map[guild_id] = False
-
-
 def generate_temp_guild_data() -> dict:
     """Generate temporary guild data for the bot.
 
@@ -401,61 +194,6 @@ def generate_guild_data() -> dict:
             "autoplay_mode": 1,
             "volume": 100,
         },
-    }
-
-
-async def generate_temp_user_data(bot: "KexoBotClient", user_id: int) -> dict:
-    """Generate temporary user data for the bot.
-
-    Parameters
-    ----------
-    bot: :class:`discord.Bot`
-        The discord bot instance.
-    user_id: int
-        The ID of the user to generate temporary data for.
-
-    Returns
-    -------
-    dict
-        A dictionary containing temporary user data.
-    """
-    multireddit: asyncpraw.models.Multireddit = await bot.reddit_agent.multireddit(
-        name=str(user_id), redditor="KexoBOT"
-    )
-    for attempt in range(3):
-        try:
-            await multireddit.load()
-            break
-        except asyncprawcore.exceptions.NotFound:
-            logging.warning(
-                f"[Reddit] Multireddit for user {user_id} not found. Attempting to create it... (Attempt {attempt + 1}/3)"
-            )
-            await asyncio.sleep(attempt + 1)
-
-        logging.error(
-            f"[Reddit] Failed to load multireddit for user {user_id} after 3 attempts."
-        )
-        return {}
-
-    for subreddit in multireddit.subreddits:
-        try:
-            # For whatever reason, subreddits are already added to the multireddit
-            await multireddit.remove(subreddit)
-        except asyncpraw.exceptions.RedditAPIException:
-            pass
-
-    for subreddit in bot.user_data[user_id]["reddit"]["subreddits"]:
-        try:
-            await multireddit.add(await bot.reddit_agent.subreddit(subreddit))
-        except asyncpraw.exceptions.RedditAPIException:
-            pass
-    return {
-        "reddit": {
-            "viewed_posts": set(),
-            "search_limit": 3,
-            "last_used": datetime.now(),
-            "multireddit": multireddit,
-        }
     }
 
 
@@ -537,87 +275,6 @@ def fix_data(
                     fixed_data[key][sub_key] = sub_value
 
     return fixed_data
-
-
-async def get_user_data(
-    bot: "KexoBotClient", ctx: discord.Interaction
-) -> tuple[dict, dict]:
-    """Get user data for the given user.
-
-    Parameters
-    ----------
-    bot: :class:`discord.Bot`
-        The discord bot instance.
-    ctx: :class:`discord.Interaction`
-        The context of the command invocation.
-
-    Returns
-    -------
-    tuple
-        A tuple containing the user data and temporary user data.
-    """
-    user_id = ctx.user.id
-    user_data: dict = bot.user_data.get(user_id)
-
-    if user_data:
-        return user_data, bot.temp_user_data[user_id]
-
-    await defer_interaction(ctx)
-
-    user_data = await bot.user_data_db.find_one({"_id": user_id})  # Load from DB
-    if user_data:
-        fixed_data = fix_user_data(user_data)
-        bot.user_data[user_id] = fixed_data
-        temp_user_data = await generate_temp_user_data(bot, user_id)
-    else:  # If not in DB, create new user data
-        user_data = generate_user_data()
-        logging.info(
-            f"[MongoDB] Creating new user data for user: {await bot.fetch_user(user_id)}"
-        )
-        await bot.user_data_db.insert_one({"_id": user_id, **user_data})
-        bot.user_data[user_id] = user_data
-
-        temp_user_data = await generate_temp_user_data(bot, user_id)
-
-    bot.temp_user_data[user_id] = temp_user_data
-    return user_data, temp_user_data
-
-
-async def get_guild_data(bot: "KexoBotClient", guild_id: int) -> tuple[dict, dict]:
-    """Get guild data for the given guild.
-
-    Parameters
-    ----------
-    bot: :class:`discord.Bot`
-        The discord bot instance.
-    guild_id: int
-        The ID of the guild to get data for.
-
-    Returns
-    -------
-    tuple
-        A tuple containing the guild data and temporary guild data.
-    """
-    guild_data: dict = bot.guild_data.get(guild_id)
-
-    if guild_data:
-        return guild_data, bot.temp_guild_data[guild_id]
-
-    guild_data = await bot.guild_data_db.find_one({"_id": guild_id})  # Load from DB
-    if guild_data:
-        fixed_data = fix_guild_data(guild_data)
-        bot.guild_data[guild_id] = fixed_data
-        temp_guild_data = generate_temp_guild_data()
-    else:  # If not in DB, create new guild data
-        guild_data = generate_guild_data()
-        guild_name = await bot.fetch_guild(guild_id)
-        logging.info(f"[MongoDB] Creating new guild data for server: {guild_name}")
-        await bot.guild_data_db.insert_one({"_id": guild_id, **guild_data})
-        bot.guild_data[guild_id] = guild_data
-        temp_guild_data = generate_temp_guild_data()
-
-    bot.temp_guild_data[guild_id] = temp_guild_data
-    return guild_data, temp_guild_data
 
 
 async def make_http_request(

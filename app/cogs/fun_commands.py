@@ -15,12 +15,8 @@ from discord import app_commands
 from discord.ext import commands
 
 from app.config.scraping import API_DAD_JOKE, API_HUMORAPI, API_JOKEAPI
-from app.response_handler import (
-    defer_interaction,
-    make_embed,
-    send,
-)
-from app.utils import get_guild_data, get_user_data, load_text_file, make_http_request
+from app.response_handler import defer_interaction, make_embed, send
+from app.utils import load_text_file, make_http_request
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -134,7 +130,7 @@ class FunCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild.id)
+        _, temp_guild_data = await self._bot.state.get_guild_data(ctx.guild.id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_jokes"])
         loaded_count = len(self._loaded_jokes)
 
@@ -175,7 +171,7 @@ class FunCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild.id)
+        _, temp_guild_data = await self._bot.state.get_guild_data(ctx.guild.id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_dad_jokes"])
         loaded_count = len(self._loaded_dad_jokes)
 
@@ -220,7 +216,7 @@ class FunCommands(commands.Cog):
         member: :class:`discord.Member`
             The member to roast.
         """
-        _, temp_guild_data = await get_guild_data(self._bot, ctx.guild.id)
+        _, temp_guild_data = await self._bot.state.get_guild_data(ctx.guild.id)
         viewed_count = len(temp_guild_data["jokes"]["viewed_yo_mama_jokes"])
         loaded_count = len(self._loaded_yo_mama_jokes)
 
@@ -333,10 +329,7 @@ class FunCommands(commands.Cog):
         self._temp_user_data[user_id]["reddit"]["search_limit"] += 1
 
     async def _load_user_data(self, ctx: discord.Interaction) -> tuple[dict, dict]:
-        user_data, temp_user_data = await get_user_data(
-            self._bot,
-            ctx,
-        )
+        user_data, temp_user_data = await self._bot.state.get_user_data(ctx)
         return user_data["reddit"], temp_user_data["reddit"]
 
     async def _create_reddit_embed(

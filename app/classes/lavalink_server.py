@@ -42,36 +42,37 @@ class LavalinkServerManager:
         )
         self._fresh_nodes: set[str] = set()
 
-    async def fetch(self) -> None:
-        """Get new Lavalink servers from Lavainfo GitHub and Lavalist."""
-        json_data_first: list = await make_http_request(
-            self._session, API_FREE_NODELINK, get_json=True
-        )
-        if json_data_first:
-            await self._parse_lavalink_servers(json_data_first)
+    async def _fetch_and_parse(self, api_url: str) -> list | None:
+        json_data: list = await make_http_request(self._session, api_url, get_json=True)
+        if json_data:
+            await self._parse_lavalink_servers(json_data)
+        return json_data
 
-        json_data_second: list = await make_http_request(
-            self._session, API_LAVALIST, get_json=True
-        )
-        if json_data_second:
-            await self._parse_lavalink_servers(json_data_second)
+    async def _update_cache_if_changed(self) -> None:
+        if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
+            await self._bot.bot_config.update_one(
+                DB_CACHE,
+                {"$set": {"lavalink_servers": self._cached_lavalink_servers}},
+            )
+            self._cached_lavalink_servers_copy = copy.deepcopy(
+                self._cached_lavalink_servers
+            )
+            logging.info(
+                "[Lavalink] Lavalink servers list got updated, updating cache."
+            )
+
+    async def fetch(self) -> None:
+        """Get new Lavalink servers from Lavainfo GitHub and Lavalist.
+        If both sources are available, update the cache and clear removed nodes.
+        """
+        json_data_first = await self._fetch_and_parse(API_FREE_NODELINK)
+        json_data_second = await self._fetch_and_parse(API_LAVALIST)
 
         # Only update cache and clear removed nodes if both sources are available.
         # Otherwise we might end up with an empty or incomplete list of nodes.
         if json_data_first and json_data_second:
             self._clear_removed_nodes()
-
-            if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
-                await self._bot.bot_config.update_one(
-                    DB_CACHE,
-                    {"$set": {"lavalink_servers": self._cached_lavalink_servers}},
-                )
-                self._cached_lavalink_servers_copy = copy.deepcopy(
-                    self._cached_lavalink_servers
-                )
-                logging.info(
-                    "[Lavalink] Lavalink servers list got updated, updating cache."
-                )
+            await self._update_cache_if_changed()
 
     async def _parse_lavalink_servers(self, json_data: list) -> None:
         for server in json_data:

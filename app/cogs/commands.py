@@ -35,12 +35,8 @@ from app.config.music import (
 )
 from app.config.reddit import SHITPOST_SUBREDDITS_ALL
 from app.config.sfd import SFD_TIMEZONE_CHOICE
-from app.response_handler import (
-    defer_interaction,
-    make_embed,
-    send,
-)
-from app.utils import EmbedPaginator, build_node, get_user_data, switch_node
+from app.response_handler import defer_interaction, make_embed, send
+from app.utils import EmbedPaginator
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -161,7 +157,9 @@ class CommandCog(commands.Cog):
             The password for the Lavalink server.
         """
         await defer_interaction(ctx)
-        node = build_node(f"{uri}:{str(port)}", password)
+
+        node_uri = f"{uri}:{str(port)}"
+        node = self._bot.state.build_node(node_uri, password)
         is_connected: bool = await self._bot.state.node_attempt_connection(node)
 
         if not is_connected:
@@ -197,8 +195,7 @@ class CommandCog(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
 
         if player:
-            node: sonolink.Node | None = await switch_node(
-                self._bot,
+            node: sonolink.Node | None = await self._bot.state.switch_node(
                 player=player,
                 send_success_message=False,
             )
@@ -633,7 +630,9 @@ class CommandCog(commands.Cog):
         if author in host_authors:
             await send(
                 ctx,
-                embed=make_embed(":x: You are already hosting a server, stop hosting first."),
+                embed=make_embed(
+                    ":x: You are already hosting a server, stop hosting first."
+                ),
             )
             return None
 
@@ -692,7 +691,10 @@ class CommandCog(commands.Cog):
         except Exception:
             await send(
                 ctx,
-                embed=make_embed(":x: Can't ping role, I don't have permission to do so.", color=COLOR_RED),
+                embed=make_embed(
+                    ":x: Can't ping role, I don't have permission to do so.",
+                    color=COLOR_RED,
+                ),
                 ephemeral=False,
             )
             return None
@@ -943,7 +945,7 @@ class CommandCog(commands.Cog):
             The context of the command invocation.
         """
         user_id = ctx.user.id
-        user_data, _ = await get_user_data(self._bot, ctx)
+        user_data, _ = await self._bot.state.get_user_data(ctx)
         current_subreddits = user_data["reddit"]["subreddits"]
         # Create a view with select menu for all available subreddits
         view = SubredditSelectorView(current_subreddits, self._bot, user_id)

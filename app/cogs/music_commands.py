@@ -29,10 +29,7 @@ from app.utils import (
     EmbedPaginator,
     find_track,
     fix_audio_title,
-    get_guild_data,
     make_http_request,
-    make_now_playing_embed,
-    switch_node,
 )
 
 if TYPE_CHECKING:
@@ -259,7 +256,7 @@ class MusicCommands(commands.Cog):
             return
 
         player._now_playing_sent = True  # Prevent listener from duplicating
-        await send(ctx, embed=make_now_playing_embed(track, self._bot))
+        await send(ctx, embed=self._bot.state.make_now_playing_embed(track))
         await self._play_track(ctx, track)
 
     @music.command(name="play", description="Plays song.")
@@ -720,7 +717,7 @@ class MusicCommands(commands.Cog):
             )
             return
 
-        guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
+        guild_data, _ = await self._bot.state.get_guild_data(ctx.guild.id)
         guild_data["music"]["volume"] = volume
         await self._bot.guild_data_db.update_one(
             {"_id": ctx.guild.id}, {"$set": guild_data}
@@ -832,7 +829,7 @@ class MusicCommands(commands.Cog):
         mode: str
             The autoplay mode to set. Can be either "normal" or "populated".
         """
-        guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
+        guild_data, _ = await self._bot.state.get_guild_data(ctx.guild.id)
         current_autoplay_mode = (
             "normal" if guild_data["music"]["autoplay_mode"] == 1 else "populated"
         )
@@ -948,8 +945,7 @@ class MusicCommands(commands.Cog):
                     ),
                     ephemeral=False,
                 )
-                await switch_node(
-                    bot=self._bot,
+                await self._bot.state.switch_node(
                     player=player,
                     play_after=True,
                     send_failure_message=False,
@@ -984,7 +980,7 @@ class MusicCommands(commands.Cog):
             return False
 
         channel = ctx.user.voice.channel
-        guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
+        guild_data, _ = await self._bot.state.get_guild_data(ctx.guild.id)
         autoplay_mode = (
             sonolink.AutoPlayMode.PARTIAL
             if guild_data["music"]["autoplay_mode"] == 1
@@ -1083,7 +1079,7 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
         player.text_channel = ctx.channel
 
-        guild_data, _ = await get_guild_data(self._bot, ctx.guild.id)
+        guild_data, _ = await self._bot.state.get_guild_data(ctx.guild.id)
         volume = guild_data["music"]["volume"]
         try:
             await player.set_volume(volume)
@@ -1091,8 +1087,7 @@ class MusicCommands(commands.Cog):
             if "Session not found" not in str(e):
                 raise
 
-            await switch_node(
-                bot=self._bot,
+            await self._bot.state.switch_node(
                 player=player,
                 send_success_message=False,
                 send_failure_message=False,

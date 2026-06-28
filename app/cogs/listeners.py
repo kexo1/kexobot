@@ -19,7 +19,6 @@ from sonolink.gateway import (
 from app.config.colors import COLOR_YELLOW
 from app.config.music import MUSIC_TIPS
 from app.response_handler import make_embed, send
-from app.utils import make_now_playing_embed, switch_node
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -145,7 +144,7 @@ class Listeners(commands.Cog):
         else:
             await send(
                 player.text_channel,
-                embed=make_now_playing_embed(payload.track, self._bot, player=player),
+                embed=self._bot.state.make_now_playing_embed(payload.track),
             )
 
         if player.autoplay != sonolink.AutoPlayMode.ENABLED:
@@ -190,7 +189,7 @@ class Listeners(commands.Cog):
             ),
         )
         self._bot.state.change_node_score(player.node.uri, -5)
-        await switch_node(bot=self._bot, player=player)
+        await self._bot.state.switch_node(player=player)
         player.should_respond = False
 
     @commands.Cog.listener()
@@ -219,7 +218,7 @@ class Listeners(commands.Cog):
             ),
         )
         self._bot.state.change_node_score(player.node.uri, -5)
-        await switch_node(bot=self._bot, player=player, play_after=True)
+        await self._bot.state.switch_node(player=player, play_after=True)
         player.should_respond = False
 
     @commands.Cog.listener()
@@ -246,8 +245,7 @@ class Listeners(commands.Cog):
             ),
         )
         self._bot.state.change_node_score(player.node.uri, -5)
-        await switch_node(
-            bot=self._bot,
+        await self._bot.state.switch_node(
             player=player,
         )
         player.should_respond = False
