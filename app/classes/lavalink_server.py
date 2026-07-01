@@ -1,4 +1,3 @@
-import copy
 import logging
 from typing import TYPE_CHECKING
 
@@ -37,9 +36,6 @@ class LavalinkServerManager:
         self._bot = bot
         self._session = session
         self._cached_lavalink_servers = self._bot.cached_lavalink_servers
-        self._cached_lavalink_servers_copy = copy.deepcopy(
-            self._cached_lavalink_servers
-        )
         self._fresh_nodes: set[str] = set()
 
     async def _fetch_and_parse(self, api_url: str) -> list | None:
@@ -47,19 +43,6 @@ class LavalinkServerManager:
         if json_data:
             await self._parse_lavalink_servers(json_data)
         return json_data
-
-    async def _update_cache_if_changed(self) -> None:
-        if self._cached_lavalink_servers != self._cached_lavalink_servers_copy:
-            await self._bot.bot_config.update_one(
-                DB_CACHE,
-                {"$set": {"lavalink_servers": self._cached_lavalink_servers}},
-            )
-            self._cached_lavalink_servers_copy = copy.deepcopy(
-                self._cached_lavalink_servers
-            )
-            logging.info(
-                "[Lavalink] Lavalink servers list got updated, updating cache."
-            )
 
     async def fetch(self) -> None:
         """Get new Lavalink servers from Lavainfo GitHub and Lavalist.
@@ -72,7 +55,10 @@ class LavalinkServerManager:
         # Otherwise we might end up with an empty or incomplete list of nodes.
         if json_data_first and json_data_second:
             self._clear_removed_nodes()
-            await self._update_cache_if_changed()
+            await self._bot.config_manager.save("lavalink_servers", DB_CACHE)
+            logging.info(
+                "[Lavalink] Lavalink servers list got updated, updating cache."
+            )
 
     async def _parse_lavalink_servers(self, json_data: list) -> None:
         for server in json_data:
@@ -88,7 +74,7 @@ class LavalinkServerManager:
             )
             self._fresh_nodes.add(uri)
 
-            if uri in self._cached_lavalink_servers_copy:
+            if uri in self._cached_lavalink_servers:
                 continue
 
             initial_ping = await get_url_response_time(uri)

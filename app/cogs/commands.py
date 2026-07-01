@@ -9,7 +9,7 @@ import time
 from typing import TYPE_CHECKING, Optional
 from urllib.parse import urlparse
 
-import asyncpraw.models
+import asyncpraw
 import discord
 import httpx
 import sonolink
@@ -35,6 +35,7 @@ from app.config.music import (
 )
 from app.config.reddit import SHITPOST_SUBREDDITS_ALL
 from app.config.sfd import SFD_TIMEZONE_CHOICE
+from app.data import UserData, UserDataManager
 from app.response_handler import defer_interaction, make_embed, send
 from app.utils import EmbedPaginator
 
@@ -97,9 +98,7 @@ class CommandCog(commands.Cog):
         self._bot: KexoBotClient = bot
         self._session: httpx.AsyncClient = self._bot.session
         self._bot_config: AsyncMongoClient = self._bot.bot_config
-        self._user_data_db: AsyncMongoClient = self._bot.user_data_db
-        self._user_data: dict = self._bot.user_data
-        self._temp_user_data: dict = self._bot.temp_user_data
+        self._user_mgr: UserDataManager = self._bot.user_data_manager
 
         self._run_time = time.time()
         self._graphs_dir = os.path.join(os.getcwd(), "graphs")
@@ -360,10 +359,10 @@ class CommandCog(commands.Cog):
         if not nodes:
             await send(ctx, embed=make_embed(":x: No nodes connected."))
             return
-        # Would change to dict
-        server_name = []
-        playing = []
-        node_uri = []
+
+        await defer_interaction(ctx)
+        entries: list[list[str]] = []
+        total_players = 0
 
         for node in nodes:
             try:
@@ -374,26 +373,33 @@ class CommandCog(commands.Cog):
             if not players:
                 continue
 
-            embed = discord.Embed(
-                title="Node Players",
-                color=COLOR_BLUE,
-            )
+            total_players += len(players)
+            guilds: dict[int, discord.Guild] = {g.id: g for g in self._bot.guilds}
 
             for player in players:
-                guild: discord.Guild = await self._bot.fetch_guild(player.guild_id)
-                server_name.append(guild.name)
-                playing.append(player.track.title if player.track else "Nothing")
-                node_uri.append(node.uri)
+                guild = guilds.get(player.guild_id)
+                server_name = guild.name if guild else f"Unknown ({player.guild_id})"
+                track_title = player.track.title if player.track else "Nothing"
+                entries.append([server_name, track_title, node.uri])
 
-        if not server_name:
+        if not entries:
             await send(ctx, embed=make_embed(":x: No players connected."))
             return
 
-        embed.add_field(name="Server:ㅤㅤㅤㅤ", value="\n".join(server_name))
-        embed.add_field(name="Playing:ㅤㅤ", value="\n".join(playing))
-        embed.add_field(name="Node:", value="\n".join(node_uri))
-
-        embed.set_footer(text=f"Total players: {len(players)}")
+        embed = discord.Embed(title="Node Players", color=COLOR_BLUE)
+        embed.add_field(
+            name="Server:ㅤㅤㅤㅤ",
+            value="\n".join(e[0] for e in entries),
+        )
+        embed.add_field(
+            name="Playing:ㅤㅤ",
+            value="\n".join(e[1] for e in entries),
+        )
+        embed.add_field(
+            name="Node:",
+            value="\n".join(e[2] for e in entries),
+        )
+        embed.set_footer(text=f"Total players: {total_players}")
         await send(ctx, embed=embed)
 
     # -------------------- SFD Servers -------------------- #
@@ -945,10 +951,9 @@ class CommandCog(commands.Cog):
             The context of the command invocation.
         """
         user_id = ctx.user.id
-        user_data, _ = await self._bot.state.get_user_data(ctx)
-        current_subreddits = user_data["reddit"]["subreddits"]
+        user = await self._user_mgr.get(user_id)
         # Create a view with select menu for all available subreddits
-        view = SubredditSelectorView(current_subreddits, self._bot, user_id)
+        view = SubredditSelectorView(user_id, self._bot, user)
 
         embed = discord.Embed(
             title="Select Subreddits",
@@ -960,66 +965,63 @@ class CommandCog(commands.Cog):
         await send(ctx, embed=embed, view=view, ephemeral=True)
 
     async def _show_bot_config(self, ctx, collection: str) -> None:
-        bot_config: dict = await self._bot_config.find_one(DB_LISTS)
-        collection_name = collection
-        collection: list = bot_config[DB_CHOICES[collection]]
+        collection_db_name = DB_CHOICES[collection]
+        collection_list = await self._bot.config_manager.get(
+            collection_db_name, DB_LISTS
+        )
 
-        embed = discord.Embed(title=collection_name, color=COLOR_BLUE)
+        embed = discord.Embed(title=collection, color=COLOR_BLUE)
         embed.add_field(
-            name=f"_{len(collection)} items_",
+            name=f"_{len(collection_list)} items_",
             value="\n".join(
-                f"{i + 1}. {collection[i]}" for i in range(len(collection))
+                f"{i + 1}. {collection_list[i]}" for i in range(len(collection_list))
             ),
         )
         await send(ctx, embed=embed)
 
     async def _add_to_bot_config(self, ctx, collection: str, to_upload: str) -> None:
-        bot_config: dict = await self._bot_config.find_one(DB_LISTS)
-        collection_name = collection
         collection_db_name = DB_CHOICES[collection]
-        collection: list = bot_config[collection_db_name]
+        collection_list = await self._bot.config_manager.get(
+            collection_db_name, DB_LISTS
+        )
 
-        if to_upload in collection:
+        if to_upload in collection_list:
             await send(
                 ctx,
                 embed=make_embed(f":x: `{to_upload}` is already in the list."),
             )
             return
 
-        collection.append(to_upload)
-        await self._bot_config.update_one(
-            DB_LISTS, {"$set": {collection_db_name: collection}}
-        )
+        collection_list.append(to_upload)
+        await self._bot.config_manager.save(collection_db_name, DB_LISTS)
         await send(
             ctx,
             embed=make_embed(
-                f":white_check_mark: Added `{to_upload}` to {collection_name} list."
+                f":white_check_mark: Added `{to_upload}` to {collection} list."
             ),
         )
 
     async def _remove_from_bot_config(
         self, ctx, collection: str, to_remove: str
     ) -> None:
-        bot_config: dict = await self._bot_config.find_one(DB_LISTS)
-        collection_name = collection
         collection_db_name = DB_CHOICES[collection]
-        collection: list = bot_config[collection_db_name]
+        collection_list = await self._bot.config_manager.get(
+            collection_db_name, DB_LISTS
+        )
 
-        if to_remove not in collection:
+        if to_remove not in collection_list:
             await send(
                 ctx,
                 embed=make_embed(f":x: `{to_remove}` is not in the list."),
             )
             return
 
-        collection.pop(collection.index(to_remove))
-        await self._bot_config.update_one(
-            DB_LISTS, {"$set": {collection_db_name: collection}}
-        )
+        collection_list.pop(collection_list.index(to_remove))
+        await self._bot.config_manager.save(collection_db_name, DB_LISTS)
         await send(
             ctx,
             embed=make_embed(
-                f":white_check_mark: Removed `{to_remove}` from {collection_name} list."
+                f":white_check_mark: Removed `{to_remove}` from {collection} list."
             ),
         )
 
@@ -1114,28 +1116,22 @@ class SubredditSelectorView(discord.ui.View):
 
     Parameters
     ----------
-    current_subreddits: set
-        A set of currently selected subreddits.
     bot: :class:`discord.Bot`
         The bot instance.
-    user_id: int
-        The ID of the user who is editing the subreddits.
+    user: :class:`UserData`
+        The user data object.
     """
 
-    def __init__(
-        self, current_subreddits: set, bot: "KexoBotClient", user_id: int
-    ) -> None:
+    def __init__(self, user_id: int, bot: "KexoBotClient", user: UserData) -> None:
         super().__init__(timeout=600)
-        self._current_subreddits = current_subreddits
+        self._user_id = user_id
         self.selected_subreddits = set()
         self._bot = bot
-        self._user_id = user_id
+        self._user = user
 
-        self._user_data = self._bot.user_data
-        self._user_data_db = self._bot.user_data_db
-        self._temp_user_data = self._bot.temp_user_data
+        self._user_mgr = self._bot.user_data_manager
 
-        self._select = SubredditSelect(current_subreddits)
+        self._select = SubredditSelect(set(user.reddit.subreddits))
         self._save_button = discord.ui.Button(
             label="Save Changes",
             style=discord.ButtonStyle.green,
@@ -1143,7 +1139,7 @@ class SubredditSelectorView(discord.ui.View):
         )
         self._save_button.callback = self.save_changes
 
-        nsfw_status = self._user_data[user_id]["reddit"]["nsfw_posts"]
+        nsfw_status = user.reddit.nsfw_posts
         self._nsfw_button = discord.ui.Button(
             label="NSFW ON" if nsfw_status else "NSFW OFF",
             style=(
@@ -1170,16 +1166,16 @@ class SubredditSelectorView(discord.ui.View):
         interaction: :class:`discord.Interaction`
             The interaction that triggered the button click.
         """
-        nsfw_status = not self._user_data[self._user_id]["reddit"]["nsfw_posts"]
+        self._user.reddit.nsfw_posts = not self._user.reddit.nsfw_posts
+        await self._user_mgr.save(self._user.id, self._user)
 
-        self._user_data[self._user_id]["reddit"]["nsfw_posts"] = nsfw_status
-        await self._user_data_db.update_one(
-            {"_id": self._user_id}, {"$set": self._user_data[self._user_id]}
+        self._nsfw_button.label = (
+            "NSFW ON" if self._user.reddit.nsfw_posts else "NSFW OFF"
         )
-
-        self._nsfw_button.label = "NSFW ON" if nsfw_status else "NSFW OFF"
         self._nsfw_button.style = (
-            discord.ButtonStyle.green if not nsfw_status else discord.ButtonStyle.red
+            discord.ButtonStyle.green
+            if not self._user.reddit.nsfw_posts
+            else discord.ButtonStyle.red
         )
 
         await interaction.response.edit_message(view=self)
@@ -1197,16 +1193,11 @@ class SubredditSelectorView(discord.ui.View):
             The interaction that triggered the button click.
         """
         if self.selected_subreddits:
-            self._user_data[self._user_id]["reddit"]["subreddits"] = list(
-                self.selected_subreddits
-            )
+            user = await self._user_mgr.get(self._user_id)
+            user.reddit.subreddits = list(self.selected_subreddits)
+            await self._user_mgr.save(self._user_id, user)
 
-            await self._user_data_db.update_one(
-                {"_id": self._user_id},
-                {"$set": self._user_data[self._user_id]},
-            )
-
-            if self._user_id in self._temp_user_data:
+            if self._user_id in self._bot.temp_user_data_manager._cache:
                 await self._update_multireddit()
 
         embed = discord.Embed(
@@ -1223,9 +1214,10 @@ class SubredditSelectorView(discord.ui.View):
         self.stop()
 
     async def _update_multireddit(self) -> None:
-        multireddit: asyncpraw.models.Multireddit = self._temp_user_data[self._user_id][
-            "reddit"
-        ]["multireddit"]
+        temp = self._bot.temp_user_data_manager.get(self._user_id)
+        multireddit = temp.reddit.multireddit
+        if not multireddit:
+            return
         await multireddit.load()
         added_subreddits = set()
 

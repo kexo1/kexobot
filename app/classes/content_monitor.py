@@ -10,7 +10,6 @@ import requests
 import unidecode
 from bs4 import BeautifulSoup, Tag
 from deep_translator import GoogleTranslator
-from pymongo import AsyncMongoClient
 
 from app.config.mongo import DB_CACHE, DB_LISTS
 from app.config.scraping import (
@@ -24,6 +23,7 @@ from app.config.scraping import (
     SITE_URL_GAME3RB,
     SITE_URL_ONLINEFIX,
 )
+from app.data.bot_data import BotConfigManager
 from app.utils import make_http_request, strip_text
 
 
@@ -98,14 +98,14 @@ class ContentMonitor:
 
     def __init__(
         self,
-        bot_config: AsyncMongoClient,
+        config_manager: BotConfigManager,
         session: httpx.AsyncClient,
         cloudscraper_session: cloudscraper.CloudScraper,
         game_updates_channel: discord.TextChannel,
         free_stuff_channel: discord.TextChannel,
         user_kexo: discord.User = None,
     ) -> None:
-        self._bot_config = bot_config
+        self._config_manager = config_manager
         self._session = session
         self._cloudscraper_session = cloudscraper_session
         self._game_updates_channel = game_updates_channel
@@ -126,11 +126,11 @@ class ContentMonitor:
 
     async def game3rb(self) -> None:
         """Check for selected games from Game3rb."""
-        game3rb_cache = await self._bot_config.find_one(DB_CACHE)
-        game3rb_cache = game3rb_cache["game3rb_cache"]
+        game3rb_cache = await self._config_manager.get("game3rb_cache", DB_CACHE)
 
-        game_list = await self._bot_config.find_one(DB_LISTS)
-        game_list = "\n".join(game_list["games"])
+        game_list = await self._config_manager.get("games", DB_LISTS)
+        game_list = "\n".join(game_list)
+
         source = await make_http_request(self._session, SITE_URL_GAME3RB)
         if not source:
             return
@@ -265,9 +265,7 @@ class ContentMonitor:
             await self._game_updates_channel.send(embed=embed)
 
         if to_upload:
-            await self._bot_config.update_one(
-                DB_CACHE, {"$set": {"game3rb_cache": to_upload}}
-            )
+            await self._config_manager.save("game3rb_cache", DB_CACHE)
 
     async def online_fix(self) -> None:
         """Checks for selected games from Online-Fix."""
@@ -323,10 +321,7 @@ class ContentMonitor:
             await self._free_stuff_channel.send(embed=embed)
 
         if alienwarearena_cache != alienwarearena_cache_copy:
-            await self._bot_config.update_one(
-                DB_CACHE,
-                {"$set": {"alienwarearena_cache": alienwarearena_cache}},
-            )
+            await self._config_manager.save("alienwarearena_cache", DB_CACHE)
 
     async def _send_onlinefix_embed(self, url: str, game_title: str) -> None:
         onlinefix_article = await make_http_request(self._session, url)
@@ -397,21 +392,20 @@ class ContentMonitor:
                 break
 
         if to_upload:
-            await self._bot_config.update_one(
-                DB_CACHE, {"$set": {"onlinefix_cache": to_upload}}
-            )
+            await self._config_manager.save("onlinefix_cache", DB_CACHE)
 
     async def _load_alienware_cache(self) -> tuple[list[str], list[str]]:
-        alienwarearena_cache = await self._bot_config.find_one(DB_CACHE)
-        to_filter = await self._bot_config.find_one(DB_LISTS)
-        return (
-            alienwarearena_cache["alienwarearena_cache"],
-            to_filter["alienwarearena_exceptions"],
+        alienwarearena_cache = await self._config_manager.get(
+            "alienwarearena_cache", DB_CACHE
         )
+        to_filter = await self._config_manager.get(
+            "alienwarearena_exceptions", DB_LISTS
+        )
+        return alienwarearena_cache, to_filter
 
     async def _load_onlinefix_cache(self) -> tuple[list[str], list[str]]:
-        onlinefix_cache = await self._bot_config.find_one(DB_CACHE)
-        games = await self._bot_config.find_one(DB_LISTS)
+        onlinefix_cache = await self._config_manager.get("onlinefix_cache", DB_CACHE)
+        games = await self._config_manager.get("games", DB_LISTS)
         # Remove quotes due to online-fix.me not using quotes
-        games = "\n".join(games["games"]).replace("'", "").split("\n")
-        return onlinefix_cache["onlinefix_cache"], games
+        games = "\n".join(games).replace("'", "").split("\n")
+        return onlinefix_cache, games

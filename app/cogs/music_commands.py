@@ -25,12 +25,7 @@ from app.config.music import (
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import defer_interaction, make_embed, send
-from app.utils import (
-    EmbedPaginator,
-    find_track,
-    fix_audio_title,
-    make_http_request,
-)
+from app.utils import EmbedPaginator, find_track, fix_audio_title, make_http_request
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -717,12 +712,9 @@ class MusicCommands(commands.Cog):
             )
             return
 
-        guild_data, _ = await self._bot.state.get_guild_data(ctx.guild.id)
-        guild_data["music"]["volume"] = volume
-        await self._bot.guild_data_db.update_one(
-            {"_id": ctx.guild.id}, {"$set": guild_data}
-        )
-        self._bot.guild_data[ctx.guild.id] = guild_data
+        guild = await self._bot.guild_data_manager.get(ctx.guild.id)
+        guild.music.volume = volume
+        await self._bot.guild_data_manager.save(ctx.guild.id, guild)
         await player.set_volume(volume)
         await send(
             ctx,
@@ -829,9 +821,9 @@ class MusicCommands(commands.Cog):
         mode: str
             The autoplay mode to set. Can be either "normal" or "populated".
         """
-        guild_data, _ = await self._bot.state.get_guild_data(ctx.guild.id)
+        guild = await self._bot.guild_data_manager.get(ctx.guild.id)
         current_autoplay_mode = (
-            "normal" if guild_data["music"]["autoplay_mode"] == 1 else "populated"
+            "normal" if guild.music.autoplay_mode == 1 else "populated"
         )
 
         if not mode:
@@ -845,7 +837,7 @@ class MusicCommands(commands.Cog):
         new_autoplay_mode = (
             sonolink.AutoPlayMode.PARTIAL
             if mode == "normal"
-            else sonolink.AutoPlayMode.POPULATED
+            else sonolink.AutoPlayMode.ENABLED
         )
         player: sonolink.Player = ctx.guild.voice_client
         await player.update(
@@ -855,11 +847,8 @@ class MusicCommands(commands.Cog):
             )
         )
 
-        guild_data["music"]["autoplay_mode"] = 1 if mode == "normal" else 2
-        await self._bot.guild_data_db.update_one(
-            {"_id": ctx.guild.id}, {"$set": guild_data}
-        )
-        self._bot.guild_data[ctx.guild.id] = guild_data
+        guild.music.autoplay_mode = 1 if mode == "normal" else 2
+        await self._bot.guild_data_manager.save(ctx.guild.id, guild)
 
         await send(
             ctx,
@@ -980,10 +969,10 @@ class MusicCommands(commands.Cog):
             return False
 
         channel = ctx.user.voice.channel
-        guild_data, _ = await self._bot.state.get_guild_data(ctx.guild.id)
+        guild = await self._bot.guild_data_manager.get(ctx.guild.id)
         autoplay_mode = (
             sonolink.AutoPlayMode.PARTIAL
-            if guild_data["music"]["autoplay_mode"] == 1
+            if guild.music.autoplay_mode == 1
             else sonolink.AutoPlayMode.ENABLED
         )
 
@@ -1079,8 +1068,8 @@ class MusicCommands(commands.Cog):
         player: sonolink.Player = ctx.guild.voice_client
         player.text_channel = ctx.channel
 
-        guild_data, _ = await self._bot.state.get_guild_data(ctx.guild.id)
-        volume = guild_data["music"]["volume"]
+        guild = await self._bot.guild_data_manager.get(ctx.guild.id)
+        volume = guild.music.volume
         try:
             await player.set_volume(volume)
         except Exception as e:

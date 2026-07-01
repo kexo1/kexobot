@@ -14,7 +14,6 @@ from asyncprawcore.exceptions import (
     RequestException,
     ResponseException,
 )
-from pymongo import AsyncMongoClient
 
 from app.config.mongo import DB_CACHE, DB_LISTS
 from app.config.reddit import (
@@ -25,6 +24,7 @@ from app.config.reddit import (
     REDDIT_FREEGAMEFINDINGS_MAX_RESULTS,
     REDDIT_TO_REMOVE,
 )
+from app.data.bot_data import BotConfigManager
 from app.utils import strip_text
 
 
@@ -72,13 +72,13 @@ class RedditFetcher:
 
     def __init__(
         self,
-        bot_config: AsyncMongoClient,
+        config_manager: BotConfigManager,
         session: httpx.AsyncClient,
         reddit_agent: asyncpraw.Reddit,
         free_stuff: discord.TextChannel,
         game_cracks: discord.TextChannel,
     ) -> None:
-        self._bot_config = bot_config
+        self._config_manager = config_manager
         self._session = session
         self._reddit_agent = reddit_agent
         self._free_stuff = free_stuff
@@ -86,9 +86,8 @@ class RedditFetcher:
 
     async def crackwatch(self) -> None:
         """Method to fetch game repacks from r/CrackWatch subreddit."""
-        crackwatch_cache, to_filter = await self._load_bot_config(
-            "crackwatch_cache", "crackwatch_exceptions"
-        )
+        crackwatch_cache = await self._config_manager.get("crackwatch_cache", DB_CACHE)
+        to_filter = await self._config_manager.get("crackwatch_exceptions", DB_LISTS)
         crackwatch_cache_upload = crackwatch_cache.copy()
         subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
             "CrackWatch"
@@ -164,9 +163,7 @@ class RedditFetcher:
         ) as e:
             logging.warning(f"[CrackWatch] - Error when accessing crackwatch:\n{e}")
         finally:
-            await self._update_cache_if_changed(
-                "crackwatch_cache", crackwatch_cache, crackwatch_cache_upload
-            )
+            await self._config_manager.save("crackwatch_cache", DB_CACHE)
 
     def _is_valid_crackwatch_submission(
         self,
@@ -193,9 +190,8 @@ class RedditFetcher:
 
     async def freegamefindings(self) -> None:
         """Method to fetch free games from r/FreeGameFindings subreddit."""
-        freegamefindings_cache, to_filter = await self._load_bot_config(
-            "freegamefindings_cache", "freegamefindings_exceptions"
-        )
+        freegamefindings_cache = await self._config_manager.get("freegamefindings_cache", DB_CACHE)
+        to_filter = await self._config_manager.get("freegamefindings_exceptions", DB_LISTS)
         freegamefindings_cache_upload = freegamefindings_cache.copy()
         subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
             "FreeGameFindings"
@@ -229,11 +225,7 @@ class RedditFetcher:
                 f"[FreeGameFindings] - Error while fetching subreddit:\n{e}"
             )
         finally:
-            await self._update_cache_if_changed(
-                "freegamefindings_cache",
-                freegamefindings_cache,
-                freegamefindings_cache_upload,
-            )
+            await self._config_manager.save("freegamefindings_cache", DB_CACHE)
 
     def _is_valid_freegame_submission(
         self,
@@ -263,7 +255,7 @@ class RedditFetcher:
 
         if any(token in submission.url for token in to_filter):
             return False
-        
+
         # Allow Epic Games giveaways, but only mobile games
         if (
             "epic games" in submission_title_lower
@@ -292,9 +284,11 @@ class RedditFetcher:
 
     async def _alienwarearena(self, url) -> None:
         # There might be an occurence where giveaway is not showing in alienwarearena.com
-        alienwarearena_cache = await self._bot_config.find_one(DB_CACHE)
+        alienwarearena_cache = await self._config_manager.get(
+            "alienwarearena_cache", DB_CACHE
+        )
         reddit_path = url[29:]
-        for cached_url in alienwarearena_cache["alienwarearena_cache"]:
+        for cached_url in alienwarearena_cache:
             if reddit_path in cached_url:
                 return
 
@@ -313,19 +307,3 @@ class RedditFetcher:
             icon_url=ICON_REDDIT_FREEGAMEFINDINGS,
         )
         await self._free_stuff.send(embed=embed)
-
-    async def _load_bot_config(
-        self, cache: str, exceptions: str
-    ) -> tuple[list[str], list[str]]:
-        crackwatch_cache = await self._bot_config.find_one(DB_CACHE)
-        to_filter = await self._bot_config.find_one(DB_LISTS)
-        return crackwatch_cache[cache], to_filter[exceptions]
-
-    async def _update_cache_if_changed(
-        self, cache_key: str, original: list[str], updated: list[str]
-    ) -> None:
-        if updated != original:
-            await self._bot_config.update_one(
-                DB_CACHE,
-                {"$set": {cache_key: updated}},
-            )

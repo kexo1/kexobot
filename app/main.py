@@ -47,35 +47,36 @@ from app.config.reddit import (
     ICON_REDDIT,
     SHITPOST_SUBREDDITS_ALL,
 )
-from app.response_handler import make_embed, send
-from app.state_types import (
-    GuildData,
-    NodeCacheEntry,
-    TempGuildData,
-    TempUserData,
-    UserData,
+from app.data import (
+    BotConfigManager,
+    GuildDataManager,
+    JokeCacheManager,
+    TempGuildDataManager,
+    TempUserDataManager,
+    UserDataManager,
 )
-from app.utils import get_url_response_time, is_older_than, make_http_request
+from app.data.bot_data import NodeCacheEntry
+from app.response_handler import make_embed, send
+from app.utils import get_url_response_time, make_http_request
 
 
 class KexoBotClient(commands.Bot):
     node: sonolink.Node | None
     sonolink_client: sonolink.Client
-    user_data: dict[int, UserData]
-    temp_user_data: dict[int, TempUserData]
-    guild_data: dict[int, GuildData]
-    temp_guild_data: dict[int, TempGuildData]
+    user_data_manager: UserDataManager
+    guild_data_manager: GuildDataManager
+    temp_user_data_manager: TempUserDataManager
+    temp_guild_data_manager: TempGuildDataManager
+    joke_cache_manager: JokeCacheManager
+    config_manager: BotConfigManager
     track_exceptions: dict[int, tuple[Any, asyncio.Event]]
     cached_lavalink_servers: dict[str, NodeCacheEntry]
+    subreddit_icons: dict[str, str]
     bot_config: AsyncMongoClient
-    user_data_db: AsyncMongoClient
-    guild_data_db: AsyncMongoClient
     reddit_agent: asyncpraw.Reddit
     humor_api_tokens: dict[str, dict[str, bool]]
+    node_is_switching: dict[int, bool]
     track_requesters: dict[str, dict[str, str]]
-    loaded_jokes: set[str]
-    loaded_dad_jokes: set[str]
-    loaded_yo_mama_jokes: set[str]
     session: httpx.AsyncClient | None
     state: BotState
 
@@ -118,21 +119,17 @@ def load_humor_api_tokens() -> None:
 
 def clear_temp_reddit_data() -> None:
     """Clear the temporary user reddit data."""
-    if not bot.temp_user_data:
-        return
-    bot.state.clear_stale_temp_reddit_data(
-        is_older_than_fn=is_older_than, stale_hours=5
-    )
+    bot.temp_user_data_manager.clear_stale_reddit_data(stale_hours=5)
 
 
 def clear_temp_guild_data() -> None:
     """Clear the temporary guild data."""
-    bot.state.reset_temp_guild_data(bot.state.generate_temp_guild_data)
+    bot.temp_guild_data_manager.reset_all()
 
 
 def clear_cached_jokes() -> None:
     """Clear the cached jokes loaded from FunCommands"""
-    bot.state.clear_joke_caches()
+    bot.joke_cache_manager.clear_all()
 
 
 class KexoBot:
@@ -153,7 +150,6 @@ class KexoBot:
         self._subreddit_cache: dict | None = None
         self._hostname = socket.gethostname()
         self._main_loop_counter = 0
-        self.cached_lavalink_servers_copy: dict | None = None
 
         database = AsyncMongoClient(ENV_API_DB)["KexoBOTDatabase"]
         self._bot_config = database["BotConfig"]
@@ -173,19 +169,20 @@ class KexoBot:
 
         # Attach to bot, so we can use it in cogs
         bot.node = None
-        bot.user_data = {}
-        bot.temp_user_data = {}
-        bot.guild_data = {}
-        bot.temp_guild_data = {}
         bot.cached_lavalink_servers = {}
         bot.close_nodes_lock = asyncio.Lock()
 
         bot.bot_config = self._bot_config
-        bot.user_data_db = self._user_data_db
-        bot.guild_data_db = self._guild_data_db
-
         bot.sonolink_client = sonolink.Client(bot)
         bot.state = BotState(bot)
+
+        # Data managers (replace old raw dicts)
+        bot.user_data_manager = UserDataManager(self._user_data_db, bot)
+        bot.guild_data_manager = GuildDataManager(self._guild_data_db)
+        bot.temp_user_data_manager = TempUserDataManager(bot)
+        bot.temp_guild_data_manager = TempGuildDataManager()
+        bot.joke_cache_manager = JokeCacheManager()
+        bot.config_manager = BotConfigManager(self._bot_config, lambda: [])
 
         bot.connect_node = self.connect_node
 
@@ -193,9 +190,6 @@ class KexoBot:
         bot.node_is_switching = {}
         bot.track_exceptions = {}
         bot.track_requesters = {}
-        bot.loaded_jokes = set()
-        bot.loaded_dad_jokes = set()
-        bot.loaded_yo_mama_jokes = set()
 
     async def initialize(self) -> None:
         """Initialize classes and fetch all channels and users."""
@@ -234,15 +228,14 @@ class KexoBot:
 
     async def _fetch_cached_lavalink_servers(self) -> None:
         """Fetch cached lavalink servers for the bot."""
-        cached_lavalink_servers = await self._bot_config.find_one(DB_CACHE)
-        bot.cached_lavalink_servers = cached_lavalink_servers["lavalink_servers"]
-        self.cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
+        bot.cached_lavalink_servers = await bot.config_manager.get(
+            "lavalink_servers", DB_CACHE
+        )
         logging.info("[Starter] Cached lavalink servers fetched.")
 
     async def _fetch_subreddit_icons(self) -> None:
         """Fetch subreddit icons for the bot."""
-        subreddit_icons = await self._bot_config.find_one(DB_CACHE)
-        bot.subreddit_icons = subreddit_icons["subreddit_icons"]
+        bot.subreddit_icons = await bot.config_manager.get("subreddit_icons", DB_CACHE)
         logging.info("[Starter] Subreddit icons fetched.")
 
     def _define_classes(self) -> None:
@@ -251,7 +244,7 @@ class KexoBot:
             raise RuntimeError("Reddit client is not initialized")
 
         self._content_monitor = ContentMonitor(
-            self._bot_config,
+            bot.config_manager,
             self.session,
             self.cloudscraper_session,
             self._channel_game_updates,
@@ -260,7 +253,7 @@ class KexoBot:
         )
 
         self._reddit_fetcher = RedditFetcher(
-            self._bot_config,
+            bot.config_manager,
             self.session,
             self._reddit_agent,
             self._channel_free_stuff,
@@ -439,9 +432,7 @@ class KexoBot:
             return
 
         logging.info("[Reddit] Subreddit icons refreshed.")
-        await self._bot_config.update_one(
-            DB_CACHE, {"$set": {"subreddit_icons": subreddit_icons}}
-        )
+        await bot.config_manager.save("subreddit_icons", DB_CACHE)
 
     async def _fetch_users(self) -> None:
         """Fetch users for the bot."""
@@ -457,14 +448,7 @@ class KexoBot:
 
     async def _upload_cached_lavalink_servers(self) -> None:
         """Upload cached lavalink servers to the database."""
-        if self.cached_lavalink_servers_copy == bot.cached_lavalink_servers:
-            return
-
-        await bot.bot_config.update_one(
-            DB_CACHE,
-            {"$set": {"lavalink_servers": bot.cached_lavalink_servers}},
-        )
-        self.cached_lavalink_servers_copy = copy.deepcopy(bot.cached_lavalink_servers)
+        await bot.config_manager.save("lavalink_servers", DB_CACHE)
 
     async def _test_all_node_pings(self) -> None:
         """Test ping for all cached lavalink nodes and update values.

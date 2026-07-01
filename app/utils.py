@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 import discord
 import httpx
@@ -11,7 +11,6 @@ import sonolink
 import sonolink.models as sl_models
 
 from app.config.music import MUSIC_TO_REMOVE
-from app.config.reddit import SHITPOST_SUBREDDITS_DEFAULT
 
 
 def load_text_file(name: str) -> list[str]:
@@ -162,119 +161,6 @@ def find_track(player: sonolink.Player, to_find: str) -> int | None:
             return None
 
     return to_find
-
-
-def generate_temp_guild_data() -> dict:
-    """Generate temporary guild data for the bot.
-
-    Returns
-    -------
-    dict
-        A dictionary containing temporary guild data.
-    """
-    return {
-        "jokes": {
-            "viewed_jokes": [],
-            "viewed_dad_jokes": [],
-            "viewed_yo_mama_jokes": [],
-        },
-    }
-
-
-def generate_guild_data() -> dict:
-    """Generate default guild data for the bot.
-
-    Returns
-    -------
-    dict
-        A dictionary containing default guild data.
-    """
-    return {
-        "music": {
-            "autoplay_mode": 1,
-            "volume": 100,
-        },
-    }
-
-
-def generate_user_data() -> dict:
-    """Generate default user data for the bot.
-
-    Returns
-    -------
-    dict
-        A dictionary containing default user data.
-    """
-    return {
-        "reddit": {
-            "subreddits": SHITPOST_SUBREDDITS_DEFAULT,
-            "nsfw_posts": False,
-        }
-    }
-
-
-def fix_user_data(old_data: dict) -> dict:
-    """Fixes user data by adding missing keys and values.
-
-    Parameters
-    ----------
-    old_data: dict
-        The old data to be fixed.
-
-    Returns
-    -------
-    dict
-        The fixed data with all required keys and values.
-    """
-    data = old_data.copy()
-    return fix_data(data, generate_user_data)
-
-
-def fix_guild_data(old_data: dict) -> dict:
-    """Fixes guild data by adding missing keys and values.
-
-    Parameters
-    ----------
-    old_data: dict
-        The old data to be fixed.
-
-    Returns
-    -------
-    dict
-        The fixed data with all required keys and values.
-    """
-    data = old_data.copy()
-    return fix_data(data, generate_guild_data)
-
-
-def fix_data(
-    fixed_data: dict[str, Any], generator: Callable[[], dict[str, Any]]
-) -> dict[str, Any]:
-    """Generic function to fix data by adding missing keys and values from a generator.
-
-    Parameters
-    ----------
-    fixed_data: dict
-        The data to be fixed.
-    generator: Callable[[], dict]
-        A callable that generates the default data structure.
-
-    Returns
-    -------
-    dict
-        The fixed data with all required keys and values.
-    """
-    default_data = generator()
-
-    for key, value in default_data.items():
-        if key not in fixed_data:
-            fixed_data[key] = value
-        elif isinstance(value, dict):
-            for sub_key, sub_value in value.items():
-                if sub_key not in fixed_data[key]:
-                    fixed_data[key][sub_key] = sub_value
-
-    return fixed_data
 
 
 async def make_http_request(

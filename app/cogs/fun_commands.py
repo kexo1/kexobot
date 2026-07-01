@@ -1,3 +1,4 @@
+import logging
 import random
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
@@ -15,30 +16,12 @@ from discord import app_commands
 from discord.ext import commands
 
 from app.config.scraping import API_DAD_JOKE, API_HUMORAPI, API_JOKEAPI
+from app.data.models import TempUserRedditData, UserRedditData
 from app.response_handler import defer_interaction, make_embed, send
 from app.utils import load_text_file, make_http_request
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
-
-
-def is_valid_submission(
-    submission: asyncpraw.models.Submission,
-    user_data: dict,
-    temp_user_data: dict,
-) -> bool:
-    """Validate whether a Reddit submission should be processed."""
-    if submission.locked or submission.stickied or hasattr(submission, "poll_data"):
-        return False
-
-    if submission.permalink in temp_user_data["viewed_posts"]:
-        return False
-
-    nsfw_posts: bool = user_data["nsfw_posts"]
-    if submission.over_18 and not nsfw_posts:
-        return False
-
-    return True
 
 
 async def send_multiple_images(
@@ -49,8 +32,25 @@ async def send_multiple_images(
 
 
 async def post_video(ctx: discord.Interaction, submission_url: str) -> None:
-    video_url = submission_url.split("/")[4]
-    await send(ctx, f"https://rxddit.com/{video_url}/", suppress=False)
+    await send(ctx, f"https://vxreddit.com{submission_url}", suppress=False)
+
+
+def is_valid_submission(
+    submission: asyncpraw.models.Submission,
+    user_reddit: UserRedditData,
+    temp_user_reddit: TempUserRedditData,
+) -> bool:
+    """Validate whether a Reddit submission should be processed."""
+    if submission.locked or submission.stickied or hasattr(submission, "poll_data"):
+        return False
+
+    if submission.permalink in temp_user_reddit.viewed_posts:
+        return False
+
+    if submission.over_18 and not user_reddit.nsfw_posts:
+        return False
+
+    return True
 
 
 class FunCommands(commands.Cog):
@@ -70,17 +70,16 @@ class FunCommands(commands.Cog):
     def __init__(self, bot: "KexoBotClient") -> None:
         self._bot = bot
         self._bot_config = self._bot.bot_config
-        self._user_data_db = self._bot.user_data_db
-
-        self._user_data = self._bot.user_data
-        self._temp_user_data = self._bot.temp_user_data
-        self._temp_guild_data = self._bot.temp_guild_data
+        self._user_mgr = self._bot.user_data_manager
+        self._temp_user_mgr = self._bot.temp_user_data_manager
+        self._temp_guild_mgr = self._bot.temp_guild_data_manager
+        self._joke_cache = self._bot.joke_cache_manager
         self._reddit_agent = self._bot.reddit_agent
         self._session: httpx.AsyncClient = self._bot.session
 
-        self._loaded_jokes: set[str] = self._bot.loaded_jokes
-        self._loaded_dad_jokes: set[str] = self._bot.loaded_dad_jokes
-        self._loaded_yo_mama_jokes: set[str] = self._bot.loaded_yo_mama_jokes
+        self._loaded_jokes: set[str] = self._joke_cache.loaded_jokes
+        self._loaded_dad_jokes: set[str] = self._joke_cache.loaded_dad_jokes
+        self._loaded_yo_mama_jokes: set[str] = self._joke_cache.loaded_yo_mama_jokes
 
         self._topstropscreenshot = load_text_file("topstropscreenshot")
         self._kotrmelce = load_text_file("kotrmelec")
@@ -130,8 +129,8 @@ class FunCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        _, temp_guild_data = await self._bot.state.get_guild_data(ctx.guild.id)
-        viewed_count = len(temp_guild_data["jokes"]["viewed_jokes"])
+        temp_guild = self._temp_guild_mgr.get(ctx.guild.id)
+        viewed_count = len(temp_guild.jokes.viewed_jokes)
         loaded_count = len(self._loaded_jokes)
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
@@ -145,7 +144,7 @@ class FunCommands(commands.Cog):
 
         joke = None
         for joke in self._loaded_jokes:
-            if joke in temp_guild_data["jokes"]["viewed_jokes"]:
+            if joke in temp_guild.jokes.viewed_jokes:
                 continue
             break
 
@@ -153,9 +152,7 @@ class FunCommands(commands.Cog):
             await send(ctx, code="NO_MORE_JOKES")
             return
 
-        temp_guild_data["jokes"]["viewed_jokes"].append(joke)
-        self._temp_guild_data[ctx.guild.id] = temp_guild_data
-
+        temp_guild.jokes.viewed_jokes.append(joke)
         joke = discord.utils.escape_markdown(joke)
         await send(ctx, joke)
 
@@ -171,8 +168,8 @@ class FunCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        _, temp_guild_data = await self._bot.state.get_guild_data(ctx.guild.id)
-        viewed_count = len(temp_guild_data["jokes"]["viewed_dad_jokes"])
+        temp_guild = self._temp_guild_mgr.get(ctx.guild.id)
+        viewed_count = len(temp_guild.jokes.viewed_dad_jokes)
         loaded_count = len(self._loaded_dad_jokes)
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
@@ -186,7 +183,7 @@ class FunCommands(commands.Cog):
 
         joke = None
         for joke in self._loaded_dad_jokes:
-            if joke in temp_guild_data["jokes"]["viewed_dad_jokes"]:
+            if joke in temp_guild.jokes.viewed_dad_jokes:
                 continue
             break
 
@@ -194,8 +191,7 @@ class FunCommands(commands.Cog):
             await send(ctx, code="NO_MORE_JOKES")
             return
 
-        temp_guild_data["jokes"]["viewed_dad_jokes"].append(joke)
-        self._temp_guild_data[ctx.guild.id] = temp_guild_data
+        temp_guild.jokes.viewed_dad_jokes.append(joke)
 
         joke = discord.utils.escape_markdown(joke)
         await send(ctx, joke)
@@ -216,8 +212,8 @@ class FunCommands(commands.Cog):
         member: :class:`discord.Member`
             The member to roast.
         """
-        _, temp_guild_data = await self._bot.state.get_guild_data(ctx.guild.id)
-        viewed_count = len(temp_guild_data["jokes"]["viewed_yo_mama_jokes"])
+        temp_guild = self._temp_guild_mgr.get(ctx.guild.id)
+        viewed_count = len(temp_guild.jokes.viewed_yo_mama_jokes)
         loaded_count = len(self._loaded_yo_mama_jokes)
 
         if (viewed_count == 0 and loaded_count == 0) or viewed_count == loaded_count:
@@ -231,7 +227,7 @@ class FunCommands(commands.Cog):
 
         joke = None
         for joke in self._loaded_yo_mama_jokes:
-            if joke in temp_guild_data["jokes"]["viewed_yo_mama_jokes"]:
+            if joke in temp_guild.jokes.viewed_yo_mama_jokes:
                 continue
             break
 
@@ -239,8 +235,7 @@ class FunCommands(commands.Cog):
             await send(ctx, code="NO_MORE_JOKES")
             return
 
-        temp_guild_data["jokes"]["viewed_yo_mama_jokes"].append(joke)
-        self._temp_guild_data[ctx.guild.id] = temp_guild_data
+        temp_guild.jokes.viewed_yo_mama_jokes.append(joke)
 
         joke = joke[0].lower() + joke[1:] if joke else ""
         joke = discord.utils.escape_markdown(joke)
@@ -257,6 +252,7 @@ class FunCommands(commands.Cog):
     )
     @app_commands.checks.cooldown(1, 5, key=lambda i: i.user.id)
     async def shitpost(self, ctx: discord.Interaction) -> None:
+        await defer_interaction(ctx)
         await self.process_shitpost(ctx)
 
     async def process_shitpost(self, ctx: discord.Interaction) -> None:
@@ -270,18 +266,20 @@ class FunCommands(commands.Cog):
             The context of the command.
         """
         user_id = ctx.user.id
-        user_data, temp_user_data = await self._load_user_data(ctx)
+        user_reddit, temp_user_reddit = await self._load_user_data(user_id)
+        multireddit = temp_user_reddit.multireddit
+        limit = temp_user_reddit.search_limit
 
-        if not temp_user_data.get("multireddit"):
+        if not temp_user_reddit.multireddit:
             await send(ctx, "REDDIT_CANT_LOAD_MULTIREDDIT")
+            return
 
-        multireddit: asyncpraw.models.Multireddit = temp_user_data["multireddit"]
-        limit = temp_user_data["search_limit"]
+        multireddit = temp_user_reddit.multireddit
+        limit = temp_user_reddit.search_limit
 
         try:
             async for submission in multireddit.hot(limit=limit):
-                is_valid = is_valid_submission(submission, user_data, temp_user_data)
-                if not is_valid:
+                if not is_valid_submission(submission, user_reddit, temp_user_reddit):
                     continue
 
                 is_channel_nsfw = ctx.channel.is_nsfw()
@@ -294,10 +292,10 @@ class FunCommands(commands.Cog):
                     )
                     return
 
-                embed = await self._create_reddit_embed(submission)
+                if not submission.media:
+                    embed = await self._create_reddit_embed(submission)
 
                 if submission.media:
-                    await send(ctx, embed=embed)
                     await post_video(ctx, submission.permalink)
                 # If it has multiple images
                 elif hasattr(submission, "gallery_data"):
@@ -323,14 +321,24 @@ class FunCommands(commands.Cog):
                 ),
             )
 
-    def _update_temp_user_data(self, user_id: int, submission_url: str) -> None:
-        self._temp_user_data[user_id]["reddit"]["viewed_posts"].add(submission_url)
-        self._temp_user_data[user_id]["reddit"]["last_used"] = datetime.now()
-        self._temp_user_data[user_id]["reddit"]["search_limit"] += 1
+        if len(temp_user_reddit.viewed_posts) >= len(user_reddit.subreddits):
+            temp_user_reddit.search_limit = min(50, temp_user_reddit.search_limit + 1)
 
-    async def _load_user_data(self, ctx: discord.Interaction) -> tuple[dict, dict]:
-        user_data, temp_user_data = await self._bot.state.get_user_data(ctx)
-        return user_data["reddit"], temp_user_data["reddit"]
+    async def _load_user_data(self, user_id: int) -> tuple[UserRedditData, TempUserRedditData]:
+        """Load user and temp user data, ensuring multireddit exists."""
+        user = await self._user_mgr.get(user_id)
+        temp = self._temp_user_mgr.get(user_id)
+
+        if temp.reddit.multireddit is None:
+            await self._temp_user_mgr.ensure_multireddit(user_id)
+
+        return user.reddit, temp.reddit
+
+    def _update_temp_user_data(self, user_id: int, submission_url: str) -> None:
+        temp = self._temp_user_mgr.get(user_id)
+        temp.reddit.viewed_posts.add(submission_url)
+        temp.reddit.last_used = datetime.now()
+        logging.info(f"User {user_id} viewed posts: {temp.reddit.viewed_posts}")
 
     async def _create_reddit_embed(
         self, submission: asyncpraw.reddit.Submission

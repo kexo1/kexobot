@@ -3,11 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
-import asyncpraw.models
-import asyncprawcore.exceptions
 import discord
 import sonolink
 import sonolink.models as sl_models
@@ -16,15 +13,7 @@ from sonolink.models import AutoPlaySettings, CacheSettings, InactivitySettings
 from app.config.colors import COLOR_GREEN, COLOR_RED
 from app.config.discord import ICON_YOUTUBE
 from app.config.music import TRACK_REQUESTER_MAXSIZE
-from app.response_handler import defer_interaction
-from app.utils import (
-    fix_audio_title,
-    fix_guild_data,
-    fix_user_data,
-    generate_guild_data,
-    generate_temp_guild_data,
-    generate_user_data,
-)
+from app.utils import fix_audio_title
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -203,12 +192,6 @@ class BotState:
             return None
         return node_entry["ping"]
 
-    def clear_joke_caches(self) -> None:
-        """Clear all in-memory joke caches in-place."""
-        self.bot.loaded_jokes.clear()
-        self.bot.loaded_dad_jokes.clear()
-        self.bot.loaded_yo_mama_jokes.clear()
-
     def cache_track_requester(self, track_encoded: str, name: str, avatar: str) -> None:
         """Cache requester metadata by encoded track ID.
 
@@ -285,42 +268,6 @@ class BotState:
     def clear_track_exception_probe(self, guild_id: int) -> None:
         """Remove stored track exception probe for guild."""
         self.bot.track_exceptions.pop(guild_id, None)
-
-    def reset_temp_guild_data(self, factory: Callable[[], dict[str, Any]]) -> None:
-        """Reset temporary guild data for all guilds.
-
-        Parameters
-        ----------
-        factory: Callable[[], dict[str, Any]]
-            Factory function that returns default temp guild data.
-        """
-        for guild_id in self.bot.temp_guild_data:
-            self.bot.temp_guild_data[guild_id] = factory()
-
-    def clear_stale_temp_reddit_data(
-        self,
-        *,
-        is_older_than_fn: Callable[[int, datetime], bool],
-        stale_hours: int = 5,
-    ) -> None:
-        """Clear stale temporary reddit user data.
-
-        Parameters
-        ----------
-        is_older_than_fn: Callable[[int, datetime], bool]
-            Function used to check data age.
-        stale_hours: int, optional
-            Number of hours after which temp data is reset.
-        """
-        for user_data in self.bot.temp_user_data.values():
-            reddit_data = user_data["reddit"]
-            last_used = reddit_data["last_used"]
-            if not last_used:
-                continue
-            if is_older_than_fn(stale_hours, last_used):
-                reddit_data["last_used"] = None
-                reddit_data["viewed_posts"] = set()
-                reddit_data["search_limit"] = 3
 
     def build_node(self, uri: str, password: str) -> sonolink.Node:
         """Create a new Lavalink node with default settings.
@@ -521,134 +468,3 @@ class BotState:
                 )
             )
             switching_map[guild_id] = False
-
-    async def generate_temp_user_data(self, user_id: int) -> dict:
-        """Generate temporary user data for the bot.
-
-        Parameters
-        ----------
-        user_id: int
-            The ID of the user to generate temporary data for.
-
-        Returns
-        -------
-        dict
-            A dictionary containing temporary user data.
-        """
-        multireddit: asyncpraw.models.Multireddit = (
-            await self.bot.reddit_agent.multireddit(
-                name=str(user_id), redditor="KexoBOT"
-            )
-        )
-        for attempt in range(3):
-            try:
-                await multireddit.load()
-                break
-            except asyncprawcore.exceptions.NotFound:
-                logging.warning(
-                    f"[Reddit] Multireddit for user {user_id} not found. Attempting to create it... (Attempt {attempt + 1}/3)"
-                )
-                await asyncio.sleep(attempt + 1)
-
-            logging.error(
-                f"[Reddit] Failed to load multireddit for user {user_id} after 3 attempts."
-            )
-            return {}
-
-        for subreddit in multireddit.subreddits:
-            try:
-                # For whatever reason, subreddits are already added to the multireddit
-                await multireddit.remove(subreddit)
-            except asyncpraw.exceptions.RedditAPIException:
-                pass
-
-        for subreddit in self.bot.user_data[user_id]["reddit"]["subreddits"]:
-            try:
-                await multireddit.add(await self.bot.reddit_agent.subreddit(subreddit))
-            except asyncpraw.exceptions.RedditAPIException:
-                pass
-        return {
-            "reddit": {
-                "viewed_posts": set(),
-                "search_limit": 3,
-                "last_used": datetime.now(),
-                "multireddit": multireddit,
-            }
-        }
-
-    async def get_user_data(self, ctx: discord.Interaction) -> tuple[dict, dict]:
-        """Get user data for the given user.
-
-        Parameters
-        ----------
-        ctx: :class:`discord.Interaction`
-            The context of the command invocation.
-
-        Returns
-        -------
-        tuple
-            A tuple containing the user data and temporary user data.
-        """
-        user_id = ctx.user.id
-        user_data: dict = self.bot.user_data.get(user_id)
-
-        if user_data:
-            return user_data, self.bot.temp_user_data[user_id]
-
-        await defer_interaction(ctx)
-
-        user_data = await self.bot.user_data_db.find_one(
-            {"_id": user_id}
-        )  # Load from DB
-        if user_data:
-            fixed_data = fix_user_data(user_data)
-            self.bot.user_data[user_id] = fixed_data
-            temp_user_data = await self.generate_temp_user_data(user_id)
-        else:  # If not in DB, create new user data
-            user_data = generate_user_data()
-            logging.info(
-                f"[MongoDB] Creating new user data for user: {await self.bot.fetch_user(user_id)}"
-            )
-            await self.bot.user_data_db.insert_one({"_id": user_id, **user_data})
-            self.bot.user_data[user_id] = user_data
-
-            temp_user_data = await self.generate_temp_user_data(user_id)
-
-        self.bot.temp_user_data[user_id] = temp_user_data
-        return user_data, temp_user_data
-
-    async def get_guild_data(self, guild_id: int) -> tuple[dict, dict]:
-        """Get guild data for the given guild.
-
-        Parameters
-        ----------
-        guild_id: int
-            The ID of the guild to get data for.
-
-        Returns
-        -------
-        tuple
-            A tuple containing the guild data and temporary guild data.
-        """
-        guild_data: dict = self.bot.guild_data.get(guild_id)
-
-        if guild_data:
-            return guild_data, self.bot.temp_guild_data[guild_id]
-
-        guild_data = await self.bot.guild_data_db.find_one(
-            {"_id": guild_id}
-        )  # Load from DB
-        if guild_data:
-            fixed_data = fix_guild_data(guild_data)
-            self.bot.guild_data[guild_id] = fixed_data
-            temp_guild_data = generate_temp_guild_data()
-        else:  # If not in DB, create new guild data
-            guild_data = generate_guild_data()
-            guild_name = await self.bot.fetch_guild(guild_id)
-            logging.info(f"[MongoDB] Creating new guild data for server: {guild_name}")
-            await self.bot.guild_data_db.insert_one({"_id": guild_id, **guild_data})
-            self.bot.guild_data[guild_id] = guild_data
-            temp_guild_data = generate_temp_guild_data()
-
-        self.bot.temp_guild_data[guild_id] = temp_guild_data
-        return guild_data, temp_guild_data
