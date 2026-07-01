@@ -87,8 +87,9 @@ class RedditFetcher:
     async def crackwatch(self) -> None:
         """Method to fetch game repacks from r/CrackWatch subreddit."""
         crackwatch_cache = await self._config_manager.get("crackwatch_cache", DB_CACHE)
+        crackwatch_cache_copy = crackwatch_cache.copy()
         to_filter = await self._config_manager.get("crackwatch_exceptions", DB_LISTS)
-        crackwatch_cache_upload = crackwatch_cache.copy()
+
         subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
             "CrackWatch"
         )
@@ -96,7 +97,7 @@ class RedditFetcher:
             async for submission in subreddit.new(limit=REDDIT_CRACKWATCH_MAX_RESULTS):
                 if not self._is_valid_crackwatch_submission(
                     submission,
-                    crackwatch_cache,
+                    crackwatch_cache_copy,
                     to_filter,
                 ):
                     continue
@@ -126,8 +127,8 @@ class RedditFetcher:
 
                     description_list.append(f"• {line}\n")
 
-                crackwatch_cache_upload.pop(0)
-                crackwatch_cache_upload.append(submission.permalink)
+                crackwatch_cache.pop(0)
+                crackwatch_cache.append(submission.permalink)
 
                 description = "".join(description_list)[:4096]
                 if (
@@ -190,26 +191,30 @@ class RedditFetcher:
 
     async def freegamefindings(self) -> None:
         """Method to fetch free games from r/FreeGameFindings subreddit."""
-        freegamefindings_cache = await self._config_manager.get("freegamefindings_cache", DB_CACHE)
-        to_filter = await self._config_manager.get("freegamefindings_exceptions", DB_LISTS)
-        freegamefindings_cache_upload = freegamefindings_cache.copy()
+        freegamefindings_cache = await self._config_manager.get(
+            "freegamefindings_cache", DB_CACHE
+        )
+        freegamefindings_cache_copy = freegamefindings_cache.copy()
+        to_filter = await self._config_manager.get(
+            "freegamefindings_exceptions", DB_LISTS
+        )
+
         subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
             "FreeGameFindings"
         )
-
         try:
             async for submission in subreddit.new(
                 limit=REDDIT_FREEGAMEFINDINGS_MAX_RESULTS
             ):
                 if not self._is_valid_freegame_submission(
                     submission,
-                    freegamefindings_cache,
+                    freegamefindings_cache_copy,
                     to_filter,
                 ):
                     continue
 
-                freegamefindings_cache_upload.pop(0)
-                freegamefindings_cache_upload.append(submission.url)
+                freegamefindings_cache.pop(0)
+                freegamefindings_cache.append(submission.url)
                 await self._process_submission(submission)
 
         except discord.errors.HTTPException as e:

@@ -288,6 +288,7 @@ class ContentMonitor:
         self, json_data: dict, alienwarearena_cache: list, to_filter: list
     ) -> None:
         alienwarearena_cache_copy = alienwarearena_cache.copy()
+
         for giveaway in json_data["data"][:ALIENWAREARENA_MAX_RESULTS]:
             url = "https://eu.alienwarearena.com" + giveaway["url"]
 

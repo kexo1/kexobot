@@ -1083,11 +1083,10 @@ class MusicCommands(commands.Cog):
             )
             await player.set_volume(volume)
 
-        # Autoplay mode is already set at player creation time from guild data
         await send(
             ctx,
             embed=make_embed(
-                f"Joined <#{player.channel.id}>, use <#{player.text_channel.id}> to control music."
+                f"Joined <#{player.channel.id}>, text channel set to <#{player.text_channel.id}>."
             ),
             ephemeral=False,
         )
