@@ -35,7 +35,7 @@ from app.config.music import (
 )
 from app.config.reddit import SHITPOST_SUBREDDITS_ALL
 from app.config.sfd import SFD_TIMEZONE_CHOICE
-from app.data import UserData, UserDataManager
+from app.data import BaseDataManager, UserData
 from app.response_handler import defer_interaction, make_embed, send
 from app.utils import EmbedPaginator
 
@@ -98,7 +98,7 @@ class CommandCog(commands.Cog):
         self._bot: KexoBotClient = bot
         self._session: httpx.AsyncClient = self._bot.session
         self._bot_config: AsyncMongoClient = self._bot.bot_config
-        self._user_mgr: UserDataManager = self._bot.user_data_manager
+        self._user_mgr: BaseDataManager[UserData] = self._bot.user_data_manager
 
         self._run_time = time.time()
         self._graphs_dir = os.path.join(os.getcwd(), "graphs")

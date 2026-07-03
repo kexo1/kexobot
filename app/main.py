@@ -48,12 +48,13 @@ from app.config.reddit import (
     SHITPOST_SUBREDDITS_ALL,
 )
 from app.data import (
+    BaseDataManager,
     BotConfigManager,
-    GuildDataManager,
+    GuildData,
     JokeCacheManager,
     TempGuildDataManager,
     TempUserDataManager,
-    UserDataManager,
+    UserData,
 )
 from app.data.bot_data import NodeCacheEntry
 from app.response_handler import make_embed, send
@@ -63,8 +64,8 @@ from app.utils import get_url_response_time, make_http_request
 class KexoBotClient(commands.Bot):
     node: sonolink.Node | None
     sonolink_client: sonolink.Client
-    user_data_manager: UserDataManager
-    guild_data_manager: GuildDataManager
+    user_data_manager: BaseDataManager[UserData]
+    guild_data_manager: BaseDataManager[GuildData]
     temp_user_data_manager: TempUserDataManager
     temp_guild_data_manager: TempGuildDataManager
     joke_cache_manager: JokeCacheManager
@@ -177,8 +178,8 @@ class KexoBot:
         bot.state = BotState(bot)
 
         # Data managers (replace old raw dicts)
-        bot.user_data_manager = UserDataManager(self._user_data_db, bot)
-        bot.guild_data_manager = GuildDataManager(self._guild_data_db)
+        bot.user_data_manager = BaseDataManager[UserData](self._user_data_db, UserData)
+        bot.guild_data_manager = BaseDataManager[GuildData](self._guild_data_db, GuildData)
         bot.temp_user_data_manager = TempUserDataManager(bot)
         bot.temp_guild_data_manager = TempGuildDataManager()
         bot.joke_cache_manager = JokeCacheManager()
@@ -609,4 +610,22 @@ async def on_guild_join(guild: discord.Guild) -> None:
     logging.info(f"Joined new guild: {guild.name}")
 
 
-bot.run(ENV_DISCORD_TOKEN)
+async def save_all_data() -> None:
+    """Save all cached bot config data to MongoDB on shutdown."""
+    await bot.config_manager.save_all(DB_CACHE)
+    logging.info("[MongoDB] All config data saved on shutdown.")
+
+
+def run_bot() -> None:
+    """Run the bot with proper shutdown handling."""
+    try:
+        bot.run(ENV_DISCORD_TOKEN)
+    finally:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(save_all_data())
+        loop.close()
+
+
+if __name__ == "__main__":
+    run_bot()
