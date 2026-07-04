@@ -77,11 +77,11 @@ class LavalinkServerManager:
             if uri in self._cached_lavalink_servers:
                 continue
 
-            initial_ping = await get_url_response_time(uri)
+            ping = get_url_response_time(uri)
             self._cached_lavalink_servers[uri] = {
                 "password": server["password"],
                 "score": 0,
-                "ping": initial_ping,
+                "ping": ping,
             }
 
     def _clear_removed_nodes(self) -> None:

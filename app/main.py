@@ -458,7 +458,7 @@ class KexoBot:
         and persist updated values to the database.
         """
         for uri in list(bot.cached_lavalink_servers.keys()):
-            ping = await get_url_response_time(uri)
+            ping = get_url_response_time(uri)
             bot.state.change_node_ping(uri, ping)
 
         await self._upload_cached_lavalink_servers()
