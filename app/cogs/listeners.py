@@ -19,6 +19,7 @@ from sonolink.gateway import (
 from app.config.colors import COLOR_YELLOW
 from app.config.music import MUSIC_TIPS
 from app.response_handler import make_embed, send
+from app.utils import make_now_playing_embed
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -128,23 +129,13 @@ class Listeners(commands.Cog):
 
         self._bot.state.change_node_score(player.node.uri, 1)
 
-        current_track = player.current or payload.track
-        temp_current = getattr(player, "temp_current", None)
-        if (
-            current_track
-            and temp_current
-            and not current_track.data.user_data
-            and temp_current.data.user_data
-        ):
-            current_track.data.user_data = dict(temp_current.data.user_data)
-
         # Skip now-playing message if the command already sent it (e.g., /play on empty queue)
         if getattr(player, "_now_playing_sent", False):
             player._now_playing_sent = False
         else:
             await send(
                 player.text_channel,
-                embed=self._bot.state.make_now_playing_embed(payload.track),
+                embed=make_now_playing_embed(player.current),
             )
 
         if player.autoplay != sonolink.AutoPlayMode.ENABLED:

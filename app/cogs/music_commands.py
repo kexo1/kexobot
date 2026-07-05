@@ -25,7 +25,15 @@ from app.config.music import (
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
 from app.response_handler import defer_interaction, make_embed, send
-from app.utils import EmbedPaginator, find_track, fix_audio_title, make_http_request
+from app.utils import (
+    EmbedPaginator,
+    find_track,
+    fix_audio_title,
+    get_track_requester_avatar,
+    get_track_requester_name,
+    make_http_request,
+    make_now_playing_embed,
+)
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -42,47 +50,16 @@ def get_search_prefix(query: str) -> str | None:
 def set_track_requester(
     track: sl_models.Playable,
     user: discord.abc.User,
-    bot: "KexoBotClient",
 ) -> None:
-    if track.data.user_data is None:
-        track.data.user_data = {}
-
-    track.data.user_data["requester_name"] = user.name
+    track.extras.requester_name = user.name
     avatar = getattr(getattr(user, "display_avatar", None), "url", None)
     if avatar:
-        track.data.user_data["requester_avatar"] = avatar
-
-    bot.state.cache_track_requester(track.encoded, user.name, avatar or "")
+        track.extras.requester_avatar = avatar
 
 
 def _parse_radiomap_stream_url(url: str) -> Optional[str]:
     channel_id = url.rstrip("/").split("/")[-1]
     return f"{API_RADIOGARDEN_LISTEN}{channel_id}/channel.mp3"
-
-
-def get_track_requester_name(track: sl_models.Playable, bot: "KexoBotClient") -> str:
-    requester_name = None
-    if track.data.user_data:
-        requester_name = track.data.user_data.get("requester_name")
-    if requester_name:
-        return requester_name
-    cached = bot.state.get_track_requester(track.encoded)
-    if cached and cached.get("name"):
-        return cached["name"]
-    return "Unknown"
-
-
-def get_track_requester_avatar(
-    track: sl_models.Playable, bot: "KexoBotClient"
-) -> str | None:
-    if track.data.user_data:
-        avatar = track.data.user_data.get("requester_avatar")
-        if avatar:
-            return avatar
-    cached = bot.state.get_track_requester(track.encoded)
-    if cached:
-        return cached.get("avatar") or None
-    return None
 
 
 async def fetch_first_track(
@@ -106,14 +83,14 @@ async def fetch_first_track(
 
     # Handle single Playable
     if isinstance(tracks, sl_models.Playable):
-        set_track_requester(tracks, ctx.user, ctx.client)
+        set_track_requester(tracks, ctx.user)
         return tracks
 
     if not tracks:
         return None
 
     first_track = tracks[0]
-    set_track_requester(first_track, ctx.user, ctx.client)
+    set_track_requester(first_track, ctx.user)
     return first_track
 
 
@@ -123,7 +100,7 @@ async def _handle_playlist(
     playlist: sl_models.Playlist,
 ) -> sl_models.Playable:
     for track in playlist:
-        set_track_requester(track, ctx.user, ctx.client)
+        set_track_requester(track, ctx.user)
 
     first_track = playlist.tracks.pop(0)
     song_count = player.queue.put(playlist)
@@ -235,7 +212,7 @@ class MusicCommands(commands.Cog):
         if not tracks:
             return
 
-        track = await fetch_first_track(ctx, tracks)
+        track: sl_models.Playable = await fetch_first_track(ctx, tracks)
         if not track:
             return
 
@@ -243,7 +220,7 @@ class MusicCommands(commands.Cog):
 
         if player.current:
             if play_next:
-                self._queue_insert_front(player, track)
+                player.queue.put_at(0, track)
             else:
                 player.queue.put(track)
 
@@ -251,7 +228,7 @@ class MusicCommands(commands.Cog):
             return
 
         player._now_playing_sent = True  # Prevent listener from duplicating
-        await send(ctx, embed=self._bot.state.make_now_playing_embed(track))
+        await send(ctx, embed=make_now_playing_embed(track))
         await self._play_track(ctx, track)
 
     @music.command(name="play", description="Plays song.")
@@ -466,10 +443,9 @@ class MusicCommands(commands.Cog):
             await send(ctx, code="NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
             return
 
-        track = player.queue[track_pos - 1]
         if track_pos > 1:
-            self._queue_remove_at(player, track_pos - 1)
-            self._queue_insert_front(player, track)
+            track = player.queue.pop_at(track_pos - 1)
+            player.queue.put_at(0, track)
 
         try:
             await player.skip()
@@ -498,8 +474,7 @@ class MusicCommands(commands.Cog):
             await send(ctx, code="NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
             return
 
-        track = player.queue[track_pos - 1]
-        self._queue_remove_at(player, track_pos - 1)
+        track = player.queue.pop_at(track_pos - 1)
         await send(
             ctx,
             code="QUEUE_TRACK_REMOVED",
@@ -856,24 +831,6 @@ class MusicCommands(commands.Cog):
             ephemeral=False,
         )
 
-    # ----------------------- Helper functions ------------------------ #
-    def _queue_insert_front(
-        self, player: sonolink.Player, track: sl_models.Playable
-    ) -> None:
-        queue_items = list(player.queue)
-        player.queue.clear()
-        player.queue.put([track, *queue_items])
-
-    def _queue_remove_at(
-        self, player: sonolink.Player, index: int
-    ) -> sl_models.Playable:
-        queue_items = list(player.queue)
-        removed = queue_items.pop(index)
-        player.queue.clear()
-        if queue_items:
-            player.queue.put(queue_items)
-        return removed
-
     async def _search_tracks(
         self, ctx: discord.Interaction, search: str
     ) -> Optional[
@@ -1061,7 +1018,7 @@ class MusicCommands(commands.Cog):
                     f"[sonolink] {i + 1}. Error playing track, retrying: %s", e
                 )
 
-        set_track_requester(track, ctx.user, self._bot)
+        set_track_requester(track, ctx.user)
         return True
 
     async def _prepare_sonolink(self, ctx: discord.Interaction) -> None:
@@ -1109,19 +1066,23 @@ class MusicCommands(commands.Cog):
             queue_status = "Looping currently playing song"
 
         current = player.current
-        requester = get_track_requester_name(current, self._bot)
+        requester_label = (
+            "Autoplay"
+            if current.autoplay
+            else f"Requested by: {get_track_requester_name(current)}"
+        )
         header = (
             f"\n***__{queue_status}:__***\n "
             f"**[{fix_audio_title(current)}]({current.uri})**\n"
             f" `{int(divmod(current.length, 60000)[0])}:"
             f"{round(divmod(current.length, 60000)[1] / 1000):02} | "
-            f"Requested by: {requester}`\n\n ***__Next:__***\n"
+            f"{requester_label}`\n\n ***__Next:__***\n"
         )
 
         pages: list[discord.Embed] = []
         current_description = header
         for pos, track in enumerate(player.queue):
-            track_requester = get_track_requester_name(track, self._bot)
+            track_requester = get_track_requester_name(track)
             song_line = (
                 f"`{pos + 1}.` **[{fix_audio_title(track)}]({track.uri})**\n"
                 f" `{int(divmod(track.length, 60000)[0])}:"
@@ -1141,6 +1102,39 @@ class MusicCommands(commands.Cog):
             else:
                 current_description += song_line
 
+        autoplay_tracks = player.queue.autoplay_tracks
+        if autoplay_tracks:
+            autoplay_header = "\n ***__Autoplay:__***\n"
+            if len(current_description) + len(autoplay_header) > 4096:
+                embed = discord.Embed(
+                    title=f"Queue for {ctx.guild.name}",
+                    description=current_description,
+                    color=COLOR_BLUE,
+                )
+                embed.set_footer(text=f"{len(player.queue)} songs in queue")
+                pages.append(embed)
+                current_description = autoplay_header
+            else:
+                current_description += autoplay_header
+
+            for pos, track in enumerate(autoplay_tracks):
+                song_line = (
+                    f"`#{pos + 1}.` **[{fix_audio_title(track)}]({track.uri})**\n"
+                    f" `{int(divmod(track.length, 60000)[0])}:"
+                    f"{round(divmod(track.length, 60000)[1] / 1000):02} | Autoplay`\n"
+                )
+                if len(current_description) + len(song_line) > 4096:
+                    embed = discord.Embed(
+                        title=f"Queue for {ctx.guild.name}",
+                        description=current_description,
+                        color=COLOR_BLUE,
+                    )
+                    embed.set_footer(text=f"{len(player.queue)} songs in queue")
+                    pages.append(embed)
+                    current_description = autoplay_header + song_line
+                else:
+                    current_description += song_line
+
         embed = discord.Embed(
             title=f"Queue for {ctx.guild.name}",
             description=current_description,
@@ -1158,9 +1152,9 @@ class MusicCommands(commands.Cog):
         )
         embed.set_author(name="Playback Information")
 
-        requester_name = get_track_requester_name(player.current, self._bot)
-        requester_avatar = get_track_requester_avatar(player.current, self._bot)
-        if requester_name != "Unknown":
+        requester_name = get_track_requester_name(player.current)
+        requester_avatar = get_track_requester_avatar(player.current)
+        if not player.current.autoplay:
             embed.set_footer(
                 text=f"Requested by {requester_name}",
                 icon_url=requester_avatar,

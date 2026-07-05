@@ -204,9 +204,6 @@ PLATFORM_EMOJIS: dict[str, str] = {
     "Gaana": "🎶",
 }
 
-############################# Track Requester Cache ############################
-TRACK_REQUESTER_MAXSIZE = 1000
-
 ############################# Music To Remove ############################
 MUSIC_TO_REMOVE = (
     ";",

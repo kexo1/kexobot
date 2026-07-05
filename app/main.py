@@ -77,7 +77,6 @@ class KexoBotClient(commands.Bot):
     reddit_agent: asyncpraw.Reddit
     humor_api_tokens: dict[str, dict[str, bool]]
     node_is_switching: dict[int, bool]
-    track_requesters: dict[str, dict[str, str]]
     session: httpx.AsyncClient | None
     state: BotState
 
@@ -179,7 +178,9 @@ class KexoBot:
 
         # Data managers (replace old raw dicts)
         bot.user_data_manager = BaseDataManager[UserData](self._user_data_db, UserData)
-        bot.guild_data_manager = BaseDataManager[GuildData](self._guild_data_db, GuildData)
+        bot.guild_data_manager = BaseDataManager[GuildData](
+            self._guild_data_db, GuildData
+        )
         bot.temp_user_data_manager = TempUserDataManager(bot)
         bot.temp_guild_data_manager = TempGuildDataManager()
         bot.joke_cache_manager = JokeCacheManager()
@@ -190,7 +191,6 @@ class KexoBot:
         bot.humor_api_tokens = {}
         bot.node_is_switching = {}
         bot.track_exceptions = {}
-        bot.track_requesters = {}
 
     async def initialize(self) -> None:
         """Initialize classes and fetch all channels and users."""
@@ -307,7 +307,6 @@ class KexoBot:
         if weekday == 6 and now.hour == 0:
             clear_cached_jokes()
             clear_temp_guild_data()
-            await self._test_all_node_pings()
             await self._refresh_subreddit_icons()
 
         if now.hour % 6 == 0:
@@ -316,6 +315,7 @@ class KexoBot:
         if now.hour == 0:
             load_humor_api_tokens()
             await self._upload_cached_lavalink_servers()
+            await self._test_all_node_pings()
             await self._lavalink_server_manager.fetch()
 
         if now.hour == 4:
@@ -454,7 +454,7 @@ class KexoBot:
     async def _test_all_node_pings(self) -> None:
         """Test ping for all cached lavalink nodes and update values.
 
-        Runs weekly on Sunday at 3 AM to refresh ping measurements
+        Runs daily to refresh ping measurements
         and persist updated values to the database.
         """
         for uri in list(bot.cached_lavalink_servers.keys()):
@@ -462,7 +462,7 @@ class KexoBot:
             bot.state.change_node_ping(uri, ping)
 
         await self._upload_cached_lavalink_servers()
-        logging.info("[Lavalink] Weekly ping test completed and saved to database.")
+        logging.info("[Lavalink] Daily ping test completed and saved to database.")
 
 
 kexobot = KexoBot()

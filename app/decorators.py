@@ -76,7 +76,8 @@ def is_queue_empty() -> Callable[[CommandFunc], CommandFunc]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             ctx = args[1]
             vc = ctx.guild.voice_client
-            if not vc or not vc.queue:
+
+            if not vc or (not vc.queue and not vc.queue.autoplay_tracks):
                 await send(ctx, code="NO_TRACKS_IN_QUEUE")
                 return None
 

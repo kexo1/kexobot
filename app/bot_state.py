@@ -7,13 +7,9 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 import sonolink
-import sonolink.models as sl_models
 from sonolink.models import AutoPlaySettings, CacheSettings, InactivitySettings
 
 from app.config.colors import COLOR_GREEN, COLOR_RED
-from app.config.discord import ICON_YOUTUBE
-from app.config.music import TRACK_REQUESTER_MAXSIZE
-from app.utils import fix_audio_title
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
@@ -192,48 +188,6 @@ class BotState:
             return None
         return node_entry["ping"]
 
-    def cache_track_requester(self, track_encoded: str, name: str, avatar: str) -> None:
-        """Cache requester metadata by encoded track ID.
-
-        Evicts the oldest entries when the cache exceeds ``TRACK_REQUESTER_MAXSIZE``.
-
-        Parameters
-        ----------
-        track_encoded: str
-            Encoded track ID used as cache key.
-        name: str
-            Requesting user's display name.
-        avatar: str
-            Requesting user's avatar URL. May be empty string.
-        """
-        requesters = self.bot.track_requesters
-        if (
-            track_encoded not in requesters
-            and len(requesters) >= TRACK_REQUESTER_MAXSIZE
-        ):
-            # Evict the oldest entry (first inserted key)
-            try:
-                oldest_key = next(iter(requesters))
-                del requesters[oldest_key]
-            except StopIteration:
-                pass
-        requesters[track_encoded] = {"name": name, "avatar": avatar}
-
-    def get_track_requester(self, track_encoded: str) -> dict[str, str] | None:
-        """Get cached requester metadata for encoded track.
-
-        Parameters
-        ----------
-        track_encoded: str
-            Encoded track ID used as cache key.
-
-        Returns
-        -------
-        dict[str, str] | None
-            Cached requester mapping if present, else ``None``.
-        """
-        return self.bot.track_requesters.get(track_encoded)
-
     def set_track_exception_probe(
         self, guild_id: int, track: Any, failed_event: Any
     ) -> None:
@@ -295,52 +249,6 @@ class BotState:
             ),
             cache_settings=CacheSettings(enabled=True, max_items=100),
         )
-
-    def make_now_playing_embed(self, track: sl_models.Playable) -> discord.Embed:
-        """Create a 'Now playing' embed for a given track.
-
-        Parameters
-        ----------
-        track: :class:`sonolink.Playable`
-            The track to create the embed for.
-
-        Returns
-        -------
-        :class:`discord.Embed`
-            The embed to send.
-        """
-        embed = discord.Embed(
-            color=COLOR_GREEN,
-            title="Now playing",
-            description=f"[**{fix_audio_title(track)}**]({track.uri})",
-        )
-
-        requester_name = None
-        requester_avatar = None
-
-        if track.data.user_data:
-            requester_name = track.data.user_data.get("requester_name")
-            requester_avatar = track.data.user_data.get("requester_avatar")
-
-        if not requester_name:
-            cached = self.get_track_requester(track.encoded)
-            if cached:
-                requester_name = cached.get("name")
-                requester_avatar = cached.get("avatar")
-
-        if requester_name:
-            embed.set_footer(
-                text=f"Requested by {requester_name}",
-                icon_url=requester_avatar,
-            )
-        else:
-            embed.set_footer(
-                text="YouTube Autoplay",
-                icon_url=ICON_YOUTUBE,
-            )
-
-        embed.set_thumbnail(url=track.artwork)
-        return embed
 
     async def switch_node(
         self,

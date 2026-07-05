@@ -10,6 +10,8 @@ import httpx
 import sonolink
 import sonolink.models as sl_models
 
+from app.config.colors import COLOR_GREEN
+from app.config.discord import ICON_YOUTUBE
 from app.config.music import MUSIC_TO_REMOVE
 
 
@@ -105,6 +107,75 @@ def fix_audio_title(track: sl_models.Playable) -> str:
     for char in MUSIC_TO_REMOVE:
         title = title.replace(char, "")
     return title.strip()
+
+
+def get_track_requester_name(track: sl_models.Playable) -> str:
+    """Get the requester name from a track's extras.
+
+    Parameters
+    ----------
+    track: :class:`sonolink.Playable`
+        The track to get the requester name from.
+
+    Returns
+    -------
+    str
+        The requester name, or ``"Unknown"`` if not set.
+    """
+    return getattr(track.extras, "requester_name", "Unknown")
+
+
+def get_track_requester_avatar(track: sl_models.Playable) -> str | None:
+    """Get the requester avatar URL from a track's extras.
+
+    Parameters
+    ----------
+    track: :class:`sonolink.Playable`
+        The track to get the requester avatar from.
+
+    Returns
+    -------
+    str | None
+        The requester avatar URL, or ``None`` if not set.
+    """
+    return getattr(track.extras, "requester_avatar", None)
+
+
+def make_now_playing_embed(track: sl_models.Playable) -> discord.Embed:
+    """Create a 'Now playing' embed for a given track.
+
+    Parameters
+    ----------
+    track: :class:`sonolink.Playable`
+        The track to create the embed for.
+
+    Returns
+    -------
+    :class:`discord.Embed`
+        The embed to send.
+    """
+    embed = discord.Embed(
+        color=COLOR_GREEN,
+        title="Now playing",
+        description=f"[**{fix_audio_title(track)}**]({track.uri})",
+    )
+
+    requester_name = get_track_requester_name(track)
+    requester_avatar = get_track_requester_avatar(track)
+
+    if not track.autoplay:
+        embed.set_footer(
+            text=f"Requested by {requester_name}",
+            icon_url=requester_avatar,
+        )
+    else:
+        embed.set_footer(
+            text="YouTube Autoplay",
+            icon_url=ICON_YOUTUBE,
+        )
+
+    embed.set_thumbnail(url=track.artwork)
+    return embed
 
 
 def is_older_than(hours: int, custom_datetime: datetime) -> bool:
