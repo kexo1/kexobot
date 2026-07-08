@@ -39,6 +39,7 @@ SHITPOST_SUBREDDITS_ALL = (
 REDDIT_TO_REMOVE = (" *", "* ", "*", "---")
 REDDIT_FREEGAMEFINDINGS_MAX_RESULTS = 5
 REDDIT_CRACKWATCH_MAX_RESULTS = 5
+CRACKWATCH_HIGHLIGHT_KEYWORDS = ["denuvo removed", "voices38"]
 
 ############################# Default Embeds ############################
 REDDIT_FREEGAMEFINDINGS_EMBEDS = {

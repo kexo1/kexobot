@@ -34,7 +34,7 @@ logger.addHandler(console_handler)
 
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp.client").setLevel(logging.CRITICAL)
-logging.getLogger("sonolink").setLevel(logging.CRITICAL)
+logging.getLogger("sonolink").setLevel(logging.DEBUG)
 logging.getLogger("discord.client").setLevel(logging.WARNING)
 logging.getLogger("discord.gateway").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)

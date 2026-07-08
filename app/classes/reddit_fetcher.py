@@ -17,6 +17,7 @@ from asyncprawcore.exceptions import (
 
 from app.config.mongo import DB_CACHE, DB_LISTS
 from app.config.reddit import (
+    CRACKWATCH_HIGHLIGHT_KEYWORDS,
     ICON_REDDIT_CRACKWATCH,
     ICON_REDDIT_FREEGAMEFINDINGS,
     REDDIT_CRACKWATCH_MAX_RESULTS,
@@ -131,9 +132,12 @@ class RedditFetcher:
                 crackwatch_cache.append(submission.permalink)
 
                 description = "".join(description_list)[:4096]
-                if (
-                    "denuvo removed" in submission.title.lower()
-                    or "denuvo removed" in description.lower()
+                title_lower = submission.title.lower()
+                description_lower = description.lower()
+
+                if any(
+                    keyword in title_lower or keyword in description_lower
+                    for keyword in CRACKWATCH_HIGHLIGHT_KEYWORDS
                 ):
                     embed = create_embed_crackwatch(
                         submission, description, discord.Color.gold()
