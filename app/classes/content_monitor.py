@@ -41,9 +41,8 @@ def get_onlinefix_messages(chat_log: str) -> list:
 def apply_build_token(
     full_title: str,
     game_title: list[str],
-    game3rb_cache: list[str],
-    to_upload: list[str],
 ) -> tuple[list[str], str, bool]:
+    """Extract build token from game title and return cleaned title with version."""
     pattern = r"Build ([0-9A-Za-z._-]+)"
     match = re.search(pattern, full_title)
     if not match:
@@ -67,12 +66,10 @@ def apply_build_token(
             break
 
     if not removed:
-        if full_title not in game3rb_cache and full_title not in to_upload:
-            logging.warning(
-                "[Game3rb] Broken name - %s",
-                full_title,
-            )
-            to_upload.append(full_title)
+        logging.warning(
+            "[Game3rb] Broken name - %s",
+            full_title,
+        )
         return game_title, version, False
 
     return game_title, version, True
@@ -127,6 +124,7 @@ class ContentMonitor:
     async def game3rb(self) -> None:
         """Check for selected games from Game3rb."""
         game3rb_cache = await self._config_manager.get("game3rb_cache", DB_CACHE)
+        game3rb_cache_copy = game3rb_cache.copy()
 
         game_list = await self._config_manager.get("games", DB_LISTS)
         game_list = "\n".join(game_list)
@@ -136,7 +134,6 @@ class ContentMonitor:
             return
 
         game_info = []
-        to_upload = []
 
         soup = BeautifulSoup(source.text, "html.parser")
         article = soup.find("article")
@@ -155,6 +152,7 @@ class ContentMonitor:
 
             game_title = line.get("title")
             full_title = game_title
+            game_url = line.get("href")
 
             game_title: list = strip_text(game_title, GAME3RB_TO_REMOVE).split()
             version = ""
@@ -167,10 +165,9 @@ class ContentMonitor:
                 game_title, version, ok = apply_build_token(
                     full_title,
                     game_title,
-                    game3rb_cache,
-                    to_upload,
                 )
                 if not ok:
+                    article = article.find_next("article")
                     continue
 
             game_title = " ".join(game_title)
@@ -184,12 +181,20 @@ class ContentMonitor:
                     break
                 carts.add(cart.text)
 
+            # Create cache key with URL and version
+            cache_key = f"{game_url}|{version}" if version else game_url
+
+            # Check if this URL+version combo is already cached
+            if cache_key in game3rb_cache_copy:
+                article = article.find_next("article")
+                continue
+
             game_info.append(
                 {
                     "title": game_title,
-                    "full_title": full_title,
                     "version": version,
-                    "url": line.get("href"),
+                    "url": game_url,
+                    "cache_key": cache_key,
                     "image": article.find("img", {"class": "entry-image"})["src"],
                     "timestamp": article.find("time")["datetime"],
                     "carts": carts,
@@ -201,9 +206,9 @@ class ContentMonitor:
             return
 
         for game in game_info:
-            to_upload.append(game["full_title"])
-            if game["full_title"] in game3rb_cache:
-                continue
+            # Cycle cache: remove oldest, add newest (matching reddit pattern)
+            game3rb_cache.pop(0)
+            game3rb_cache.append(game["cache_key"])
 
             description = []
             source = await make_http_request(
@@ -264,8 +269,7 @@ class ContentMonitor:
             embed.set_image(url=game["image"])
             await self._game_updates_channel.send(embed=embed)
 
-        if to_upload:
-            await self._config_manager.save("game3rb_cache", DB_CACHE)
+        await self._config_manager.save("game3rb_cache", DB_CACHE)
 
     async def online_fix(self) -> None:
         """Checks for selected games from Online-Fix."""
