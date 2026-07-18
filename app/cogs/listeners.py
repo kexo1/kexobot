@@ -298,17 +298,10 @@ class Listeners(commands.Cog):
 
         if len(player.channel.members) == 1:
             await player.disconnect()
-
-        if player.channel.members[0] == player.guild.me:
-            try:
-                await send(
-                    player.text_channel,
-                    embed=make_embed(
-                        f"Left <#{player.channel.id}>, no users in channel."
-                    ),
-                )
-            except AttributeError:
-                pass
+            await send(
+                player.text_channel,
+                embed=make_embed(f"Left <#{player.channel.id}>, no users in channel."),
+            )
 
 
 async def setup(bot: "KexoBotClient") -> None:

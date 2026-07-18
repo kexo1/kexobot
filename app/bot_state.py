@@ -298,7 +298,6 @@ class BotState:
         play_after: bool = False,
         send_success_message: bool = True,
         send_failure_message: bool = True,
-        search_mode: bool = False,
         search_callback: Callable[[], Awaitable[Any]] | None = None,
     ) -> None:
         """Attempt to switch to a new node for audio playback or search retry.
@@ -313,9 +312,6 @@ class BotState:
             Whether to send a success message in the text channel upon successful node switch.
         send_failure_message: bool
             Whether to send a failure message in the text channel if no suitable node is found.
-        search_mode: bool
-            If True, skip all playback-related logic (autoplay disable, track resume, playback probe).
-            Use this when switching nodes for search retries.
         search_callback: Callable[[], Awaitable[Any]] | None
             When in search_mode, this callback is invoked up to 5 times per node to verify
             the node can successfully perform a search. If the callback times out or fails
@@ -338,7 +334,7 @@ class BotState:
             excluded_nodes.add(_node.uri)
 
         original_autoplay_mode: sonolink.AutoPlayMode = player.autoplay
-        if not search_mode:
+        if not search_callback:
             await player.update(
                 autoplay_settings=AutoPlaySettings(
                     mode=sonolink.AutoPlayMode.DISABLED,
@@ -413,7 +409,7 @@ class BotState:
                 if not node:
                     continue
 
-                if search_mode:
+                if search_callback:
                     is_working = await _try_move_and_search(node)
                 else:
                     is_working = await _try_move_and_resume(node)
@@ -434,7 +430,7 @@ class BotState:
                         discord.abc.Messageable, player.text_channel
                     )
                     await _success_channel.send(embed=embed)
-                return
+                return node
 
             if send_failure_message:
                 embed = discord.Embed(
@@ -447,7 +443,7 @@ class BotState:
                 )
                 await _failure_channel.send(embed=embed)
         finally:
-            if not search_mode:
+            if not search_callback:
                 await player.update(
                     autoplay_settings=AutoPlaySettings(
                         mode=original_autoplay_mode,

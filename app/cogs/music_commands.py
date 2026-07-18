@@ -894,7 +894,6 @@ class MusicCommands(commands.Cog):
                     )
                 await self._bot.state.switch_node(
                     player=player,
-                    search_mode=True,
                     search_callback=lambda: self._bot.sonolink_client.search_track(
                         search, source=source
                     ),
