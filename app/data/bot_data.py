@@ -40,7 +40,7 @@ class BotConfigManager:
         self._cache: dict[str, Any] = {}
         self._snapshot: dict[str, Any] = {}
 
-    async def get(self, key: str, query: dict) -> Any:
+    async def get(self, key: str, query: dict[str, Any]) -> Any:
         """Get cached data by key, loading from MongoDB if needed.
 
         Parameters
@@ -83,7 +83,7 @@ class BotConfigManager:
         """
         return self._cache.get(key)
 
-    async def save(self, key: str, query: dict) -> None:
+    async def save(self, key: str, query: dict[str, Any]) -> None:
         """Persist data to MongoDB only if it has changed.
 
         Automatically detects in-place modifications by comparing
@@ -112,7 +112,7 @@ class BotConfigManager:
         )
         self._snapshot[key] = current_snapshot
 
-    async def save_all(self, query: dict) -> None:
+    async def save_all(self, query: dict[str, Any]) -> None:
         """Save all cached keys that have changed.
 
         Parameters

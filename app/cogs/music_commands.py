@@ -883,17 +883,21 @@ class MusicCommands(commands.Cog):
                         return tracks
 
             except asyncio.TimeoutError:
-                await send(
-                    ctx,
-                    embed=make_embed(
-                        ":warning: Node timed out finding tracks, switching to another node.",
-                        color=COLOR_YELLOW,
-                    ),
-                    ephemeral=False,
-                )
+                if i == 0:
+                    await send(
+                        ctx,
+                        embed=make_embed(
+                            ":warning: Node timed out finding tracks, switching to another node.",
+                            color=COLOR_YELLOW,
+                        ),
+                        ephemeral=False,
+                    )
                 await self._bot.state.switch_node(
                     player=player,
-                    play_after=True,
+                    search_mode=True,
+                    search_callback=lambda: self._bot.sonolink_client.search_track(
+                        search, source=source
+                    ),
                     send_failure_message=False,
                 )
                 continue

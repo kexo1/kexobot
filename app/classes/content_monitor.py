@@ -181,7 +181,6 @@ class ContentMonitor:
                     break
                 carts.add(cart.text)
 
-            # Create cache key with URL and version
             cache_key = f"{game_url}|{version}" if version else game_url
 
             # Check if this URL+version combo is already cached
@@ -206,7 +205,6 @@ class ContentMonitor:
             return
 
         for game in game_info:
-            # Cycle cache: remove oldest, add newest (matching reddit pattern)
             game3rb_cache.pop(0)
             game3rb_cache.append(game["cache_key"])
 

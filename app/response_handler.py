@@ -4,8 +4,6 @@ import discord
 
 from app.config.colors import COLOR_BLUE, COLOR_RED
 
-ResponseBuilder = Callable[..., discord.Embed]
-
 
 def make_embed(
     description: str,
@@ -20,7 +18,40 @@ def make_embed(
     return embed
 
 
-# Only messages reused in multiple places belong here.
+def _no_track_found(to_find: str) -> discord.Embed:
+    return make_embed(
+        f":x: No tracks with index {to_find} were found in the queue. "
+        + "Type `/music queue` to see the list of tracks."
+    )
+
+
+def _no_tracks_found(search: str) -> discord.Embed:
+    return make_embed(f":x: No tracks were found for `{search}`.")
+
+
+def _radiomap_no_station_found(search: str) -> discord.Embed:
+    return make_embed(f":x: No station found with name {search}.")
+
+
+def _queue_track_removed(title: str, uri: str) -> discord.Embed:
+    return make_embed(f":wastebasket: Removed [{title}]({uri})")
+
+
+def _queue_loop_enabled(count: int) -> discord.Embed:
+    return make_embed(f"🔁 Looping queue with `({count}` songs)")
+
+
+def _track_loop_enabled(title: str, uri: str) -> discord.Embed:
+    return make_embed(f"🔁 Looping [{title}]({uri})")
+
+
+def _reconnected_node(node: str) -> discord.Embed:
+    return make_embed(f":white_check_mark: Reconnected to node `{node}`.")
+
+
+type ResponseBuilder = Callable[..., discord.Embed]
+
+
 RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     # ──────────────────────────── Music errors ───────────────────────────── #
     "NO_VOICE_CHANNEL": make_embed(
@@ -29,10 +60,7 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     "NOT_IN_SAME_VOICE_CHANNEL": make_embed(
         ":x: I am playing in a different voice channel."
     ),
-    "NO_TRACK_FOUND_IN_QUEUE": lambda **kwargs: make_embed(
-        f":x: No tracks with index {kwargs.get('to_find')} were found in the queue."
-        " Type `/music queue` to see the list of tracks."
-    ),
+    "NO_TRACK_FOUND_IN_QUEUE": _no_track_found,
     "NO_PERMISSIONS": make_embed(
         ":x: I don't have permissions to join your channel.", color=COLOR_RED
     ),
@@ -42,20 +70,16 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
     ),
     "NODE_NOT_FOUND": make_embed(
         ":x: Couldn't find node to play this music, try switching to a different node "
-        "with `/node reconnect`, or use Youtube links instead of Spotify/Deezer/Apple Music.",
+        + "with `/node reconnect`, or use Youtube links instead of Spotify/Deezer/Apple Music.",
         color=COLOR_RED,
     ),
-    "NO_TRACKS_FOUND": lambda **kwargs: make_embed(
-        f":x: No tracks were found for `{kwargs.get('search')}`."
-    ),
+    "NO_TRACKS_FOUND": _no_tracks_found,
     "NO_TRACKS_IN_QUEUE": make_embed("Queue is empty."),
     "RADIOMAP_ERROR": make_embed(
         ":x: Failed to get response from RadioMap API, try again later.",
         color=COLOR_RED,
     ),
-    "RADIOMAP_NO_STATION_FOUND": lambda **kwargs: make_embed(
-        f":x: No station found with name {kwargs.get('search')}."
-    ),
+    "RADIOMAP_NO_STATION_FOUND": _radiomap_no_station_found,
     "JOKE_TIMEOUT": make_embed(
         ":x: Failed to get joke, try again later.", color=COLOR_RED
     ),
@@ -63,21 +87,13 @@ RESPONSE_CODES: dict[str, discord.Embed | ResponseBuilder] = {
         ":x: You've seen all available jokes for now.", color=COLOR_RED
     ),
     "QUEUE_CLEARED": make_embed(":wastebasket: Queue has been cleared."),
-    "QUEUE_TRACK_REMOVED": lambda **kwargs: make_embed(
-        f":wastebasket: Removed [{kwargs.get('title')}]({kwargs.get('uri')})"
-    ),
+    "QUEUE_TRACK_REMOVED": _queue_track_removed,
     "QUEUE_SHUFFLED": make_embed("🔀 Queue shuffled."),
     "QUEUE_LOOP_DISABLED": make_embed("No longer looping queue."),
-    "QUEUE_LOOP_ENABLED": lambda **kwargs: make_embed(
-        f"🔁 Looping queue with `({kwargs.get('count')}` songs)"
-    ),
+    "QUEUE_LOOP_ENABLED": _queue_loop_enabled,
     "TRACK_LOOP_DISABLED": make_embed("No longer looping current song."),
-    "TRACK_LOOP_ENABLED": lambda **kwargs: make_embed(
-        f"🔁 Looping [{kwargs.get('title')}]({kwargs.get('uri')})"
-    ),
-    "RECONNECTED_NODE": lambda **kwargs: make_embed(
-        f":white_check_mark: Reconnected to node `{kwargs.get('node')}`."
-    ),
+    "TRACK_LOOP_ENABLED": _track_loop_enabled,
+    "RECONNECTED_NODE": _reconnected_node,
 }
 
 
@@ -87,6 +103,35 @@ async def defer_interaction(
     if interaction.response.is_done():
         return
     await interaction.response.defer(ephemeral=ephemeral)
+
+
+def _build_send_kwargs(
+    *,
+    content: str | None = None,
+    embed: discord.Embed | None = None,
+    embeds: list[discord.Embed] | None = None,
+    view: discord.ui.View | None = None,
+    files: list[discord.File] | None = None,
+    suppress: bool | None = None,
+    ephemeral: bool | None = None,
+) -> dict[str, Any]:
+    """Build keyword arguments dict for discord send methods, omitting None values."""
+    kwargs: dict[str, Any] = {}
+    if content is not None:
+        kwargs["content"] = content
+    if embed is not None:
+        kwargs["embed"] = embed
+    if embeds is not None:
+        kwargs["embeds"] = embeds
+    if view is not None:
+        kwargs["view"] = view
+    if files is not None:
+        kwargs["files"] = files
+    if suppress is not None:
+        kwargs["suppress_embeds"] = suppress
+    if ephemeral is not None:
+        kwargs["ephemeral"] = ephemeral
+    return kwargs
 
 
 async def send(
@@ -101,7 +146,7 @@ async def send(
     delete_after: float | None = None,
     ephemeral: bool = False,
     suppress: bool | None = None,
-    **kwargs: Any,
+    **kwargs: Any,  # pyright: ignore[reportAny]
 ) -> discord.Message | None:
     """Unified send function — the one entry point for all bot messages.
 
@@ -136,47 +181,39 @@ async def send(
             response = response(**kwargs)
         resolved_embed = response  # type: ignore[assignment]
 
-    # ── 2. Build the payload that both interaction + channel paths need ─────
-    payload: dict[str, Any] = {}
-    if content is not None:
-        payload["content"] = content
-    if view is not None:
-        payload["view"] = view
-    if embeds is not None:
-        payload["embeds"] = embeds
-    elif resolved_embed is not None:
-        payload["embed"] = resolved_embed
-    if files is not None:
-        payload["files"] = files
-    if suppress is not None:
-        payload["suppress_embeds"] = suppress
-
-    # ── 3. Route to the correct backend ────────────────────────────────────
+    # ── 2. Route to the correct backend ────────────────────────────────────
     message: discord.Message | None = None
 
     if isinstance(target, discord.Interaction):
-        # --- Interaction path ---
-        interaction_payload: dict[str, Any] = {**payload, "ephemeral": ephemeral}
+        payload = _build_send_kwargs(
+            content=content,
+            embed=resolved_embed if embeds is None else None,
+            embeds=embeds,
+            view=view,
+            files=files,
+            suppress=suppress,
+        )
 
         if target.response.is_done():
             try:
-                message = await target.followup.send(**interaction_payload, wait=True)
+                message = await target.followup.send(
+                    **payload,  # pyright: ignore[reportAny]
+                    ephemeral=ephemeral,
+                    wait=True,
+                )
             except discord.NotFound:
                 if not ephemeral and target.channel:
-                    channel_payload = {
-                        k: v for k, v in payload.items() if k != "ephemeral"
-                    }
                     try:
-                        message = await target.channel.send(**channel_payload)
+                        message = await target.channel.send(**payload)  # pyright: ignore[reportAny, reportUnknownVariableType, reportUnknownMemberType]
                     except discord.HTTPException:
                         pass
         else:
             try:
-                await target.response.send_message(**interaction_payload)
+                await target.response.send_message(**payload, ephemeral=ephemeral)  # pyright: ignore[reportAny]
             except discord.NotFound:
                 if not ephemeral and target.channel:
                     try:
-                        message = await target.channel.send(**payload)
+                        message = await target.channel.send(**payload)  # pyright: ignore[reportAny, reportUnknownVariableType, reportUnknownMemberType]
                     except discord.HTTPException:
                         pass
             else:
@@ -186,12 +223,20 @@ async def send(
                     message = None
     else:
         # --- Channel / Messageable path ---
+        payload = _build_send_kwargs(
+            content=content,
+            embed=resolved_embed if embeds is None else None,
+            embeds=embeds,
+            view=view,
+            files=files,
+            suppress=suppress,
+        )
         try:
-            message = await target.send(**payload)
+            message = await target.send(**payload)  # pyright: ignore[reportAny]
         except discord.HTTPException:
             pass
 
     if message and delete_after is not None:
-        await message.delete(delay=delete_after)
+        await message.delete(delay=delete_after)  # pyright: ignore[reportUnknownMemberType]
 
-    return message
+    return message  # pyright: ignore[reportUnknownVariableType]

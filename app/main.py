@@ -2,12 +2,12 @@ import asyncio
 import copy
 import logging
 import socket
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any
+from typing import Any, cast, override
 from zoneinfo import ZoneInfo
 
 import asyncpraw
-import asyncpraw.models
 import asyncprawcore.exceptions
 import cloudscraper
 import discord
@@ -62,24 +62,32 @@ from app.utils import get_url_response_time, make_http_request
 
 
 class KexoBotClient(commands.Bot):
-    node: sonolink.Node | None
-    sonolink_client: sonolink.Client
-    user_data_manager: BaseDataManager[UserData]
-    guild_data_manager: BaseDataManager[GuildData]
-    temp_user_data_manager: TempUserDataManager
-    temp_guild_data_manager: TempGuildDataManager
-    joke_cache_manager: JokeCacheManager
-    config_manager: BotConfigManager
-    track_exceptions: dict[int, tuple[Any, asyncio.Event]]
-    cached_lavalink_servers: dict[str, NodeCacheEntry]
-    subreddit_icons: dict[str, str]
-    bot_config: AsyncMongoClient
-    reddit_agent: asyncpraw.Reddit
-    humor_api_tokens: dict[str, dict[str, bool]]
-    node_is_switching: dict[int, bool]
-    session: httpx.AsyncClient | None
-    state: BotState
+    node: sonolink.Node | None = None
+    sonolink_client: sonolink.Client | None = None
+    close_nodes_lock: asyncio.Lock | None = None
+    user_data_manager: BaseDataManager[UserData] | None = None
+    guild_data_manager: BaseDataManager[GuildData] | None = None
+    temp_user_data_manager: TempUserDataManager | None = None
+    temp_guild_data_manager: TempGuildDataManager | None = None
+    joke_cache_manager: JokeCacheManager | None = None
+    config_manager: BotConfigManager | None = None
+    track_exceptions: (
+        dict[int, tuple[sonolink.models.Playable | None, asyncio.Event]] | None
+    ) = None
+    cached_lavalink_servers: dict[str, NodeCacheEntry] | None = None
+    subreddit_icons: dict[str, str] | None = None
+    bot_config: AsyncMongoClient[Any] | None = None
+    _bot_config: AsyncMongoClient[Any] | None = None
+    _user_data_db: AsyncMongoClient[Any] | None = None
+    _guild_data_db: AsyncMongoClient[Any] | None = None
+    reddit_agent: asyncpraw.Reddit | None = None
+    humor_api_tokens: dict[str, dict[str, bool]] | None = None
+    node_is_switching: dict[int, bool] | None = None
+    session: httpx.AsyncClient | None = None
+    state: BotState | None = None
+    connect_node: Callable[..., Awaitable[sonolink.Node | None]] | None = None
 
+    @override
     async def setup_hook(self) -> None:
         """Initialize sonolink client, fetch cached nodes, connect node, load cogs.
 
@@ -92,13 +100,17 @@ class KexoBotClient(commands.Bot):
             logging.warning(
                 "[Sonolink] Setup hook connect failed, refreshing node cache."
             )
-            await kexobot._lavalink_server_manager.fetch()
+            assert kexobot.lavalink_server_manager is not None, (
+                "Lavalink server manager must be initialized"
+            )
+            await kexobot.lavalink_server_manager.fetch()
             node = await kexobot.connect_node()
 
         if not node:
             logging.error("[Sonolink] Node is not connected after setup hook attempts.")
 
         await setup_cogs()
+        assert self.sonolink_client is not None, "Sonolink client must be initialized"
         await self.sonolink_client.start()
 
         main_loop_task.start()
@@ -114,21 +126,29 @@ bot = KexoBotClient(command_prefix=commands.when_mentioned, intents=intents)
 
 def load_humor_api_tokens() -> None:
     """Load the humor API tokens."""
+    assert bot.humor_api_tokens is not None, "Humor API tokens dict must be initialized"
     bot.humor_api_tokens = {token: {"exhausted": False} for token in ENV_HUMOR_KEY}
 
 
 def clear_temp_reddit_data() -> None:
     """Clear the temporary user reddit data."""
+    assert bot.temp_user_data_manager is not None, (
+        "Temp user data manager must be initialized"
+    )
     bot.temp_user_data_manager.clear_stale_reddit_data(stale_hours=5)
 
 
 def clear_temp_guild_data() -> None:
     """Clear the temporary guild data."""
+    assert bot.temp_guild_data_manager is not None, (
+        "Temp guild data manager must be initialized"
+    )
     bot.temp_guild_data_manager.reset_all()
 
 
 def clear_cached_jokes() -> None:
     """Clear the cached jokes loaded from FunCommands"""
+    assert bot.joke_cache_manager is not None, "Joke cache manager must be initialized"
     bot.joke_cache_manager.clear_all()
 
 
@@ -147,14 +167,20 @@ class KexoBot:
         self.session: httpx.AsyncClient | None = None
         self.cloudscraper_session: cloudscraper.CloudScraper | None = None
         self._user_kexo: discord.User | None = None
-        self._subreddit_cache: dict | None = None
-        self._hostname = socket.gethostname()
-        self._main_loop_counter = 0
+        self._subreddit_cache: dict[str, Any] | None = None
+        self._hostname: str = socket.gethostname()
+        self._main_loop_counter: int = 0
 
-        database = AsyncMongoClient(ENV_API_DB)["KexoBOTDatabase"]
-        self._bot_config = database["BotConfig"]
-        self._user_data_db = database["UserData"]
-        self._guild_data_db = database["GuildData"]
+        db = cast(Any, AsyncMongoClient(ENV_API_DB)["KexoBOTDatabase"])  # pyright: ignore[reportAny]
+        self._bot_config: AsyncMongoClient[Any] = cast(
+            AsyncMongoClient[Any], db["BotConfig"]
+        )
+        self._user_data_db: AsyncMongoClient[Any] = cast(
+            AsyncMongoClient[Any], db["UserData"]
+        )
+        self._guild_data_db: AsyncMongoClient[Any] = cast(
+            AsyncMongoClient[Any], db["GuildData"]
+        )
 
         self._reddit_agent: asyncpraw.Reddit | None = None
 
@@ -162,6 +188,8 @@ class KexoBot:
         self._content_monitor: ContentMonitor | None = None
         self._lavalink_server_manager: LavalinkServerManager | None = None
         self._sfd_servers: SFDServers | None = None
+
+        self.lavalink_server_manager: LavalinkServerManager | None = None
 
         self._channel_game_updates: discord.TextChannel | None = None
         self._channel_game_cracks: discord.TextChannel | None = None
@@ -174,6 +202,7 @@ class KexoBot:
 
         bot.bot_config = self._bot_config
         bot.sonolink_client = sonolink.Client(bot)
+        bot.connect_node = self.connect_node
         bot.state = BotState(bot)
 
         # Data managers (replace old raw dicts)
@@ -184,9 +213,7 @@ class KexoBot:
         bot.temp_user_data_manager = TempUserDataManager(bot)
         bot.temp_guild_data_manager = TempGuildDataManager()
         bot.joke_cache_manager = JokeCacheManager()
-        bot.config_manager = BotConfigManager(self._bot_config, lambda: [])
-
-        bot.connect_node = self.connect_node
+        bot.config_manager = BotConfigManager(self._bot_config, lambda: list[str]())
 
         bot.humor_api_tokens = {}
         bot.node_is_switching = {}
@@ -244,6 +271,22 @@ class KexoBot:
         if self._reddit_agent is None:
             raise RuntimeError("Reddit client is not initialized")
 
+        assert self.cloudscraper_session is not None, (
+            "Cloudscraper session must be initialized"
+        )
+        assert self.session is not None, "HTTP session must be initialized"
+        assert bot.config_manager is not None, "Config manager must be initialized"
+        assert self._channel_game_updates is not None, (
+            "Game updates channel must be fetched"
+        )
+        assert self._channel_free_stuff is not None, (
+            "Free stuff channel must be fetched"
+        )
+        assert self._channel_game_cracks is not None, (
+            "Game cracks channel must be fetched"
+        )
+        assert self._user_kexo is not None, "User Kexo must be fetched"
+
         self._content_monitor = ContentMonitor(
             bot.config_manager,
             self.session,
@@ -269,6 +312,9 @@ class KexoBot:
         fetch data from different sources.
         It runs the classes in a round-robin fashion.
         """
+        assert self._reddit_fetcher is not None, "Reddit fetcher must be initialized"
+        assert self._content_monitor is not None, "Content monitor must be initialized"
+        assert self._sfd_servers is not None, "SFD servers must be initialized"
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
 
         if self._main_loop_counter == 0:
@@ -301,6 +347,14 @@ class KexoBot:
         It runs the classes in a round-robin fashion.
         It also updates the reddit cache and fetches lavalink servers.
         """
+        assert self._lavalink_server_manager is not None, (
+            "Lavalink server manager must be initialized"
+        )
+        assert bot.cached_lavalink_servers is not None, (
+            "Cached lavalink servers must be loaded"
+        )
+        assert bot.config_manager is not None, "Config manager must be initialized"
+
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
         weekday = now.weekday()
 
@@ -319,6 +373,7 @@ class KexoBot:
             await self._lavalink_server_manager.fetch()
 
         if now.hour == 4:
+            assert self.session is not None, "HTTP session must be initialized"
             await self.wordnik_presence()
 
     async def connect_node(
@@ -343,6 +398,7 @@ class KexoBot:
             The lavalink node that was connected to.
         """
         node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
+        node = None
 
         for exclude_node in exclude_nodes or []:
             node_candidates.pop(exclude_node, None)
@@ -389,18 +445,21 @@ class KexoBot:
             logging.critical("[Lavalink] No lavalink servers available.")
             return None
 
+        assert node is not None, "Node must be assigned after loop"
         bot.node = node
         return node
 
     async def wordnik_presence(self) -> None:
         """Fetches the word of the day from Wordnik API."""
+        assert self.session is not None, "HTTP session must be initialized"
         json_data = await make_http_request(self.session, API_WORDNIK, get_json=True)
         if not json_data:
             logging.warning("[API] Wordnik API returned no data.")
             return
 
-        word = json_data["word"]
-        definition = json_data["definitions"][0]["text"]
+        assert isinstance(json_data, dict)
+        word = cast(str, json_data["word"])
+        definition = cast(str, json_data["definitions"][0]["text"])
         definition = definition[:-1]
         presence = f"{word}: {definition}"
 
@@ -414,20 +473,21 @@ class KexoBot:
 
     async def _refresh_subreddit_icons(self) -> None:
         """Refreshes subreddit icons on Sunday."""
-        subreddit_icons = {}
+        subreddit_icons: dict[str, str] = {}
         for subreddit_name in SHITPOST_SUBREDDITS_ALL:
-            subreddit: asyncpraw.models.Subreddit = await self._reddit_agent.subreddit(
-                subreddit_name
-            )
+            subreddit = await self._reddit_agent.subreddit(subreddit_name)
+            assert subreddit is not None, "Subreddit must be resolved"
+
             try:
                 await subreddit.load()
             except asyncprawcore.exceptions.NotFound:
                 pass
 
-            if not subreddit.icon_img:
+            icon_img = cast(str, subreddit.icon_img)
+            if not icon_img:
                 subreddit_icons[subreddit.display_name] = ICON_REDDIT
                 continue
-            subreddit_icons[subreddit.display_name] = subreddit.icon_img
+            subreddit_icons[subreddit.display_name] = icon_img
 
         if bot.subreddit_icons == subreddit_icons:
             return
@@ -444,7 +504,7 @@ class KexoBot:
         """Create a httpx session for the bot."""
         self.session = httpx.AsyncClient()
         self.session.headers = httpx.Headers({"User-Agent": USER_AGENT})
-        self.cloudscraper_session = cloudscraper.create_scraper()
+        self.cloudscraper_session = cloudscraper.create_scraper()  # pyright: ignore[reportUnknownMemberType]
         logging.info("[Starter] Httpx and cloudscraper session initialized.")
 
     async def _upload_cached_lavalink_servers(self) -> None:
@@ -529,7 +589,9 @@ async def on_ready() -> None:
 
 
 @bot.event
-async def on_application_command_error(ctx: discord.Interaction, error) -> None:
+async def on_application_command_error(
+    ctx: discord.Interaction, error: discord.app_commands.AppCommandError
+) -> None:
     """This event is called when an error occurs in an application command.
 
     Parameters
@@ -541,8 +603,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
     """
     if isinstance(error, (commands.CommandOnCooldown, app_commands.CommandOnCooldown)):
         embed = make_embed(
-            f"🚫 You're sending too much!,"
-            f" try again in `{round(error.retry_after, 1)}s`.",
+            f"🚫 You're sending too much!, try again in `{round(error.retry_after, 1)}s`.",
             color=COLOR_RED,
             footer="Message will be deleted in 20 seconds.",
         )
@@ -551,8 +612,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
 
     if isinstance(error, commands.MissingPermissions):
         embed = make_embed(
-            f"🚫 You don't have the required permissions to use this command."
-            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+            f"🚫 You don't have the required permissions to use this command.\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=COLOR_RED,
         )
         await send(ctx, embed=embed, ephemeral=True)
@@ -560,8 +620,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
 
     if isinstance(error, commands.BotMissingPermissions):
         embed = make_embed(
-            f"🚫 I don't have the required permissions to use this command."
-            f"\nRequired permissions: `{', '.join(error.missing_permissions)}`",
+            f"🚫 I don't have the required permissions to use this command.\nRequired permissions: `{', '.join(error.missing_permissions)}`",
             color=COLOR_RED,
         )
         await send(ctx, embed=embed)
@@ -569,8 +628,7 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
 
     if isinstance(error, commands.BotMissingRole):
         embed = make_embed(
-            f"🚫 You don't have the required role to use this command."
-            f"\nRequired role: `{error.missing_role}`",
+            f"🚫 You don't have the required role to use this command.\nRequired role: `{error.missing_role}`",
             color=COLOR_RED,
         )
         await send(ctx, embed=embed, ephemeral=True)
@@ -583,13 +641,14 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
             "⚠️ Discord API is not responding. Please try again in a minute.",
             color=COLOR_ORANGE_LIGHT,
         )
-        try:
-            await ctx.channel.send(embed=embed, delete_after=20)
-        except discord.Forbidden:
-            pass
+        if isinstance(ctx.channel, (discord.TextChannel, discord.Thread)):
+            try:
+                await ctx.channel.send(embed=embed, delete_after=20)
+            except discord.Forbidden:
+                pass
         return
 
-    if isinstance(error, discord.ext.commands.NotOwner):
+    if isinstance(error, commands.NotOwner):
         embed = make_embed(
             "🚫 This command is available only to owner of this bot.",
             color=COLOR_RED,
@@ -601,7 +660,9 @@ async def on_application_command_error(ctx: discord.Interaction, error) -> None:
 
 
 @bot.tree.error
-async def on_tree_error(interaction: discord.Interaction, error) -> None:
+async def on_tree_error(
+    interaction: discord.Interaction, error: discord.app_commands.AppCommandError
+) -> None:
     await on_application_command_error(interaction, error)
 
 
@@ -612,14 +673,17 @@ async def on_guild_join(guild: discord.Guild) -> None:
 
 async def save_all_data() -> None:
     """Save all cached bot config data to MongoDB on shutdown."""
+    assert bot.config_manager is not None, "Config manager must be initialized"
     await bot.config_manager.save_all(DB_CACHE)
     logging.info("[MongoDB] All config data saved on shutdown.")
 
 
 def run_bot() -> None:
     """Run the bot with proper shutdown handling."""
+    assert ENV_DISCORD_TOKEN is not None, "DISCORD_TOKEN environment variable not set"
+    discord_token: str = ENV_DISCORD_TOKEN
     try:
-        bot.run(ENV_DISCORD_TOKEN)
+        bot.run(discord_token)
     finally:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

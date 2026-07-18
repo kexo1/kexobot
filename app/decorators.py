@@ -1,22 +1,20 @@
 from functools import wraps
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, cast
+
+import discord
 
 from app.response_handler import make_embed, send
 
 
-class CommandFunc(Protocol):
-    async def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
-
-
-def is_joined() -> Callable[[CommandFunc], CommandFunc]:
+def is_joined() -> Callable[[Any], Any]:
     """Ensure the user and bot share a connected voice channel."""
 
-    def decorator(func: CommandFunc) -> CommandFunc:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportAny]
             # args[0] is self and args[1] is ctx.
-            ctx = args[1]
-            if not ctx.user.voice or not ctx.user.voice.channel:
+            ctx = cast(discord.Interaction, args[1])
+            if not ctx.user.voice or not ctx.user.voice.channel:  # pyright: ignore[reportUnknownMemberType]
                 await send(ctx, code="NO_VOICE_CHANNEL")
                 return None
 
@@ -29,26 +27,26 @@ def is_joined() -> Callable[[CommandFunc], CommandFunc]:
                 )
                 return None
 
-            if player_channel.id != ctx.user.voice.channel.id:
+            if player_channel.id != ctx.user.voice.channel.id:  # pyright: ignore[reportAny, reportUnknownMemberType]
                 await send(ctx, code="NOT_IN_SAME_VOICE_CHANNEL")
                 return None
 
-            return await func(*args, **kwargs)
+            return await func(*args, **kwargs)  # pyright: ignore[reportAny]
 
         return wrapper
 
     return decorator
 
 
-def is_playing() -> Callable[[CommandFunc], CommandFunc]:
+def is_playing() -> Callable[[Any], Any]:
     """Ensure a track is playing and user shares the voice channel."""
 
-    def decorator(func: CommandFunc) -> CommandFunc:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            ctx = args[1]
-            vc = ctx.guild.voice_client
-            if not vc or not vc.current:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportAny]
+            ctx = cast(discord.Interaction, args[1])
+            player = ctx.guild.voice_client
+            if not player or not player.current:  # pyright: ignore[reportUnknownMemberType]
                 await send(
                     ctx,
                     embed=make_embed(
@@ -57,31 +55,31 @@ def is_playing() -> Callable[[CommandFunc], CommandFunc]:
                 )
                 return None
 
-            if ctx.guild.voice_client.channel.id != ctx.user.voice.channel.id:
+            if player.channel.id != ctx.user.voice.channel.id:  # pyright: ignore[reportUnknownMemberType]
                 await send(ctx, code="NOT_IN_SAME_VOICE_CHANNEL")
                 return None
 
-            return await func(*args, **kwargs)
+            return await func(*args, **kwargs)  # pyright: ignore[reportAny]
 
         return wrapper
 
     return decorator
 
 
-def is_queue_empty() -> Callable[[CommandFunc], CommandFunc]:
+def is_queue_empty() -> Callable[[Any], Any]:
     """Ensure the queue is not empty."""
 
-    def decorator(func: CommandFunc) -> CommandFunc:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            ctx = args[1]
-            vc = ctx.guild.voice_client
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:  # pyright: ignore[reportAny]
+            ctx = cast(discord.Interaction, args[1])
+            player = ctx.guild.voice_client
 
-            if not vc or (not vc.queue and not vc.queue.autoplay_tracks):
+            if not player or (not player.queue and not player.queue.autoplay_tracks):  # pyright: ignore[reportUnknownMemberType]
                 await send(ctx, code="NO_TRACKS_IN_QUEUE")
                 return None
 
-            return await func(*args, **kwargs)
+            return await func(*args, **kwargs)  # pyright: ignore[reportAny]
 
         return wrapper
 

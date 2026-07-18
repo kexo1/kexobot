@@ -1,0 +1,6 @@
+[tool.basedpyright]
+reportUnusedCallResult = "none"
+reportExplicitAny = "none"
+reportMissingTypeStubs = "none"
+reportAttributeAccessIssue = "none"
+reportOptionalMemberAccess = "none"

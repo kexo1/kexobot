@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import discord
 import httpx
@@ -219,19 +219,18 @@ def find_track(player: sonolink.Player, to_find: str) -> int | None:
     if not to_find.isdigit():
         for i, track in enumerate(player.queue):
             if to_find.lower() in track.title.lower():
-                to_find = i + 1
-                break
+                return i + 1
 
             if i != len(player.queue) - 1:
                 continue
 
             return None
     else:
-        to_find = int(to_find)
-        if to_find > len(player.queue):
+        index = int(to_find)
+        if index > len(player.queue):
             return None
 
-    return to_find
+        return index
 
 
 async def make_http_request(
@@ -243,7 +242,7 @@ async def make_http_request(
     timeout: float = 3.0,
     get_json: bool = False,
     binary: bool = False,
-) -> httpx.Response | Any | None:
+) -> httpx.Response | dict[str, Any] | None:
     """
     Make an HTTP request with retry logic.
 
@@ -285,7 +284,7 @@ async def make_http_request(
                 response.raise_for_status()
 
             if get_json:
-                return response.json()
+                return cast(dict[str, Any], response.json())
             return response
         except (
             httpx.ReadTimeout,
@@ -302,7 +301,6 @@ async def make_http_request(
     return None
 
 
-# noinspection PyUnusedLocal
 class EmbedPaginator(discord.ui.View):
     """A paginator for displaying embeds that are too long for Discord.
 
@@ -316,6 +314,9 @@ class EmbedPaginator(discord.ui.View):
     timeout : int
         The time in seconds before the paginator times out. Default is 600 seconds.
     """
+
+    _embeds: list[discord.Embed]
+    _current_page: int
 
     def __init__(self, embeds: list[discord.Embed], timeout: int = 600) -> None:
         super().__init__(timeout=timeout)
@@ -336,7 +337,7 @@ class EmbedPaginator(discord.ui.View):
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple)
     async def previous(
-        self, interaction: discord.Interaction, button: discord.ui.Button
+        self, interaction: discord.Interaction, _button: discord.ui.Button[Any]
     ) -> None:
         """Handles the "Previous" button click event.
 
@@ -355,7 +356,7 @@ class EmbedPaginator(discord.ui.View):
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple)
     async def next(
-        self, interaction: discord.Interaction, button: discord.ui.Button
+        self, interaction: discord.Interaction, _button: discord.ui.Button[Any]
     ) -> None:
         """Handles the "Next" button click event.
 
