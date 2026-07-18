@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import asyncpraw.models
 
@@ -37,7 +37,14 @@ class UserData:
 
     def __post_init__(self) -> None:
         if isinstance(self.reddit, dict):
-            self.reddit = UserRedditData(**self.reddit)
+            reddit_dict = cast(dict[str, Any], self.reddit)
+            self.reddit = UserRedditData(
+                subreddits=cast(
+                    list[str],
+                    reddit_dict.get("subreddits", list(SHITPOST_SUBREDDITS_DEFAULT)),
+                ),
+                nsfw_posts=cast(bool, reddit_dict.get("nsfw_posts", False)),
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return {"reddit": self.reddit.to_dict()}
@@ -65,7 +72,11 @@ class GuildData:
 
     def __post_init__(self) -> None:
         if isinstance(self.music, dict):
-            self.music = GuildMusicData(**self.music)
+            music_dict = cast(dict[str, Any], self.music)
+            self.music = GuildMusicData(
+                autoplay_mode=cast(int, music_dict.get("autoplay_mode", 1)),
+                volume=cast(int, music_dict.get("volume", 100)),
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return {"music": self.music.to_dict()}
@@ -98,7 +109,16 @@ class TempGuildData:
 
     def __post_init__(self) -> None:
         if isinstance(self.jokes, dict):
-            self.jokes = GuildJokesData(**self.jokes)
+            jokes_dict = cast(dict[str, Any], self.jokes)
+            self.jokes = GuildJokesData(
+                viewed_jokes=cast(list[str], jokes_dict.get("viewed_jokes", [])),
+                viewed_dad_jokes=cast(
+                    list[str], jokes_dict.get("viewed_dad_jokes", [])
+                ),
+                viewed_yo_mama_jokes=cast(
+                    list[str], jokes_dict.get("viewed_yo_mama_jokes", [])
+                ),
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return {"jokes": self.jokes.to_dict()}
@@ -131,8 +151,20 @@ class TempUserData:
     def __post_init__(self) -> None:
         if isinstance(self.reddit, dict):
             # Reconstruct from dict — handle set serialization
-            reddit_kw: dict[str, Any] = dict(self.reddit)
-            viewed = reddit_kw.pop("viewed_posts", set())
-            if isinstance(viewed, list):
-                viewed = set(viewed)
-            self.reddit = TempUserRedditData(viewed_posts=viewed, **reddit_kw)
+            reddit_dict = cast(dict[str, Any], self.reddit)
+            viewed_raw = cast(
+                list[str] | set[str], reddit_dict.get("viewed_posts", set())
+            )
+            if isinstance(viewed_raw, list):
+                viewed: set[str] = set(viewed_raw)
+            else:
+                viewed = viewed_raw
+
+            self.reddit = TempUserRedditData(
+                viewed_posts=viewed,
+                search_limit=cast(int, reddit_dict.get("search_limit", 3)),
+                last_used=cast(datetime | None, reddit_dict.get("last_used")),
+                multireddit=cast(
+                    asyncpraw.models.Multireddit | None, reddit_dict.get("multireddit")
+                ),
+            )

@@ -7,7 +7,9 @@ from zoneinfo import ZoneInfo
 import httpx
 import matplotlib
 from bs4 import BeautifulSoup
-from pymongo import AsyncMongoClient
+from typing import Any
+
+from pymongo.asynchronous.collection import AsyncCollection
 
 from app.config.mongo import DB_SFD_ACTIVITY
 from app.config.sfd import API_SFD_SERVER, SFD_HEADERS, SFD_REQUEST, TIMEZONES
@@ -121,7 +123,7 @@ class SFDServers:
         The directory where graphs will be saved.
     """
 
-    def __init__(self, bot_config: AsyncMongoClient, session: httpx.AsyncClient):
+    def __init__(self, bot_config: AsyncCollection[Any], session: httpx.AsyncClient):
         self._session = session
         self._bot_config = bot_config
         self._graphs_dir = os.path.join(os.getcwd(), "graphs")

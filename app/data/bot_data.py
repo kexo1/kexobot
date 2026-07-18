@@ -8,7 +8,10 @@ since the last save, and only writes to MongoDB when necessary.
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 from typing import Any, TypedDict
+
+from pymongo.asynchronous.collection import AsyncCollection
 
 
 class NodeCacheEntry(TypedDict):
@@ -28,19 +31,23 @@ class BotConfigManager:
 
     Parameters
     ----------
-    collection: :class:`pymongo.AsyncMongoClient`
+    collection: :class:`pymongo.AsyncCollection`
         The MongoDB collection to persist data to.
     default_factory: Callable[[], Any]
         Factory function that returns the default empty data structure.
     """
 
-    def __init__(self, collection, default_factory) -> None:
-        self._db = collection
-        self._default_factory = default_factory
+    def __init__(
+        self,
+        collection: AsyncCollection[Any],
+        default_factory: Callable[[], Any],
+    ) -> None:
+        self._db: AsyncCollection[Any] = collection
+        self._default_factory: Callable[[], Any] = default_factory
         self._cache: dict[str, Any] = {}
         self._snapshot: dict[str, Any] = {}
 
-    async def get(self, key: str, query: dict[str, Any]) -> Any:
+    async def get(self, key: str, query: dict[str, Any]) -> Any:  # pyright: ignore[reportAny]
         """Get cached data by key, loading from MongoDB if needed.
 
         Parameters
@@ -56,17 +63,17 @@ class BotConfigManager:
             The cached data for the specified key.
         """
         if key in self._cache:
-            return self._cache[key]
+            return self._cache[key]  # pyright: ignore[reportAny]
 
         doc = await self._db.find_one(query)
         if doc is not None and key in doc:
-            data = doc[key]
+            data: Any = doc[key]  # pyright: ignore[reportAny]
         else:
-            data = self._default_factory()
+            data = self._default_factory()  # pyright: ignore[reportAny]
 
         self._cache[key] = data
-        self._snapshot[key] = copy.deepcopy(data)
-        return data
+        self._snapshot[key] = copy.deepcopy(data)  # pyright: ignore[reportAny]
+        return data  # pyright: ignore[reportAny]
 
     def get_cached(self, key: str) -> Any | None:
         """Get data from cache only, without hitting the database.
@@ -101,7 +108,7 @@ class BotConfigManager:
             return
 
         # Deep copy current state for comparison (handles in-place modifications)
-        current_snapshot = copy.deepcopy(current)
+        current_snapshot = copy.deepcopy(current)  # pyright: ignore[reportAny]
         if current_snapshot == self._snapshot.get(key):
             return  # No changes, skip DB write
 

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
-from pymongo import AsyncMongoClient
+from pymongo.asynchronous.collection import AsyncCollection
 
 T = TypeVar("T")
 
@@ -18,7 +18,7 @@ class BaseDataManager(Generic[T]):
 
     Parameters
     ----------
-    collection: :class:`pymongo.AsyncMongoClient`
+    collection: :class:`pymongo.AsyncCollection`
         The MongoDB collection to persist data to.
     data_class: type[T]
         The dataclass type used for deserialization.
@@ -26,11 +26,11 @@ class BaseDataManager(Generic[T]):
 
     def __init__(
         self,
-        collection: AsyncMongoClient,
+        collection: AsyncCollection[Any],
         data_class: type[T],  # Can be either UserData or GuildData
     ) -> None:
-        self._db = collection
-        self._data_class = data_class
+        self._db: AsyncCollection[Any] = collection
+        self._data_class: type[T] = data_class
         self._cache: dict[int, T] = {}
 
     async def get(self, _id: int) -> T:
@@ -56,8 +56,8 @@ class BaseDataManager(Generic[T]):
 
         raw = await self._db.find_one({"_id": _id})
         if raw is not None:
-            raw.pop("_id", None)
-            instance: T = self._data_class(**raw)
+            raw.pop("_id", None)  # pyright: ignore[reportAny]
+            instance: T = self._data_class(**cast(dict[str, Any], raw))
         else:
             instance = self._data_class()
             logging.info(
@@ -65,7 +65,9 @@ class BaseDataManager(Generic[T]):
                 self._data_class.__name__,
                 _id,
             )
-            await self._db.insert_one({"_id": _id, **instance.to_dict()})
+            await self._db.insert_one(
+                cast(dict[str, Any], {"_id": _id, **cast(Any, instance.to_dict())})  # pyright: ignore[reportUnknownMemberType]
+            )
 
         self._cache[_id] = instance
         return instance
@@ -83,7 +85,6 @@ class BaseDataManager(Generic[T]):
         self._cache[_id] = data
         await self._db.update_one(
             {"_id": _id},
-            {"$set": data.to_dict()},
+            {"$set": cast(Any, data.to_dict())},  # pyright: ignore[reportUnknownMemberType]
             upsert=True,
         )
-

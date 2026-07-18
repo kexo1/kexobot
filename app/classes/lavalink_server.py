@@ -77,7 +77,7 @@ class LavalinkServerManager:
             if uri in self._cached_lavalink_servers:
                 continue
 
-            ping = get_url_response_time(uri)
+            ping = await get_url_response_time(self._session, uri)
             self._cached_lavalink_servers[uri] = {
                 "password": server["password"],
                 "score": 0,

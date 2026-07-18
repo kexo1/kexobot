@@ -16,6 +16,7 @@ import sonolink
 from discord import app_commands
 from discord.ext import commands, tasks
 from pymongo import AsyncMongoClient
+from pymongo.asynchronous.collection import AsyncCollection
 
 from app.bot_state import BotState
 from app.classes.content_monitor import ContentMonitor
@@ -76,10 +77,10 @@ class KexoBotClient(commands.Bot):
     ) = None
     cached_lavalink_servers: dict[str, NodeCacheEntry] | None = None
     subreddit_icons: dict[str, str] | None = None
-    bot_config: AsyncMongoClient[Any] | None = None
-    _bot_config: AsyncMongoClient[Any] | None = None
-    _user_data_db: AsyncMongoClient[Any] | None = None
-    _guild_data_db: AsyncMongoClient[Any] | None = None
+    bot_config: AsyncCollection[Any] | None = None
+    _bot_config: AsyncCollection[Any] | None = None
+    _user_data_db: AsyncCollection[Any] | None = None
+    _guild_data_db: AsyncCollection[Any] | None = None
     reddit_agent: asyncpraw.Reddit | None = None
     humor_api_tokens: dict[str, dict[str, bool]] | None = None
     node_is_switching: dict[int, bool] | None = None
@@ -172,14 +173,14 @@ class KexoBot:
         self._main_loop_counter: int = 0
 
         db = cast(Any, AsyncMongoClient(ENV_API_DB)["KexoBOTDatabase"])  # pyright: ignore[reportAny]
-        self._bot_config: AsyncMongoClient[Any] = cast(
-            AsyncMongoClient[Any], db["BotConfig"]
+        self._bot_config: AsyncCollection[Any] = cast(
+            AsyncCollection[Any], db["BotConfig"]
         )
-        self._user_data_db: AsyncMongoClient[Any] = cast(
-            AsyncMongoClient[Any], db["UserData"]
+        self._user_data_db: AsyncCollection[Any] = cast(
+            AsyncCollection[Any], db["UserData"]
         )
-        self._guild_data_db: AsyncMongoClient[Any] = cast(
-            AsyncMongoClient[Any], db["GuildData"]
+        self._guild_data_db: AsyncCollection[Any] = cast(
+            AsyncCollection[Any], db["GuildData"]
         )
 
         self._reddit_agent: asyncpraw.Reddit | None = None
@@ -517,10 +518,13 @@ class KexoBot:
         Runs daily to refresh ping measurements
         and persist updated values to the database.
         """
-        for uri in list(bot.cached_lavalink_servers.keys()):
-            ping = get_url_response_time(uri)
+        uris = list(bot.cached_lavalink_servers.keys())
+
+        async def ping_one(uri: str) -> None:
+            ping = await get_url_response_time(self.session, uri)
             bot.state.change_node_ping(uri, ping)
 
+        await asyncio.gather(*(ping_one(uri) for uri in uris))
         await self._upload_cached_lavalink_servers()
         logging.info("[Lavalink] Daily ping test completed and saved to database.")
 

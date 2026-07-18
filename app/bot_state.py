@@ -299,7 +299,7 @@ class BotState:
         send_success_message: bool = True,
         send_failure_message: bool = True,
         search_callback: Callable[[], Awaitable[Any]] | None = None,
-    ) -> None:
+    ) -> sonolink.Node | None:
         """Attempt to switch to a new node for audio playback or search retry.
 
         Parameters
@@ -313,7 +313,7 @@ class BotState:
         send_failure_message: bool
             Whether to send a failure message in the text channel if no suitable node is found.
         search_callback: Callable[[], Awaitable[Any]] | None
-            When in search_mode, this callback is invoked up to 5 times per node to verify
+            When in search_mode, this callback is invoked to verify
             the node can successfully perform a search. If the callback times out or fails
             on all attempts for a node, the next node is tried. If all nodes are exhausted,
             returns None.
@@ -430,6 +430,7 @@ class BotState:
                         discord.abc.Messageable, player.text_channel
                     )
                     await _success_channel.send(embed=embed)
+
                 return node
 
             if send_failure_message:
@@ -442,6 +443,7 @@ class BotState:
                     discord.abc.Messageable, player.text_channel
                 )
                 await _failure_channel.send(embed=embed)
+                return None
         finally:
             if not search_callback:
                 await player.update(

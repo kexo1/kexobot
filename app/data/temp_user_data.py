@@ -24,9 +24,9 @@ class TempUserDataManager:
     This includes Reddit session state (viewed posts, multireddit, etc.).
     """
 
-    def __init__(self, bot: KexoBotClient | None = None) -> None:
+    def __init__(self, bot: "KexoBotClient | None" = None) -> None:
         self._cache: dict[int, TempUserData] = {}
-        self._bot = bot
+        self._bot: "KexoBotClient | None" = bot
 
     def get(self, user_id: int) -> TempUserData:
         """Get temporary user data, creating defaults if missing."""
@@ -55,7 +55,7 @@ class TempUserDataManager:
             except asyncprawcore.exceptions.NotFound:
                 logging.warning(
                     "[Reddit] Multireddit for user %s not found. "
-                    "Attempting to create it... (Attempt %s/3)",
+                    + "Attempting to create it... (Attempt %s/3)",
                     user_id,
                     attempt + 1,
                 )

@@ -45,23 +45,25 @@ def average(numbers: list[float | int]) -> float:
     return sum(numbers) / len(numbers)
 
 
-def get_url_response_time(url: str) -> int:
-    """Get the response time of a URL in seconds.
+async def get_url_response_time(session: httpx.AsyncClient, url: str) -> int:
+    """Get the response time of a URL in milliseconds.
 
     Parameters
     ----------
+    session: :class:`httpx.AsyncClient`
+        The HTTP client to use for the request.
     url: str
         The URL to check the response time of.
 
     Returns
     -------
-    float
-        The response time of the URL in seconds, or 0.0 if the request failed.
+    int
+        The response time of the URL in milliseconds, or 9999 if the request failed.
     """
     try:
         start_time = time.perf_counter()
-        httpx.get(url, timeout=5)
-        return int((time.perf_counter() - start_time) * 1000)  # Convert to milliseconds
+        await session.get(url, timeout=5)
+        return int((time.perf_counter() - start_time) * 1000)
     except httpx.RequestError:
         return 9999
 
