@@ -60,7 +60,9 @@ class BotState:
         Score -5 = track exception or stuck
         Score set to -1 = failed voice connection attempt
         """
-        assert self.bot.cached_lavalink_servers is not None
+        assert self.bot.cached_lavalink_servers is not None, (
+            "BotState requires bot.cached_lavalink_servers to be set"
+        )
         node_entry = self.bot.cached_lavalink_servers.get(node_uri)
         if not node_entry:
             return
@@ -92,7 +94,9 @@ class BotState:
         """Get the number of online lavalink nodes,
         returns ``int`` of online nodes.
         """
-        assert self.bot.sonolink_client is not None
+        assert self.bot.sonolink_client is not None, (
+            "BotState requires bot.sonolink_client to be set"
+        )
         return len(
             [node for node in self.bot.sonolink_client.nodes if node.is_connected]
         )
@@ -102,7 +106,9 @@ class BotState:
 
         Returns the count of cached lavalink nodes.
         """
-        assert self.bot.cached_lavalink_servers is not None
+        assert self.bot.cached_lavalink_servers is not None, (
+            "BotState requires bot.cached_lavalink_servers to be set"
+        )
         return len(self.bot.cached_lavalink_servers)
 
     async def close_unused_nodes(self) -> None:
@@ -111,8 +117,12 @@ class BotState:
         This function will check if there are any lavalink nodes
         that are not being used and will close them.
         """
-        assert self.bot.sonolink_client is not None
-        assert self.bot.close_nodes_lock is not None
+        assert self.bot.sonolink_client is not None, (
+            "BotState requires bot.sonolink_client to be set"
+        )
+        assert self.bot.close_nodes_lock is not None, (
+            "BotState requires bot.close_nodes_lock to be set"
+        )
         async with self.bot.close_nodes_lock:
             nodes: list[sonolink.Node] = list(self.bot.sonolink_client.nodes)
             for node in nodes:
@@ -142,14 +152,11 @@ class BotState:
             True if the node is connected, False otherwise.
         """
         try:
-            await asyncio.wait_for(node.connect(), timeout=3)
+            logging.info(f"[Sonolink] Attempting to connect to node: {node.uri}")
+            await node.connect()
             # Some fucking nodes secretly don't respond,
             # I've played these games before!!!
             if not await self.node_health_check(node):
-                logging.info(
-                    f"[Sonolink] Node failed health check when attempting to connect: ({node.uri})"
-                )
-                self.change_node_score(node.uri, -1)
                 return False
             return True
 
@@ -236,7 +243,9 @@ class BotState:
         failed_event: :class:`asyncio.Event`
             Event set by listeners when track fails on new node.
         """
-        assert self.bot.track_exceptions is not None
+        assert self.bot.track_exceptions is not None, (
+            "BotState requires bot.track_exceptions to be set"
+        )
         self.bot.track_exceptions[guild_id] = (track, failed_event)
 
     def get_track_exception_probe(
@@ -254,12 +263,16 @@ class BotState:
         tuple[sonolink.models.Playable | None, asyncio.Event] | None
             Probe tuple ``(track, event)`` if present, else ``None``.
         """
-        assert self.bot.track_exceptions is not None
+        assert self.bot.track_exceptions is not None, (
+            "BotState requires bot.track_exceptions to be set"
+        )
         return self.bot.track_exceptions.get(guild_id)
 
     def clear_track_exception_probe(self, guild_id: int) -> None:
         """Remove stored track exception probe for guild."""
-        assert self.bot.track_exceptions is not None
+        assert self.bot.track_exceptions is not None, (
+            "BotState requires bot.track_exceptions to be set"
+        )
         self.bot.track_exceptions.pop(guild_id, None)
 
     def build_node(self, uri: str, password: str) -> sonolink.Node:

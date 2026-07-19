@@ -518,10 +518,12 @@ class KexoBot:
         Runs daily to refresh ping measurements
         and persist updated values to the database.
         """
+        assert self.session is not None, "HTTP session must be initialized"
         uris = list(bot.cached_lavalink_servers.keys())
+        session = self.session
 
         async def ping_one(uri: str) -> None:
-            ping = await get_url_response_time(self.session, uri)
+            ping = await get_url_response_time(session, uri)
             bot.state.change_node_ping(uri, ping)
 
         await asyncio.gather(*(ping_one(uri) for uri in uris))
