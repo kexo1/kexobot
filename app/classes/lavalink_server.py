@@ -48,12 +48,11 @@ class LavalinkServerManager:
         """Get new Lavalink servers from Lavainfo GitHub and Lavalist.
         If both sources are available, update the cache and clear removed nodes.
         """
-        json_data_first = await self._fetch_and_parse(API_FREE_NODELINK)
-        json_data_second = await self._fetch_and_parse(API_LAVALIST)
+        json_data_first = await self._fetch_and_parse(API_LAVALIST)
 
         # Only update cache and clear removed nodes if both sources are available.
         # Otherwise we might end up with an empty or incomplete list of nodes.
-        if json_data_first and json_data_second:
+        if json_data_first:
             self._clear_removed_nodes()
             await self._bot.config_manager.save("lavalink_servers", DB_CACHE)
             logging.info(

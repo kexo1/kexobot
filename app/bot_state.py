@@ -32,14 +32,12 @@ class _BotProtocol(Protocol):
     connect_node: Callable[..., Awaitable[sonolink.Node | None]] | None
 
 
+class _HasID(Protocol):
+    id: int
+
+
 @dataclass(slots=True)
 class BotState:
-    """Typed state operations for mutable bot runtime data.
-
-    This class centralizes write/read operations for mutable bot state so cogs
-    and helpers do not duplicate direct dictionary/list manipulation logic.
-    """
-
     bot: _BotProtocol
 
     def change_node_score(self, node_uri: str, delta: int) -> None:
@@ -331,7 +329,11 @@ class BotState:
             on all attempts for a node, the next node is tried. If all nodes are exhausted,
             returns None.
         """
-        guild_id: int = cast(int, player.guild.id)  # pyright: ignore[reportAny]
+        # Ensure guild and guild id exist
+        guild_obj = cast(_HasID | None, getattr(player, "guild", None))
+        assert guild_obj is not None, "Player must have a guild"
+        assert getattr(guild_obj, "id", None) is not None, "Guild must have an id"
+        guild_id: int = guild_obj.id
         assert self.bot.node_is_switching is not None, (
             "BotState requires bot.node_is_switching to be set"
         )
@@ -360,7 +362,9 @@ class BotState:
         async def _try_move_and_resume(target_node: sonolink.Node) -> bool:
             try:
                 # Stop the inactivity timer on previous node to prevent it from disconnecting
-                player._stop_inactivity_timer()  # pyright: ignore[reportPrivateUsage]
+                stop_timer = getattr(player, "_stop_inactivity_timer", None)
+                if callable(stop_timer):
+                    stop_timer()
                 await player.move_to(target_node)
                 track = _resume_track()
                 # Only when we didn't even get to play the track, moving won't play it, so we have to do it manually here.
@@ -368,7 +372,9 @@ class BotState:
                     await player.play(track)
 
                 # Check for inactivity after moving to the new node
-                player._check_inactivity()  # pyright: ignore[reportPrivateUsage]
+                check_inactivity = getattr(player, "_check_inactivity", None)
+                if callable(check_inactivity):
+                    check_inactivity()
                 return True
             except Exception:
                 self.change_node_score(target_node.uri, -5)

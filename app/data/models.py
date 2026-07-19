@@ -131,7 +131,7 @@ class TempUserRedditData:
     viewed_posts: set[str] = field(default_factory=set)
     search_limit: int = 3
     last_used: datetime | None = None
-    multireddit: asyncpraw.models.Multireddit | None = None
+    multireddit: object | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {

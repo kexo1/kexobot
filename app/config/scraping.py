@@ -48,4 +48,3 @@ API_DAD_JOKE = "https://icanhazdadjoke.com/search?limit=10"
 
 ############################# Lavalink ############################
 API_LAVALIST = "https://lavalink-list.ajieblogs.eu.org/All"
-API_FREE_NODELINK = "https://free-nodelink.nyxbot.app/api/nodes"

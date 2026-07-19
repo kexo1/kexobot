@@ -5,16 +5,35 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import Protocol, cast, runtime_checkable
 
 import asyncpraw.exceptions
-import asyncpraw.models
 import asyncprawcore.exceptions
 
-from app.data.models import TempUserData
+from app.data.models import TempUserData, UserData
 
-if TYPE_CHECKING:
-    from app.main import KexoBotClient
+
+@runtime_checkable
+class _RedditAgent(Protocol):
+    async def multireddit(
+        self, name: str, redditor: str
+    ) -> object:  # pragma: no cover - protocol
+        ...
+
+    async def subreddit(self, name: str) -> object:  # pragma: no cover - protocol
+        ...
+
+
+@runtime_checkable
+class _UserDataManager(Protocol):
+    async def get(self, user_id: int) -> UserData:  # pragma: no cover - protocol
+        ...
+
+
+@runtime_checkable
+class _BotLike(Protocol):
+    reddit_agent: _RedditAgent | None
+    user_data_manager: _UserDataManager | None
 
 
 class TempUserDataManager:
@@ -24,9 +43,9 @@ class TempUserDataManager:
     This includes Reddit session state (viewed posts, multireddit, etc.).
     """
 
-    def __init__(self, bot: "KexoBotClient | None" = None) -> None:
+    def __init__(self, bot: object | None = None) -> None:
         self._cache: dict[int, TempUserData] = {}
-        self._bot: "KexoBotClient | None" = bot
+        self._bot: "_BotLike | None" = cast("_BotLike | None", bot)
 
     def get(self, user_id: int) -> TempUserData:
         """Get temporary user data, creating defaults if missing."""
@@ -43,11 +62,31 @@ class TempUserDataManager:
         if temp.reddit.multireddit is not None:
             return
 
-        multireddit: asyncpraw.models.Multireddit = (
-            await self._bot.reddit_agent.multireddit(
-                name=str(user_id), redditor="KexoBOT"
+        if (
+            self._bot is None
+            or self._bot.reddit_agent is None
+            or self._bot.user_data_manager is None
+        ):
+            logging.error(
+                "[TempUserData] Bot or services not available when ensuring multireddit for %s",
+                user_id,
             )
+            return
+
+        multireddit_raw: object = await self._bot.reddit_agent.multireddit(
+            name=str(user_id), redditor="KexoBOT"
         )
+
+        class _LocalMultireddit(Protocol):
+            subreddits: list[object]
+
+            async def load(self) -> None: ...
+
+            async def remove(self, subreddit: object) -> None: ...
+
+            async def add(self, subreddit: object) -> None: ...
+
+        multireddit = cast(_LocalMultireddit, multireddit_raw)
         for attempt in range(3):
             try:
                 await multireddit.load()
@@ -78,9 +117,8 @@ class TempUserDataManager:
 
         for subreddit_name in user.reddit.subreddits:
             try:
-                await multireddit.add(
-                    await self._bot.reddit_agent.subreddit(subreddit_name)
-                )
+                subreddit_obj = await self._bot.reddit_agent.subreddit(subreddit_name)
+                await multireddit.add(subreddit_obj)
             except asyncpraw.exceptions.RedditAPIException:
                 pass
 
