@@ -6,7 +6,7 @@ import logging
 import socket
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import asyncpraw
@@ -51,18 +51,15 @@ from app.config.reddit import (
     ICON_REDDIT,
     SHITPOST_SUBREDDITS_ALL,
 )
-
-if TYPE_CHECKING:
-    from app.data import (
-        BaseDataManager,
-        BotConfigManager,
-        GuildData,
-        JokeCacheManager,
-        TempGuildDataManager,
-        TempUserDataManager,
-        UserData,
-    )
-
+from app.data import (
+    BaseDataManager,
+    BotConfigManager,
+    GuildData,
+    JokeCacheManager,
+    TempGuildDataManager,
+    TempUserDataManager,
+    UserData,
+)
 from app.data.bot_data import NodeCacheEntry
 from app.response_handler import make_embed, send
 from app.utils import get_url_response_time, make_http_request

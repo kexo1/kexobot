@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from app.config.mongo import DB_CACHE
-from app.config.scraping import API_FREE_NODELINK, API_LAVALIST
+from app.config.scraping import API_LAVALIST
 from app.utils import get_url_response_time, make_http_request
 
 if TYPE_CHECKING:
