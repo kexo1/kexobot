@@ -151,7 +151,7 @@ class BotState:
         """
         try:
             logging.info(f"[Sonolink] Attempting to connect to node: {node.uri}")
-            await node.connect()
+            await asyncio.wait_for(node.connect(), timeout=3)
             # Some fucking nodes secretly don't respond,
             # I've played these games before!!!
             if not await self.node_health_check(node):
