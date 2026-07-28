@@ -5,10 +5,10 @@ __pycache__/
 .idea/
 
 *.pyc
+*.toml 
 .env
 .git
-.flake8
-.gitignore 
+.gitignore
 
 TODO.md
 README.md

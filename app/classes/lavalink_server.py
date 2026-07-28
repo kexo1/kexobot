@@ -65,6 +65,7 @@ class LavalinkServerManager:
                 (server.get("restVersion") not in (None, "v4"))
                 or (server.get("version") not in (None, "v4"))
                 or not server.get("host")
+                or "nodelink" in server.get("host", "")
             ):
                 continue
 
