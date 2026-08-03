@@ -1049,7 +1049,7 @@ class HostView(discord.ui.View):
         style=discord.ButtonStyle.gray, label="I stopped hosting.", emoji="📣"
     )
     async def button_callback(
-        self, interaction: discord.Interaction, button: discord.Button
+        self, interaction: discord.Interaction, _button: discord.Button
     ) -> None:
         """Callback for the button in the hosting embed.
 
