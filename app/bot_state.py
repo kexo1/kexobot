@@ -132,9 +132,13 @@ class BotState:
 
                 try:
                     await node.close()
-                    logging.info(f"[Sonolink] Closed unused node: {node.uri}")
                 except RuntimeError:
                     pass
+                finally:
+                    self.bot.sonolink_client.remove_node(node.id)
+                    logging.info(
+                        f"[Sonolink] Closed and removed unused node: {node.uri}"
+                    )
 
     async def node_attempt_connection(self, node: sonolink.Node) -> bool:
         """Attempt to connect to a lavalink node.
