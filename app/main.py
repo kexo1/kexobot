@@ -434,7 +434,7 @@ class KexoBot:
             if existing_node and existing_node.is_connected:
                 is_connected = await bot.state.node_health_check(existing_node)
                 node = existing_node
-            else:
+            elif not existing_node:
                 node = bot.state.build_node(node_uri, node_info["password"])
                 is_connected = await bot.state.node_attempt_connection(node)
 
