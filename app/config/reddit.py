@@ -48,12 +48,6 @@ REDDIT_FREEGAMEFINDINGS_EMBEDS = {
         "description": "",
         "icon": "https://styles.redditmedia.com/t5_30mv3/styles/communityIcon_xnoh6m7g9qh71.png",
     },
-    "Gleam": {
-        "title": "Gleam",
-        "description": "**Gleam** - keys from this site __disappear really fast__"
-        " so you should get it fast!",
-        "icon": "https://files.catbox.moe/or8beg.png",
-    },
     "AlienwareArena": {
         "title": "AlienwareArena",
         "description": "**AlienwareArena** - "
