@@ -403,10 +403,13 @@ class CommandCog(commands.Cog):
         await send(ctx, embed=embed)
 
     # -------------------- SFD Servers -------------------- #
+    """
     @slash_sfd.command(
         name="servers", description="Fetches Superfighters Deluxe servers."
     )
     @app_commands.checks.cooldown(1, 10, key=lambda i: i.user.id)
+    """
+
     async def get_sfd_servers(self, ctx: discord.Interaction) -> None:
         """Method to fetch and display information about available SFD servers.
 
@@ -463,9 +466,12 @@ class CommandCog(commands.Cog):
             view = EmbedPaginator(pages)
             await send(ctx, embed=pages[0], view=view)
 
+    """"
     @slash_sfd.command(name="server_info", description="Find searched server.")
     @app_commands.describe(search="Server name to search for.")
     @app_commands.checks.cooldown(1, 5, key=lambda i: i.user.id)
+    """
+
     async def get_sfd_server_info(
         self,
         ctx: discord.Interaction,
@@ -499,6 +505,7 @@ class CommandCog(commands.Cog):
         embed.add_field(name="Game Mode:ㅤㅤ", value=server.game_mode)
         await send(ctx, embed=embed)
 
+    """
     @slash_sfd.command(
         name="activity",
         description="Shows graph of SFD servers activity.",
@@ -518,6 +525,8 @@ class CommandCog(commands.Cog):
         ],
     )
     @app_commands.checks.cooldown(1, 60, key=lambda i: i.user.id)
+    """
+
     async def get_sfd_graph(
         self,
         ctx: discord.Interaction,

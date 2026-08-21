@@ -341,8 +341,8 @@ class KexoBot:
             self._main_loop_counter = 0
             await self._reddit_fetcher.crackwatch()
 
-        if now.minute % 6 == 0 and self._hostname != LOCAL_MACHINE_NAME:
-            await self._sfd_servers.update_stats(now)
+        # if now.minute % 6 == 0 and self._hostname != LOCAL_MACHINE_NAME:
+        #    await self._sfd_servers.update_stats(now)
 
     async def hourly_loop(self) -> None:
         """Hourly loop for the bot.
