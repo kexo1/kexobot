@@ -3,6 +3,9 @@
 import re
 from enum import Enum
 
+############################# Lavalink ############################
+LAVALINK_URL = "https://lavalink.kexohost.win:443"
+
 ############################# Radio Garden API URLs ############################
 API_RADIOGARDEN_PLACES = "https://radio.garden/api/ara/content/places"
 API_RADIOGARDEN_PAGE = "https://radio.garden/api/ara/content/page/"

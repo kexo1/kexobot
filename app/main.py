@@ -38,10 +38,11 @@ from app.config.env import (
     ENV_API_DB,
     ENV_DISCORD_TOKEN,
     ENV_HUMOR_KEY,
-    LOCAL_MACHINE_NAME,
+    LAVALINK_PASSWORD,
     USER_AGENT,
 )
 from app.config.mongo import DB_CACHE
+from app.config.music import LAVALINK_URL
 from app.config.reddit import (
     ENV_REDDIT_CLIENT_ID,
     ENV_REDDIT_PASSWORD,
@@ -263,6 +264,16 @@ class KexoBot:
         bot.cached_lavalink_servers = await bot.config_manager.get(
             "lavalink_servers", DB_CACHE
         )
+        # Add custom lavalink server if not already in cache
+        assert bot.cached_lavalink_servers is not None, (
+            "Cached lavalink servers must be loaded"
+        )
+        if LAVALINK_URL not in bot.cached_lavalink_servers:
+            bot.cached_lavalink_servers[LAVALINK_URL] = {
+                "password": LAVALINK_PASSWORD,
+                "score": 10,
+                "ping": 200,
+            }
         logging.info("[Starter] Cached lavalink servers fetched.")
 
     async def _fetch_subreddit_icons(self) -> None:
@@ -319,7 +330,7 @@ class KexoBot:
         assert self._reddit_fetcher is not None, "Reddit fetcher must be initialized"
         assert self._content_monitor is not None, "Content monitor must be initialized"
         assert self._sfd_servers is not None, "SFD servers must be initialized"
-        now = datetime.now(ZoneInfo("Europe/Bratislava"))
+        # now = datetime.now(ZoneInfo("Europe/Bratislava"))
 
         if self._main_loop_counter == 0:
             self._main_loop_counter = 1

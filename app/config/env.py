@@ -57,3 +57,6 @@ ENV_HUMOR_KEY = [token for token in _humor_api_tokens.split(":") if token]
 
 ############################# Wordnik API Configuration ############################
 API_WORDNIK = f"https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key={os.getenv('WORDNIK_API_KEY')}"
+
+############################## Lavalink Configuration ############################
+LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")

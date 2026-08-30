@@ -862,7 +862,7 @@ class MusicCommands(commands.Cog):
             try:
                 tracks: sl_models.SearchResult = await asyncio.wait_for(
                     self._bot.sonolink_client.search_track(search, source=source),
-                    timeout=5,
+                    timeout=10,
                 )
                 if not tracks.is_error() and not tracks.is_empty() and tracks.result:
                     return tracks

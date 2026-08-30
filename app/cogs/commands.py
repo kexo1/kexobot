@@ -34,7 +34,7 @@ from app.config.music import (
     AudioSourceSupport,
 )
 from app.config.reddit import SHITPOST_SUBREDDITS_ALL
-from app.config.sfd import SFD_TIMEZONE_CHOICE
+# from app.config.sfd import SFD_TIMEZONE_CHOICE
 from app.data import BaseDataManager, UserData
 from app.response_handler import defer_interaction, make_embed, send
 from app.utils import EmbedPaginator
