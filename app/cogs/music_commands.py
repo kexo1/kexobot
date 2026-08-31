@@ -1036,7 +1036,7 @@ class MusicCommands(commands.Cog):
 
     async def _prepare_sonolink(self, ctx: discord.Interaction) -> None:
         player = get_player(ctx)
-        player.text_channel = cast(discord.abc.MessageableChannel, ctx.channel)
+        player.text_channel = cast("discord.abc.MessageableChannel", ctx.channel)
 
         guild = await self._bot.guild_data_manager.get(guild_of(ctx).id)
         volume = guild.music.volume
