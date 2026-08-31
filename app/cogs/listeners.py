@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import discord
 import sonolink
@@ -9,11 +9,13 @@ from sonolink import models as sl_models
 from sonolink.gateway import (
     DisconnectTriggerType,
     PlayerDisconnectEvent,
+    WebSocketClosedEvent,
+)
+from sonolink.gateway.event_models import (
     ReadyEvent,
     TrackExceptionEvent,
     TrackStartEvent,
     TrackStuckEvent,
-    WebSocketClosedEvent,
 )
 
 from app.config.colors import COLOR_YELLOW
@@ -23,13 +25,16 @@ from app.utils import make_now_playing_embed
 
 if TYPE_CHECKING:
     from app.main import KexoBotClient
+    from app.player_types import KexoPlayer
 
 
 def is_bot_node_connected(bot: "KexoBotClient") -> bool:
     return bool(getattr(bot, "node", None))
 
 
-def is_same_track(track: sl_models.Playable, payload_track: sl_models.Playable) -> bool:
+def is_same_track(
+    track: sl_models.Playable | None, payload_track: sl_models.Playable
+) -> bool:
     track_encoded = getattr(track, "encoded", None)
     payload_encoded = getattr(payload_track, "encoded", None)
     return bool(
@@ -113,7 +118,7 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_sonolink_track_start(
-        self, player: sonolink.Player, payload: TrackStartEvent
+        self, player: "KexoPlayer", payload: TrackStartEvent
     ) -> None:
         """This event is triggered when a track starts playing.
 
@@ -135,11 +140,13 @@ class Listeners(commands.Cog):
         else:
             await send(
                 player.text_channel,
-                embed=make_now_playing_embed(player.current),
+                embed=make_now_playing_embed(
+                    cast("sl_models.Playable", player.current)
+                ),
             )
 
         if player.autoplay != sonolink.AutoPlayMode.ENABLED:
-            history_count = len(player.queue.history)
+            history_count = len(player.queue.history or [])
             tip = MUSIC_TIPS.get(history_count)
 
             if tip and random.randint(0, 2) == 0:
@@ -151,7 +158,7 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_sonolink_websocket_closed(
-        self, player: sonolink.Player, payload: WebSocketClosedEvent
+        self, player: "KexoPlayer", payload: WebSocketClosedEvent
     ) -> None:
         """This event is triggered when the websocket connection to the node is closed.
 
@@ -185,7 +192,7 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_sonolink_track_exception(
-        self, player: sonolink.Player, payload: TrackExceptionEvent
+        self, player: "KexoPlayer", payload: TrackExceptionEvent
     ) -> None:
         """This event is triggered when a track encounters an exception.
 
@@ -203,7 +210,7 @@ class Listeners(commands.Cog):
             player.text_channel,
             embed=make_embed(
                 ":warning: An error occurred when playing song, trying to connect to a new node."
-                f"\n**Message**: {payload.exception.message[:128]}"
+                f"\n**Message**: {(payload.exception.message or '')[:128]}"
                 f"\n**Severity**: {payload.exception.severity.value}",
                 color=COLOR_YELLOW,
             ),
@@ -214,7 +221,7 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_sonolink_track_stuck(
-        self, player: sonolink.Player, payload: TrackStuckEvent
+        self, player: "KexoPlayer", payload: TrackStuckEvent
     ) -> None:
         """This event is triggered when a track gets stuck.
 
@@ -243,7 +250,7 @@ class Listeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_sonolink_player_disconnect(
-        self, player: sonolink.Player, payload: PlayerDisconnectEvent
+        self, player: "KexoPlayer", payload: PlayerDisconnectEvent
     ) -> None:
         """This event is triggered when a player gets disconnected due to inactivity.
 
@@ -289,7 +296,7 @@ class Listeners(commands.Cog):
         after: :class:`discord.VoiceState`
             The voice state after the change.
         """
-        player: sonolink.Player = member.guild.voice_client
+        player = cast("KexoPlayer", member.guild.voice_client)
         if player is None:
             return
 

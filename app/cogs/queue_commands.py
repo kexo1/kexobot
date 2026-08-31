@@ -1,12 +1,14 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import discord
 import sonolink
 from discord import app_commands
 from discord.ext import commands
+from sonolink import models as sl_models
 
 from app.config.colors import COLOR_BLUE
 from app.decorators import is_joined, is_playing, is_queue_empty
+from app.player_types import get_player
 from app.response_handler import make_embed, send
 from app.utils import (
     EmbedPaginator,
@@ -33,17 +35,19 @@ def get_queue_embeds(
     ctx: discord.Interaction, player: sonolink.Player
 ) -> list[discord.Embed]:
     queue_status, footer = get_queue_status(player.queue.mode)
+    guild_name = cast(discord.Guild, ctx.guild).name
+    current = cast(sl_models.Playable, player.current)  # guarded by @is_playing
 
     requester_label = (
         "Autoplay"
-        if player.current.autoplay
-        else f"Requested by: {get_track_requester_name(player.current)}"
+        if current.autoplay
+        else f"Requested by: {get_track_requester_name(current)}"
     )
     header = (
-        f"\n***__{queue_status}:__***\n **[{fix_audio_title(player.current)}]"
-        f"({player.current.uri})**\n"
-        f" `{int(divmod(player.current.length, 60000)[0])}:"
-        f"{round(divmod(player.current.length, 60000)[1] / 1000):02} | "
+        f"\n***__{queue_status}:__***\n **[{fix_audio_title(current)}]"
+        f"({current.uri})**\n"
+        f" `{int(divmod(current.length, 60000)[0])}:"
+        f"{round(divmod(current.length, 60000)[1] / 1000):02} | "
         f"{requester_label}`\n\n ***__Next:__***\n"
     )
 
@@ -60,7 +64,7 @@ def get_queue_embeds(
         )
         if len(current_description) + len(song_line) > 4096:
             embed = discord.Embed(
-                title=f"Queue for {ctx.guild.name}",
+                title=f"Queue for {guild_name}",
                 description=current_description,
                 color=COLOR_BLUE,
             )
@@ -75,7 +79,7 @@ def get_queue_embeds(
         autoplay_header = "\n ***__Autoplay:__***\n"
         if len(current_description) + len(autoplay_header) > 4096:
             embed = discord.Embed(
-                title=f"Queue for {ctx.guild.name}",
+                title=f"Queue for {guild_name}",
                 description=current_description,
                 color=COLOR_BLUE,
             )
@@ -93,7 +97,7 @@ def get_queue_embeds(
             )
             if len(current_description) + len(song_line) > 4096:
                 embed = discord.Embed(
-                    title=f"Queue for {ctx.guild.name}",
+                    title=f"Queue for {guild_name}",
                     description=current_description,
                     color=COLOR_BLUE,
                 )
@@ -104,7 +108,7 @@ def get_queue_embeds(
                 current_description += song_line
 
     embed = discord.Embed(
-        title=f"Queue for {ctx.guild.name}",
+        title=f"Queue for {guild_name}",
         description=current_description,
         color=COLOR_BLUE,
     )
@@ -143,7 +147,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         pages = get_queue_embeds(ctx, player)
 
         if len(pages) == 1:
@@ -171,7 +175,7 @@ class Queue(commands.Cog):
         to_find: str
             The name of the song to be removed from the queue.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         track_pos = find_track(player, to_find)
         if track_pos is None:
             await send(ctx, code="NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
@@ -201,7 +205,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         if len(player.queue) < 2:
             await send(
@@ -227,7 +231,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         if player.queue.mode == sonolink.QueueMode.LOOP_ALL:
             player.queue.mode = sonolink.QueueMode.NORMAL
@@ -256,7 +260,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         if player.queue.mode == sonolink.QueueMode.LOOP:
             player.queue.mode = sonolink.QueueMode.NORMAL
@@ -264,12 +268,13 @@ class Queue(commands.Cog):
             return
 
         player.queue.mode = sonolink.QueueMode.LOOP
+        current = cast(sl_models.Playable, player.current)  # guarded by @is_playing
         await send(
             ctx,
             code="TRACK_LOOP_ENABLED",
             ephemeral=False,
-            title=player.current.title,
-            uri=player.current.uri,
+            title=current.title,
+            uri=current.uri,
         )
 
     @app_commands.command(name="clear", description="Clears queue")
@@ -283,7 +288,7 @@ class Queue(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         player.queue.clear()
         await send(ctx, code="QUEUE_CLEARED", ephemeral=False)
 

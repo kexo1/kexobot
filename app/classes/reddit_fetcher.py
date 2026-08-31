@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 import asyncpraw
 import asyncpraw.models
+import asyncpraw.reddit
 import discord
 import httpx
 from asyncprawcore.exceptions import (
@@ -158,8 +159,9 @@ class RedditFetcher:
                 await self._game_cracks.send(embed=embed)
 
         except discord.errors.HTTPException as e:
+            # Only .send() inside the loop raises this, so `submission` is bound.
             logging.warning(
-                f"[CrackWatch] - Error when sending message ({submission.permalink}):\n{e}"
+                f"[CrackWatch] - Error when sending message ({submission.permalink}):\n{e}"  # pyright: ignore[reportPossiblyUnboundVariable]
             )
         except (
             AsyncPrawcoreException,
@@ -223,7 +225,7 @@ class RedditFetcher:
 
         except discord.errors.HTTPException as e:
             logging.warning(
-                f"[FreeGameFindings] - Error when sending message ({submission.permalink}):\n{e}"
+                f"[FreeGameFindings] - Error when sending message ({submission.permalink}):\n{e}"  # pyright: ignore[reportPossiblyUnboundVariable]
             )
         except (
             AsyncPrawcoreException,

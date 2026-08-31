@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, Literal, cast, overload
 
 import discord
 import httpx
@@ -104,7 +104,7 @@ def fix_audio_title(track: sl_models.Playable) -> str:
     if track.title and track.title != "Unknown title":
         title = track.title
     else:
-        title = track.uri
+        title = cast(str, track.uri)  # a loaded Playable always has a uri
 
     for char in MUSIC_TO_REMOVE:
         title = title.replace(char, "")
@@ -235,10 +235,37 @@ def find_track(player: sonolink.Player, to_find: str) -> int | None:
         return index
 
 
+@overload
 async def make_http_request(
     session: httpx.AsyncClient,
     url: str,
-    data: dict[str, Any] | None = None,
+    data: dict[str, Any] | str | None = ...,
+    headers: dict[str, Any] | None = ...,
+    retries: int = ...,
+    timeout: float = ...,
+    *,
+    get_json: Literal[True],
+    binary: bool = ...,
+) -> Any | None: ...  # parsed JSON: object or array
+
+
+@overload
+async def make_http_request(
+    session: httpx.AsyncClient,
+    url: str,
+    data: dict[str, Any] | str | None = ...,
+    headers: dict[str, Any] | None = ...,
+    retries: int = ...,
+    timeout: float = ...,
+    get_json: Literal[False] = ...,
+    binary: bool = ...,
+) -> httpx.Response | None: ...
+
+
+async def make_http_request(
+    session: httpx.AsyncClient,
+    url: str,
+    data: dict[str, Any] | str | None = None,
     headers: dict[str, Any] | None = None,
     retries: int = 2,
     timeout: float = 3.0,
@@ -274,7 +301,11 @@ async def make_http_request(
     """
     for attempt in range(retries):
         try:
-            if data:
+            if isinstance(data, str):
+                response = await session.post(
+                    url, content=data, headers=headers, timeout=timeout
+                )
+            elif data:
                 response = await session.post(
                     url, data=data, headers=headers, timeout=timeout
                 )

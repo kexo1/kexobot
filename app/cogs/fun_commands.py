@@ -1,7 +1,7 @@
 import logging
 import random
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 import asyncpraw.models
 import asyncpraw.reddit
@@ -17,6 +17,7 @@ from discord.ext import commands
 
 from app.config.scraping import API_DAD_JOKE, API_HUMORAPI, API_JOKEAPI
 from app.data.models import TempUserRedditData, UserRedditData
+from app.player_types import guild_of
 from app.response_handler import defer_interaction, make_embed, send
 from app.utils import load_text_file, make_http_request
 
@@ -129,7 +130,7 @@ class FunCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        temp_guild = self._temp_guild_mgr.get(ctx.guild.id)
+        temp_guild = self._temp_guild_mgr.get(guild_of(ctx).id)
         viewed_count = len(temp_guild.jokes.viewed_jokes)
         loaded_count = len(self._loaded_jokes)
 
@@ -168,7 +169,7 @@ class FunCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        temp_guild = self._temp_guild_mgr.get(ctx.guild.id)
+        temp_guild = self._temp_guild_mgr.get(guild_of(ctx).id)
         viewed_count = len(temp_guild.jokes.viewed_dad_jokes)
         loaded_count = len(self._loaded_dad_jokes)
 
@@ -212,7 +213,7 @@ class FunCommands(commands.Cog):
         member: :class:`discord.Member`
             The member to roast.
         """
-        temp_guild = self._temp_guild_mgr.get(ctx.guild.id)
+        temp_guild = self._temp_guild_mgr.get(guild_of(ctx).id)
         viewed_count = len(temp_guild.jokes.viewed_yo_mama_jokes)
         loaded_count = len(self._loaded_yo_mama_jokes)
 
@@ -267,14 +268,14 @@ class FunCommands(commands.Cog):
         """
         user_id = ctx.user.id
         user_reddit, temp_user_reddit = await self._load_user_data(user_id)
-        multireddit = temp_user_reddit.multireddit
-        limit = temp_user_reddit.search_limit
 
         if not temp_user_reddit.multireddit:
             await send(ctx, "REDDIT_CANT_LOAD_MULTIREDDIT")
             return
 
-        multireddit = temp_user_reddit.multireddit
+        multireddit = cast(
+            asyncpraw.models.Multireddit, temp_user_reddit.multireddit
+        )
         limit = temp_user_reddit.search_limit
 
         try:
@@ -282,7 +283,7 @@ class FunCommands(commands.Cog):
                 if not is_valid_submission(submission, user_reddit, temp_user_reddit):
                     continue
 
-                is_channel_nsfw = ctx.channel.is_nsfw()
+                is_channel_nsfw = cast(discord.TextChannel, ctx.channel).is_nsfw()
                 if submission.over_18 and not is_channel_nsfw:
                     await send(
                         ctx,
@@ -292,18 +293,17 @@ class FunCommands(commands.Cog):
                     )
                     return
 
-                if not submission.media:
-                    embed = await self._create_reddit_embed(submission)
-
                 if submission.media:
                     await post_video(ctx, submission.permalink)
-                # If it has multiple images
-                elif hasattr(submission, "gallery_data"):
-                    await send(ctx, embed=embed)
-                    await send_multiple_images(ctx, submission)
                 else:
-                    embed.set_image(url=submission.url)
-                    await send(ctx, embed=embed)
+                    embed = await self._create_reddit_embed(submission)
+                    # If it has multiple images
+                    if hasattr(submission, "gallery_data"):
+                        await send(ctx, embed=embed)
+                        await send_multiple_images(ctx, submission)
+                    else:
+                        embed.set_image(url=submission.url)
+                        await send(ctx, embed=embed)
 
                 self._update_temp_user_data(user_id, submission.permalink)
                 break

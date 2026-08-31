@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from app.config.mongo import DB_CACHE
+from app.config.music import LAVALINK_URL
 from app.config.scraping import API_LAVALIST
 from app.utils import get_url_response_time, make_http_request
 
@@ -39,7 +40,9 @@ class LavalinkServerManager:
         self._fresh_nodes: set[str] = set()
 
     async def _fetch_and_parse(self, api_url: str) -> list | None:
-        json_data: list = await make_http_request(self._session, api_url, get_json=True)
+        json_data: list | None = await make_http_request(
+            self._session, api_url, get_json=True
+        )
         if json_data:
             await self._parse_lavalink_servers(json_data)
         return json_data
@@ -86,6 +89,8 @@ class LavalinkServerManager:
 
     def _clear_removed_nodes(self) -> None:
         """Method to clear old nodes from the cached lavalink servers."""
+        self._fresh_nodes.add(LAVALINK_URL)
+
         for uri in list(self._cached_lavalink_servers.keys()):
             if uri not in self._fresh_nodes:
                 self._cached_lavalink_servers.pop(uri, None)

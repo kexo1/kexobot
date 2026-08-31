@@ -4,10 +4,11 @@ import os
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 
+from typing import Any, cast
+
 import httpx
 import matplotlib
 from bs4 import BeautifulSoup
-from typing import Any
 
 from pymongo.asynchronous.collection import AsyncCollection
 
@@ -369,7 +370,7 @@ class SFDServers:
         return players, len(servers)
 
     async def _load_sfd_activity_data(self) -> dict:
-        return await self._bot_config.find_one(DB_SFD_ACTIVITY)
+        return cast(dict, await self._bot_config.find_one(DB_SFD_ACTIVITY))
 
     async def _parse_servers(self, search: str | None = None) -> list[SFDServer] | None:
         response = await self._load_sfd_servers()
@@ -377,7 +378,8 @@ class SFDServers:
             return None
 
         soup = BeautifulSoup(response, "xml")
-        servers_element = soup.find("GetGameServersResult").find("Servers")
+        # bs4 navigation from here is untyped: the parser assumes the SOAP structure.
+        servers_element = cast(Any, soup.find("GetGameServersResult")).find("Servers")
 
         servers = []
         if not servers_element:

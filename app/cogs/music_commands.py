@@ -3,7 +3,7 @@ import datetime
 import logging
 import random
 import re
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union, cast
 
 import discord
 import sonolink
@@ -24,6 +24,7 @@ from app.config.music import (
     MUSIC_SOURCES,
 )
 from app.decorators import is_joined, is_playing, is_queue_empty
+from app.player_types import caller_voice_channel, get_player, guild_of, member_of
 from app.response_handler import defer_interaction, make_embed, send
 from app.utils import (
     EmbedPaginator,
@@ -57,7 +58,7 @@ def set_track_requester(
         track.extras.requester_avatar = avatar
 
 
-def _parse_radiomap_stream_url(url: str) -> Optional[str]:
+def _parse_radiomap_stream_url(url: str) -> str:
     channel_id = url.rstrip("/").split("/")[-1]
     return f"{API_RADIOGARDEN_LISTEN}{channel_id}/channel.mp3"
 
@@ -71,25 +72,24 @@ async def fetch_first_track(
         list[sl_models.Playable],
     ],
 ) -> Optional[sl_models.Playable]:
-    player: sonolink.Player = ctx.guild.voice_client
+    player = get_player(ctx)
 
     # Unwrap SearchResult
-    if isinstance(tracks, sl_models.SearchResult):
-        tracks = tracks.result
+    resolved = tracks.result if isinstance(tracks, sl_models.SearchResult) else tracks
 
     # Handle Playlist
-    if isinstance(tracks, sl_models.Playlist):
-        return await _handle_playlist(ctx, player, tracks)
+    if isinstance(resolved, sl_models.Playlist):
+        return await _handle_playlist(ctx, player, resolved)
 
     # Handle single Playable
-    if isinstance(tracks, sl_models.Playable):
-        set_track_requester(tracks, ctx.user)
-        return tracks
+    if isinstance(resolved, sl_models.Playable):
+        set_track_requester(resolved, ctx.user)
+        return resolved
 
-    if not tracks:
+    if not resolved:
         return None
 
-    first_track = tracks[0]
+    first_track = resolved[0]
     set_track_requester(first_track, ctx.user)
     return first_track
 
@@ -116,8 +116,9 @@ async def _handle_playlist(
 
 
 async def should_move_to_channel(ctx: discord.Interaction) -> bool:
-    player: sonolink.Player = ctx.guild.voice_client
-    if player and player.channel.id == ctx.user.voice.channel.id:
+    player = get_player(ctx)
+    target_channel = caller_voice_channel(ctx)
+    if player and player.channel.id == target_channel.id:
         return True
 
     if player.current:
@@ -129,10 +130,10 @@ async def should_move_to_channel(ctx: discord.Interaction) -> bool:
         )
         return False
 
-    await player.move_to(ctx.user.voice.channel)
+    await player.guild.change_voice_state(channel=target_channel)
     await send(
         ctx,
-        embed=make_embed(f":wheelchair: Moving to <#{ctx.user.voice.channel.id}>"),
+        embed=make_embed(f":wheelchair: Moving to <#{target_channel.id}>"),
         ephemeral=False,
     )
     return True
@@ -180,7 +181,7 @@ class MusicCommands(commands.Cog):
         """Shared play flow used by /music play and radio commands."""
         await defer_interaction(ctx)
 
-        if self._bot.node_is_switching.get(ctx.guild.id, False):
+        if self._bot.node_is_switching.get(guild_of(ctx).id, False):
             await send(
                 ctx,
                 embed=make_embed(
@@ -194,7 +195,7 @@ class MusicCommands(commands.Cog):
             await send(ctx, code="NODE_NOT_FOUND", ephemeral=False)
             return
 
-        if not ctx.guild.voice_client:
+        if not get_player(ctx):
             joined: bool = await self._join_channel(ctx)
 
             if not joined:
@@ -206,13 +207,13 @@ class MusicCommands(commands.Cog):
         if not is_moved:
             return
 
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         tracks = await self._search_tracks(ctx, search)
         if not tracks:
             return
 
-        track: sl_models.Playable = await fetch_first_track(ctx, tracks)
+        track = await fetch_first_track(ctx, tracks)
         if not track:
             return
 
@@ -383,6 +384,8 @@ class MusicCommands(commands.Cog):
                     self._session,
                     stream_url,
                 )
+                if not redirect_response:
+                    continue
                 stream_url = redirect_response.headers.get("Location", stream_url)
                 if not stream_url:
                     continue
@@ -405,7 +408,7 @@ class MusicCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         await defer_interaction(ctx)
 
         try:
@@ -436,7 +439,7 @@ class MusicCommands(commands.Cog):
         to_find: str
             The name of the song or its position in the queue.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         track_pos = find_track(player, to_find)
         if not track_pos:
@@ -446,6 +449,8 @@ class MusicCommands(commands.Cog):
         if track_pos > 1:
             track = player.queue.pop_at(track_pos - 1)
             player.queue.put_at(0, track)
+        else:
+            track = player.queue[track_pos - 1]
 
         try:
             await player.skip()
@@ -468,7 +473,7 @@ class MusicCommands(commands.Cog):
         ctx: discord.Interaction,
         to_find: Range[str, 1, 120],
     ) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         track_pos = find_track(player, to_find)
         if track_pos is None:
             await send(ctx, code="NO_TRACK_FOUND_IN_QUEUE", to_find=to_find)
@@ -488,7 +493,7 @@ class MusicCommands(commands.Cog):
     @is_joined()
     @is_queue_empty()
     async def shuffle(self, ctx: discord.Interaction) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         player.queue.shuffle()
         await send(ctx, code="QUEUE_SHUFFLED", ephemeral=False)
 
@@ -499,7 +504,7 @@ class MusicCommands(commands.Cog):
     @app_commands.guild_only()
     @is_joined()
     async def loop_queue(self, ctx: discord.Interaction) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         if len(player.queue) == 0 and player.queue.mode != sonolink.QueueMode.LOOP_ALL:
             await send(ctx, code="NO_TRACKS_IN_QUEUE")
@@ -529,7 +534,7 @@ class MusicCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         if player.paused:
             await send(ctx, embed=make_embed(":x: Track is already paused."))
@@ -554,7 +559,7 @@ class MusicCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         await player.resume()
         await send(
             ctx,
@@ -581,7 +586,7 @@ class MusicCommands(commands.Cog):
         seconds: int
             The position to seek to in seconds.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         # Convert seconds to milliseconds
         position_ms = seconds * 1000
@@ -617,7 +622,7 @@ class MusicCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         try:
             track = await player.previous()
@@ -642,7 +647,7 @@ class MusicCommands(commands.Cog):
     @app_commands.guild_only()
     @is_playing()
     async def loop(self, ctx: discord.Interaction) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         if player.queue.mode == sonolink.QueueMode.LOOP:
             await player.update(queue_mode=sonolink.QueueMode.NORMAL)
@@ -650,19 +655,20 @@ class MusicCommands(commands.Cog):
             return
 
         await player.update(queue_mode=sonolink.QueueMode.LOOP)
+        current = cast(sl_models.Playable, player.current)  # guarded by @is_playing
         await send(
             ctx,
             code="TRACK_LOOP_ENABLED",
             ephemeral=False,
-            title=player.current.title,
-            uri=player.current.uri,
+            title=current.title,
+            uri=current.uri,
         )
 
     @music.command(name="clear-queue", description="Clears queue and history.")
     @app_commands.guild_only()
     @is_joined()
     async def clear_queue(self, ctx: discord.Interaction) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         player.queue.clear()
         player.queue.clear_history()
         await send(ctx, code="QUEUE_CLEARED", ephemeral=False)
@@ -678,7 +684,7 @@ class MusicCommands(commands.Cog):
         ctx: discord.Interaction,
         volume: Optional[Range[int, 0, 200]] = None,
     ) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         if volume is None:
             await send(
@@ -687,9 +693,9 @@ class MusicCommands(commands.Cog):
             )
             return
 
-        guild = await self._bot.guild_data_manager.get(ctx.guild.id)
+        guild = await self._bot.guild_data_manager.get(guild_of(ctx).id)
         guild.music.volume = volume
-        await self._bot.guild_data_manager.save(ctx.guild.id, guild)
+        await self._bot.guild_data_manager.save(guild_of(ctx).id, guild)
         await player.set_volume(volume)
         await send(
             ctx,
@@ -706,7 +712,7 @@ class MusicCommands(commands.Cog):
         ctx: discord.Interaction,
         multiplier: Optional[Range[int, 1, 4]] = 1,
     ) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         filters = sl_models.Filters(timescale=sl_models.Timescale(speed=multiplier))
 
         await player.set_filters(filters)
@@ -720,7 +726,7 @@ class MusicCommands(commands.Cog):
     @app_commands.guild_only()
     @is_joined()
     async def clear_effects(self, ctx: discord.Interaction) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         filters = sl_models.Filters()
         await player.set_filters(filters)
         await send(ctx, embed=make_embed("🔇 Effects cleared."), ephemeral=False)
@@ -730,7 +736,7 @@ class MusicCommands(commands.Cog):
     @is_joined()
     @is_queue_empty()
     async def queue(self, ctx: discord.Interaction) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         pages = self._build_queue_embeds(ctx, player)
 
         if len(pages) == 1:
@@ -743,7 +749,7 @@ class MusicCommands(commands.Cog):
     @app_commands.guild_only()
     @is_playing()
     async def playing_command(self, ctx: discord.Interaction) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         await send(ctx, embed=self._build_playing_embed(player))
 
     @music.command(name="leave", description="Leaves voice channel.")
@@ -757,9 +763,9 @@ class MusicCommands(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command.
         """
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
-        if player.channel.id != ctx.user.voice.channel.id:
+        if player.channel.id != caller_voice_channel(ctx).id:
             await send(ctx, code="NOT_IN_SAME_VOICE_CHANNEL")
             return
 
@@ -796,7 +802,7 @@ class MusicCommands(commands.Cog):
         mode: str
             The autoplay mode to set. Can be either "normal" or "populated".
         """
-        guild = await self._bot.guild_data_manager.get(ctx.guild.id)
+        guild = await self._bot.guild_data_manager.get(guild_of(ctx).id)
         current_autoplay_mode = (
             "normal" if guild.music.autoplay_mode == 1 else "populated"
         )
@@ -814,7 +820,7 @@ class MusicCommands(commands.Cog):
             if mode == "normal"
             else sonolink.AutoPlayMode.ENABLED
         )
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         await player.update(
             autoplay_settings=AutoPlaySettings(
                 mode=new_autoplay_mode,
@@ -823,7 +829,7 @@ class MusicCommands(commands.Cog):
         )
 
         guild.music.autoplay_mode = 1 if mode == "normal" else 2
-        await self._bot.guild_data_manager.save(ctx.guild.id, guild)
+        await self._bot.guild_data_manager.save(guild_of(ctx).id, guild)
 
         await send(
             ctx,
@@ -856,12 +862,14 @@ class MusicCommands(commands.Cog):
         else:
             spotify_search = False
 
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         for i in range(2):
             try:
                 tracks: sl_models.SearchResult = await asyncio.wait_for(
-                    self._bot.sonolink_client.search_track(search, source=source),
+                    self._bot.sonolink_client.search_track(
+                        search, source=cast("str", source)
+                    ),
                     timeout=10,
                 )
                 if not tracks.is_error() and not tracks.is_empty() and tracks.result:
@@ -895,7 +903,7 @@ class MusicCommands(commands.Cog):
                 await self._bot.state.switch_node(
                     player=player,
                     search_callback=lambda: self._bot.sonolink_client.search_track(
-                        search, source=source
+                        search, source=cast("str", source)
                     ),
                     send_failure_message=False,
                 )
@@ -924,12 +932,13 @@ class MusicCommands(commands.Cog):
         return None
 
     async def _join_channel(self, ctx: discord.Interaction) -> bool:
-        if not ctx.user.voice or not ctx.user.voice.channel:
+        member = member_of(ctx)
+        if not member.voice or not member.voice.channel:
             await send(ctx, code="NO_VOICE_CHANNEL")
             return False
 
-        channel = ctx.user.voice.channel
-        guild = await self._bot.guild_data_manager.get(ctx.guild.id)
+        channel = member.voice.channel
+        guild = await self._bot.guild_data_manager.get(guild_of(ctx).id)
         autoplay_mode = (
             sonolink.AutoPlayMode.PARTIAL
             if guild.music.autoplay_mode == 1
@@ -942,8 +951,9 @@ class MusicCommands(commands.Cog):
 
         for attempt in range(4):
             if attempt == 0:
-                if not await self._bot.state.node_health_check(node):
-                    failed_uris.add(node.uri)
+                if node is None or not await self._bot.state.node_health_check(node):
+                    if node is not None:
+                        failed_uris.add(node.uri)
                     continue
             else:
                 node = await self._bot.connect_node(
@@ -965,7 +975,7 @@ class MusicCommands(commands.Cog):
             except Exception as e:
                 last_error = e
                 failed_uris.add(node.uri)
-                score = self._bot.state.get_node_score(node.uri)
+                score = self._bot.state.get_node_score(node.uri) or 0
                 # Punish the node on voice connection failure
                 score = -score - 1
                 self._bot.state.change_node_score(node.uri, score)
@@ -1011,7 +1021,7 @@ class MusicCommands(commands.Cog):
     async def _play_track(
         self, ctx: discord.Interaction, track: sl_models.Playable
     ) -> bool:
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
         for i in range(3):
             try:
                 await player.play(track)
@@ -1025,10 +1035,10 @@ class MusicCommands(commands.Cog):
         return True
 
     async def _prepare_sonolink(self, ctx: discord.Interaction) -> None:
-        player: sonolink.Player = ctx.guild.voice_client
-        player.text_channel = ctx.channel
+        player = get_player(ctx)
+        player.text_channel = cast(discord.abc.MessageableChannel, ctx.channel)
 
-        guild = await self._bot.guild_data_manager.get(ctx.guild.id)
+        guild = await self._bot.guild_data_manager.get(guild_of(ctx).id)
         volume = guild.music.volume
         try:
             await player.set_volume(volume)
@@ -1095,7 +1105,7 @@ class MusicCommands(commands.Cog):
 
             if len(current_description) + len(song_line) > 4096:
                 embed = discord.Embed(
-                    title=f"Queue for {ctx.guild.name}",
+                    title=f"Queue for {guild_of(ctx).name}",
                     description=current_description,
                     color=COLOR_BLUE,
                 )
@@ -1110,7 +1120,7 @@ class MusicCommands(commands.Cog):
             autoplay_header = "\n ***__Autoplay:__***\n"
             if len(current_description) + len(autoplay_header) > 4096:
                 embed = discord.Embed(
-                    title=f"Queue for {ctx.guild.name}",
+                    title=f"Queue for {guild_of(ctx).name}",
                     description=current_description,
                     color=COLOR_BLUE,
                 )
@@ -1128,7 +1138,7 @@ class MusicCommands(commands.Cog):
                 )
                 if len(current_description) + len(song_line) > 4096:
                     embed = discord.Embed(
-                        title=f"Queue for {ctx.guild.name}",
+                        title=f"Queue for {guild_of(ctx).name}",
                         description=current_description,
                         color=COLOR_BLUE,
                     )
@@ -1139,7 +1149,7 @@ class MusicCommands(commands.Cog):
                     current_description += song_line
 
         embed = discord.Embed(
-            title=f"Queue for {ctx.guild.name}",
+            title=f"Queue for {guild_of(ctx).name}",
             description=current_description,
             color=COLOR_BLUE,
         )
@@ -1155,9 +1165,10 @@ class MusicCommands(commands.Cog):
         )
         embed.set_author(name="Playback Information")
 
-        requester_name = get_track_requester_name(player.current)
-        requester_avatar = get_track_requester_avatar(player.current)
-        if not player.current.autoplay:
+        current = cast(sl_models.Playable, player.current)  # embed implies a track
+        requester_name = get_track_requester_name(current)
+        requester_avatar = get_track_requester_avatar(current)
+        if not current.autoplay:
             embed.set_footer(
                 text=f"Requested by {requester_name}",
                 icon_url=requester_avatar,
@@ -1170,18 +1181,18 @@ class MusicCommands(commands.Cog):
 
         embed.add_field(
             name="Track title",
-            value=f"**[{player.current.title}]({player.current.uri})**",
+            value=f"**[{current.title}]({current.uri})**",
             inline=False,
         )
         embed.add_field(
             name="Artist",
-            value=f"_{player.current.author if player.current.author else 'None'}_",
+            value=f"_{current.author if current.author else 'None'}_",
             inline=False,
         )
-        embed.set_image(url=player.current.artwork)
+        embed.set_image(url=current.artwork)
 
         position = divmod(player.position, 60000)
-        length = divmod(player.current.length, 60000)
+        length = divmod(current.length, 60000)
         embed.add_field(
             name="Position",
             value=f"`{int(position[0])}:{round(position[1] / 1000):02}"

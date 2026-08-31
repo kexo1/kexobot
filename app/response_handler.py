@@ -202,18 +202,22 @@ async def send(
                     wait=True,
                 )
             except discord.NotFound:
-                if not ephemeral and target.channel:
+                if not ephemeral and isinstance(
+                    target.channel, discord.abc.Messageable
+                ):
                     try:
-                        message = await target.channel.send(**payload)  # pyright: ignore[reportAny, reportUnknownVariableType, reportUnknownMemberType]
+                        message = await target.channel.send(**payload)  # pyright: ignore[reportAny]
                     except discord.HTTPException:
                         pass
         else:
             try:
                 await target.response.send_message(**payload, ephemeral=ephemeral)  # pyright: ignore[reportAny]
             except discord.NotFound:
-                if not ephemeral and target.channel:
+                if not ephemeral and isinstance(
+                    target.channel, discord.abc.Messageable
+                ):
                     try:
-                        message = await target.channel.send(**payload)  # pyright: ignore[reportAny, reportUnknownVariableType, reportUnknownMemberType]
+                        message = await target.channel.send(**payload)  # pyright: ignore[reportAny]
                     except discord.HTTPException:
                         pass
             else:

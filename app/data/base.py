@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, Protocol, TypeVar, cast
 
 from pymongo.asynchronous.collection import AsyncCollection
 
-T = TypeVar("T")
+
+class _DataModel(Protocol):
+    """Structural type for the dataclasses this manager persists."""
+
+    def to_dict(self) -> dict[str, Any]: ...
+
+
+T = TypeVar("T", bound=_DataModel)
 
 
 class BaseDataManager(Generic[T]):
@@ -66,7 +73,7 @@ class BaseDataManager(Generic[T]):
                 _id,
             )
             await self._db.insert_one(
-                cast(dict[str, Any], {"_id": _id, **cast(Any, instance.to_dict())})  # pyright: ignore[reportUnknownMemberType]
+                cast(dict[str, Any], {"_id": _id, **instance.to_dict()})
             )
 
         self._cache[_id] = instance
@@ -85,6 +92,6 @@ class BaseDataManager(Generic[T]):
         self._cache[_id] = data
         await self._db.update_one(
             {"_id": _id},
-            {"$set": cast(Any, data.to_dict())},  # pyright: ignore[reportUnknownMemberType]
+            {"$set": data.to_dict()},
             upsert=True,
         )

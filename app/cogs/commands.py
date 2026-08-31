@@ -6,16 +6,19 @@ import os
 import random
 import sys
 import time
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 from urllib.parse import urlparse
 
 import asyncpraw
+import asyncpraw.exceptions
+import asyncpraw.models
 import discord
 import httpx
 import sonolink
 from discord import app_commands
 from discord.ext import commands
-from pymongo import AsyncMongoClient
+from pymongo.asynchronous.collection import AsyncCollection
+from sonolink.rest.schemas.info import PluginObject
 
 from app.__init__ import __version__
 from app.classes.sfd_servers import SFDServers
@@ -36,6 +39,7 @@ from app.config.music import (
 from app.config.reddit import SHITPOST_SUBREDDITS_ALL
 # from app.config.sfd import SFD_TIMEZONE_CHOICE
 from app.data import BaseDataManager, UserData
+from app.player_types import get_player, member_of
 from app.response_handler import defer_interaction, make_embed, send
 from app.utils import EmbedPaginator
 
@@ -71,7 +75,7 @@ host_authors: set[str] = set()
 
 
 async def is_owner(interaction: discord.Interaction) -> bool:
-    return await interaction.client.is_owner(interaction.user)
+    return await cast("KexoBotClient", interaction.client).is_owner(interaction.user)
 
 
 class CommandCog(commands.Cog):
@@ -97,7 +101,7 @@ class CommandCog(commands.Cog):
     def __init__(self, bot: KexoBotClient) -> None:
         self._bot: KexoBotClient = bot
         self._session: httpx.AsyncClient = self._bot.session
-        self._bot_config: AsyncMongoClient = self._bot.bot_config
+        self._bot_config: AsyncCollection[Any] = self._bot.bot_config
         self._user_mgr: BaseDataManager[UserData] = self._bot.user_data_manager
 
         self._run_time = time.time()
@@ -191,7 +195,7 @@ class CommandCog(commands.Cog):
             The context of the command invocation.
         """
         await defer_interaction(ctx)
-        player: sonolink.Player = ctx.guild.voice_client
+        player = get_player(ctx)
 
         if player:
             node: sonolink.Node | None = await self._bot.state.switch_node(
@@ -206,7 +210,7 @@ class CommandCog(commands.Cog):
             await send(ctx, code="RECONNECTED_NODE", node=node.uri)
             return
 
-        node: sonolink.Node | None = await self._bot.connect_node(
+        node = await self._bot.connect_node(
             exclude_nodes=[self._bot.node.uri] if self._bot.node else None
         )
         if not node:
@@ -225,9 +229,12 @@ class CommandCog(commands.Cog):
         ctx: :class:`discord.Interaction`
             The context of the command invocation.
         """
-        node: sonolink.Node = self._bot.node
+        node = self._bot.node
+        if node is None:
+            await send(ctx, code="NO_NODE_INFO")
+            return
         try:
-            node_info: sonolink.InfoResponsePayload = await node.fetch_info()
+            node_info = await node.fetch_info()
         except Exception:
             await send(ctx, code="NO_NODE_INFO")
             return
@@ -236,7 +243,7 @@ class CommandCog(commands.Cog):
             title=urlparse(node.uri).netloc,
             color=COLOR_BLUE,
         )
-        plugins: sonolink.PluginResponsePayload = node_info.plugins
+        plugins = node_info.plugins
         unix_timestamp = int(iso_to_timestamp(str(node_info.build_time)).timestamp())
         embed.add_field(
             name="Score:",
@@ -272,7 +279,7 @@ class CommandCog(commands.Cog):
         """
 
         def resolve_platform_support(
-            plugins: list[sonolink.PluginResponsePayload],
+            plugins: list[PluginObject],
         ) -> dict[str, AudioSourceSupport]:
             """Merge all plugin platform support, preferring LIKELY over UNLIKELY."""
             merged: dict[str, AudioSourceSupport] = {}
@@ -290,10 +297,13 @@ class CommandCog(commands.Cog):
 
             return merged
 
-        node: sonolink.Node = self._bot.node
+        node = self._bot.node
+        if node is None:
+            await send(ctx, code="NO_NODE_INFO")
+            return
 
         try:
-            node_info: sonolink.InfoResponsePayload = await node.fetch_info()
+            node_info = await node.fetch_info()
         except Exception:
             await send(ctx, code="NO_NODE_INFO")
             return
@@ -366,7 +376,7 @@ class CommandCog(commands.Cog):
 
         for node in nodes:
             try:
-                players: sonolink.PlayerResponsePayload = await node.fetch_players()
+                players = await node.fetch_players()
             except Exception:
                 continue
 
@@ -429,6 +439,7 @@ class CommandCog(commands.Cog):
 
         server_name_char, map_char, stopped_at = 0, 0, 0
         pages = []
+        embed = discord.Embed(title="Available Servers", color=COLOR_BLUE)
 
         for i in range(len(servers_dict["server_name"])):
             server_name_char += len(servers_dict["server_name"][i])
@@ -640,7 +651,7 @@ class CommandCog(commands.Cog):
         image: str
             The URL of the image to be used in the embed.
         """
-        author = ctx.user
+        author = member_of(ctx)
 
         if author in host_authors:
             await send(
@@ -659,7 +670,7 @@ class CommandCog(commands.Cog):
         )
 
         embed.set_author(
-            icon_url=author.avatar.url, name=f"{author.name} is now hosting!"
+            icon_url=author.display_avatar.url, name=f"{author.name} is now hosting!"
         )
 
         if not branch:
@@ -716,7 +727,7 @@ class CommandCog(commands.Cog):
 
         view = HostView(author=author)
         response = await send(ctx, embed=embed, view=view)
-        view.message = response
+        view.message = cast(discord.Message, response)
         return None
 
     # -------------------- Discord functions -------------------- #
@@ -792,8 +803,8 @@ class CommandCog(commands.Cog):
         words: str
             The list of words separated by spaces.
         """
-        words = words.split()
-        await send(ctx, "I chose " + "`" + str(random.choice(words)) + "`")
+        word_list = words.split()
+        await send(ctx, "I chose " + "`" + str(random.choice(word_list)) + "`")
 
     @app_commands.command(
         name="clear-messages", description="Clears messages, max 50 (Admin)"
@@ -818,7 +829,7 @@ class CommandCog(commands.Cog):
         await send(
             ctx, f"`{integer}` messages cleared ✅", delete_after=20, ephemeral=True
         )
-        await ctx.channel.purge(limit=integer)
+        await cast(discord.TextChannel, ctx.channel).purge(limit=integer)
 
     @app_commands.command(
         name="spam", description="Spams a word (bot owner only, max 50)."
@@ -828,7 +839,7 @@ class CommandCog(commands.Cog):
         integer="How many times to send it (1-50).",
         channel="Optional text channel.",
     )
-    @app_commands.checks.check(is_owner)
+    @app_commands.check(is_owner)
     async def spam(
         self,
         ctx: discord.Interaction,
@@ -837,7 +848,9 @@ class CommandCog(commands.Cog):
         channel: Optional[discord.TextChannel] = None,
     ) -> None:
         """Spam a word in the current channel or a selected text channel."""
-        target_channel: discord.abc.Messageable = channel or ctx.channel
+        target_channel: discord.abc.Messageable = channel or cast(
+            discord.abc.Messageable, ctx.channel
+        )
 
         if channel is not None:
             await send(
@@ -865,7 +878,7 @@ class CommandCog(commands.Cog):
     @app_commands.choices(
         collection=[app_commands.Choice(name=name, value=name) for name in DB_CHOICES]
     )
-    @app_commands.checks.check(is_owner)
+    @app_commands.check(is_owner)
     async def bot_config_add(
         self,
         ctx: discord.Interaction,
@@ -897,7 +910,7 @@ class CommandCog(commands.Cog):
     @app_commands.choices(
         collection=[app_commands.Choice(name=name, value=name) for name in DB_CHOICES]
     )
-    @app_commands.checks.check(is_owner)
+    @app_commands.check(is_owner)
     async def bot_config_remove(
         self,
         ctx: discord.Interaction,
@@ -926,7 +939,7 @@ class CommandCog(commands.Cog):
     @app_commands.choices(
         collection=[app_commands.Choice(name=name, value=name) for name in DB_CHOICES]
     )
-    @app_commands.checks.check(is_owner)
+    @app_commands.check(is_owner)
     async def bot_config_show(
         self,
         ctx: discord.Interaction,
@@ -1049,6 +1062,8 @@ class HostView(discord.ui.View):
         The author of the hosting embed.
     """
 
+    message: discord.Message
+
     def __init__(self, author: discord.Member):
         super().__init__(timeout=43200)
         self._author = author
@@ -1058,7 +1073,7 @@ class HostView(discord.ui.View):
         style=discord.ButtonStyle.gray, label="I stopped hosting.", emoji="📣"
     )
     async def button_callback(
-        self, interaction: discord.Interaction, _button: discord.Button
+        self, interaction: discord.Interaction, _button: discord.ui.Button["HostView"]
     ) -> None:
         """Callback for the button in the hosting embed.
 
@@ -1105,7 +1120,7 @@ class HostView(discord.ui.View):
 
         embed = self.message.embeds[0]
         embed.set_author(
-            icon_url=self._author.avatar.url,
+            icon_url=self._author.display_avatar.url,
             name=f"{self._author.name} is no longer hosting.",
         )
         embed.color = COLOR_RED_DARK
@@ -1115,7 +1130,7 @@ class HostView(discord.ui.View):
             value="**OFFLINE** <:offline:1355571345613787296>",
         )
 
-        timestamp = embed.fields[2].value.replace("R", "t")
+        timestamp = (embed.fields[2].value or "").replace("R", "t")
         embed.set_field_at(2, name="Hosted at:ㅤ", value=timestamp)
         return embed
 
@@ -1176,7 +1191,7 @@ class SubredditSelectorView(discord.ui.View):
             The interaction that triggered the button click.
         """
         self._user.reddit.nsfw_posts = not self._user.reddit.nsfw_posts
-        await self._user_mgr.save(self._user.id, self._user)
+        await self._user_mgr.save(self._user_id, self._user)
 
         self._nsfw_button.label = (
             "NSFW ON" if self._user.reddit.nsfw_posts else "NSFW OFF"
@@ -1219,7 +1234,9 @@ class SubredditSelectorView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=None, delete_after=20)
 
     async def on_timeout(self) -> None:
-        self.disable_all_items()
+        for item in self.children:
+            if isinstance(item, (discord.ui.Button, discord.ui.Select)):
+                item.disabled = True
         self.stop()
 
     async def _update_multireddit(self) -> None:
@@ -1227,6 +1244,7 @@ class SubredditSelectorView(discord.ui.View):
         multireddit = temp.reddit.multireddit
         if not multireddit:
             return
+        multireddit = cast(asyncpraw.models.Multireddit, multireddit)
         await multireddit.load()
         added_subreddits = set()
 
@@ -1287,9 +1305,10 @@ class SubredditSelect(discord.ui.Select):
         interaction: :class:`discord.Interaction`
             The interaction that triggered the select menu callback.
         """
-        self.view.selected_subreddits = set()
+        view = cast("SubredditSelectorView", self.view)
+        view.selected_subreddits = set()
         for subreddit in self.values:
-            self.view.selected_subreddits.add(subreddit)
+            view.selected_subreddits.add(subreddit)
         await interaction.response.defer()
 
 

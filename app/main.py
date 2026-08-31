@@ -38,11 +38,9 @@ from app.config.env import (
     ENV_API_DB,
     ENV_DISCORD_TOKEN,
     ENV_HUMOR_KEY,
-    LAVALINK_PASSWORD,
     USER_AGENT,
 )
 from app.config.mongo import DB_CACHE
-from app.config.music import LAVALINK_URL
 from app.config.reddit import (
     ENV_REDDIT_CLIENT_ID,
     ENV_REDDIT_PASSWORD,
@@ -68,29 +66,24 @@ from app.utils import get_url_response_time, make_http_request
 
 class KexoBotClient(commands.Bot):
     node: sonolink.Node | None = None
-    sonolink_client: sonolink.Client | None = None
-    close_nodes_lock: asyncio.Lock | None = None
-    user_data_manager: BaseDataManager[UserData] | None = None
-    guild_data_manager: BaseDataManager[GuildData] | None = None
-    temp_user_data_manager: TempUserDataManager | None = None
-    temp_guild_data_manager: TempGuildDataManager | None = None
-    joke_cache_manager: JokeCacheManager | None = None
-    config_manager: BotConfigManager | None = None
-    track_exceptions: (
-        dict[int, tuple[sonolink.models.Playable | None, asyncio.Event]] | None
-    ) = None
-    cached_lavalink_servers: dict[str, NodeCacheEntry] | None = None
-    subreddit_icons: dict[str, str] | None = None
-    bot_config: AsyncCollection[Any] | None = None
-    _bot_config: AsyncCollection[Any] | None = None
-    _user_data_db: AsyncCollection[Any] | None = None
-    _guild_data_db: AsyncCollection[Any] | None = None
-    reddit_agent: asyncpraw.Reddit | None = None
-    humor_api_tokens: dict[str, dict[str, bool]] | None = None
-    node_is_switching: dict[int, bool] | None = None
-    session: httpx.AsyncClient | None = None
-    state: BotState | None = None
-    connect_node: Callable[..., Awaitable[sonolink.Node | None]] | None = None
+    sonolink_client: sonolink.Client
+    close_nodes_lock: asyncio.Lock
+    user_data_manager: BaseDataManager[UserData]
+    guild_data_manager: BaseDataManager[GuildData]
+    temp_user_data_manager: TempUserDataManager
+    temp_guild_data_manager: TempGuildDataManager
+    joke_cache_manager: JokeCacheManager
+    config_manager: BotConfigManager
+    track_exceptions: dict[int, tuple[sonolink.models.Playable | None, asyncio.Event]]
+    cached_lavalink_servers: dict[str, NodeCacheEntry]
+    subreddit_icons: dict[str, str]
+    bot_config: AsyncCollection[Any]
+    reddit_agent: asyncpraw.Reddit
+    humor_api_tokens: dict[str, dict[str, bool]]
+    node_is_switching: dict[int, bool]
+    session: httpx.AsyncClient
+    state: BotState
+    connect_node: Callable[..., Awaitable[sonolink.Node | None]]
 
     @override
     async def setup_hook(self) -> None:
@@ -115,7 +108,6 @@ class KexoBotClient(commands.Bot):
             logging.error("[Sonolink] Node is not connected after setup hook attempts.")
 
         await setup_cogs()
-        assert self.sonolink_client is not None, "Sonolink client must be initialized"
         await self.sonolink_client.start()
 
         main_loop_task.start()
@@ -131,29 +123,21 @@ bot = KexoBotClient(command_prefix=commands.when_mentioned, intents=intents)
 
 def load_humor_api_tokens() -> None:
     """Load the humor API tokens."""
-    assert bot.humor_api_tokens is not None, "Humor API tokens dict must be initialized"
     bot.humor_api_tokens = {token: {"exhausted": False} for token in ENV_HUMOR_KEY}
 
 
 def clear_temp_reddit_data() -> None:
     """Clear the temporary user reddit data."""
-    assert bot.temp_user_data_manager is not None, (
-        "Temp user data manager must be initialized"
-    )
     bot.temp_user_data_manager.clear_stale_reddit_data(stale_hours=5)
 
 
 def clear_temp_guild_data() -> None:
     """Clear the temporary guild data."""
-    assert bot.temp_guild_data_manager is not None, (
-        "Temp guild data manager must be initialized"
-    )
     bot.temp_guild_data_manager.reset_all()
 
 
 def clear_cached_jokes() -> None:
     """Clear the cached jokes loaded from FunCommands"""
-    assert bot.joke_cache_manager is not None, "Joke cache manager must be initialized"
     bot.joke_cache_manager.clear_all()
 
 
@@ -248,14 +232,17 @@ class KexoBot:
 
     async def _fetch_channels(self) -> None:
         """Fetch all channels for the bot."""
-        self._channel_game_updates = await bot.fetch_channel(
-            CHANNEL_ID_GAME_UPDATES_CHANNEL
+        self._channel_game_updates = cast(
+            discord.TextChannel,
+            await bot.fetch_channel(CHANNEL_ID_GAME_UPDATES_CHANNEL),
         )
-        self._channel_game_cracks = await bot.fetch_channel(
-            CHANNEL_ID_GAME_CRACKS_CHANNEL
+        self._channel_game_cracks = cast(
+            discord.TextChannel,
+            await bot.fetch_channel(CHANNEL_ID_GAME_CRACKS_CHANNEL),
         )
-        self._channel_free_stuff = await bot.fetch_channel(
-            CHANNEL_ID_FREE_STUFF_CHANNEL
+        self._channel_free_stuff = cast(
+            discord.TextChannel,
+            await bot.fetch_channel(CHANNEL_ID_FREE_STUFF_CHANNEL),
         )
         logging.info("[Starter] Channels fetched.")
 
@@ -264,16 +251,6 @@ class KexoBot:
         bot.cached_lavalink_servers = await bot.config_manager.get(
             "lavalink_servers", DB_CACHE
         )
-        # Add custom lavalink server if not already in cache
-        assert bot.cached_lavalink_servers is not None, (
-            "Cached lavalink servers must be loaded"
-        )
-        if LAVALINK_URL not in bot.cached_lavalink_servers:
-            bot.cached_lavalink_servers[LAVALINK_URL] = {
-                "password": LAVALINK_PASSWORD,
-                "score": 10,
-                "ping": 200,
-            }
         logging.info("[Starter] Cached lavalink servers fetched.")
 
     async def _fetch_subreddit_icons(self) -> None:
@@ -290,7 +267,6 @@ class KexoBot:
             "Cloudscraper session must be initialized"
         )
         assert self.session is not None, "HTTP session must be initialized"
-        assert bot.config_manager is not None, "Config manager must be initialized"
         assert self._channel_game_updates is not None, (
             "Game updates channel must be fetched"
         )
@@ -365,10 +341,6 @@ class KexoBot:
         assert self._lavalink_server_manager is not None, (
             "Lavalink server manager must be initialized"
         )
-        assert bot.cached_lavalink_servers is not None, (
-            "Cached lavalink servers must be loaded"
-        )
-        assert bot.config_manager is not None, "Config manager must be initialized"
 
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
         weekday = now.weekday()
@@ -490,7 +462,7 @@ class KexoBot:
         """Refreshes subreddit icons on Sunday."""
         subreddit_icons: dict[str, str] = {}
         for subreddit_name in SHITPOST_SUBREDDITS_ALL:
-            subreddit = await self._reddit_agent.subreddit(subreddit_name)
+            subreddit = await bot.reddit_agent.subreddit(subreddit_name)
             assert subreddit is not None, "Subreddit must be resolved"
 
             try:
@@ -693,7 +665,6 @@ async def on_guild_join(guild: discord.Guild) -> None:
 
 async def save_all_data() -> None:
     """Save all cached bot config data to MongoDB on shutdown."""
-    assert bot.config_manager is not None, "Config manager must be initialized"
     await bot.config_manager.save_all(DB_CACHE)
     logging.info("[MongoDB] All config data saved on shutdown.")
 

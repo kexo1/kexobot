@@ -12,6 +12,7 @@ from sonolink.models import AutoPlaySettings, CacheSettings, InactivitySettings
 
 from app.config.colors import COLOR_GREEN, COLOR_RED
 from app.data.bot_data import NodeCacheEntry
+from app.player_types import KexoPlayer
 
 
 @runtime_checkable
@@ -22,14 +23,12 @@ class _BotProtocol(Protocol):
     ``app.main``, which would create a cyclic import chain.
     """
 
-    sonolink_client: sonolink.Client | None
-    cached_lavalink_servers: dict[str, NodeCacheEntry] | None
-    track_exceptions: (
-        dict[int, tuple[sonolink.models.Playable | None, asyncio.Event]] | None
-    )
-    close_nodes_lock: asyncio.Lock | None
-    node_is_switching: dict[int, bool] | None
-    connect_node: Callable[..., Awaitable[sonolink.Node | None]] | None
+    sonolink_client: sonolink.Client
+    cached_lavalink_servers: dict[str, NodeCacheEntry]
+    track_exceptions: dict[int, tuple[sonolink.models.Playable | None, asyncio.Event]]
+    close_nodes_lock: asyncio.Lock
+    node_is_switching: dict[int, bool]
+    connect_node: Callable[..., Awaitable[sonolink.Node | None]]
 
 
 class _HasID(Protocol):
@@ -309,7 +308,7 @@ class BotState:
 
     async def switch_node(
         self,
-        player: sonolink.Player,
+        player: KexoPlayer,
         play_after: bool = False,
         send_success_message: bool = True,
         send_failure_message: bool = True,

@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import re
+from typing import Any
 
 import cloudscraper
 import discord
@@ -100,7 +101,7 @@ class ContentMonitor:
         cloudscraper_session: cloudscraper.CloudScraper,
         game_updates_channel: discord.TextChannel,
         free_stuff_channel: discord.TextChannel,
-        user_kexo: discord.User = None,
+        user_kexo: discord.User | None = None,
     ) -> None:
         self._config_manager = config_manager
         self._session = session
@@ -136,7 +137,8 @@ class ContentMonitor:
         game_info = []
 
         soup = BeautifulSoup(source.text, "html.parser")
-        article = soup.find("article")
+        # bs4 navigation from here is untyped: the scraper assumes the page structure.
+        article: Any = soup.find("article")
 
         if not article:
             return
@@ -150,27 +152,26 @@ class ContentMonitor:
             if not line:
                 break
 
-            game_title = line.get("title")
-            full_title = game_title
+            full_title = line.get("title")
             game_url = line.get("href")
 
-            game_title: list = strip_text(game_title, GAME3RB_TO_REMOVE).split()
+            title_parts: list[str] = strip_text(full_title, GAME3RB_TO_REMOVE).split()
             version = ""
             regex = re.compile(r"v\d+(\.\d+)*")
 
-            if regex.match(game_title[-1]):
-                version = f" got updated to {game_title[-1]}"
-                game_title.pop()
+            if regex.match(title_parts[-1]):
+                version = f" got updated to {title_parts[-1]}"
+                title_parts.pop()
             else:
-                game_title, version, ok = apply_build_token(
+                title_parts, version, ok = apply_build_token(
                     full_title,
-                    game_title,
+                    title_parts,
                 )
                 if not ok:
                     article = article.find_next("article")
                     continue
 
-            game_title = " ".join(game_title)
+            game_title = " ".join(title_parts)
             carts = set()
             if game_title.lower() not in game_list.lower():
                 article = article.find_next("article")
@@ -331,7 +332,7 @@ class ContentMonitor:
         if not onlinefix_article:
             return
         soup = BeautifulSoup(onlinefix_article.text, "html.parser")
-        head_tag = soup.find("head")
+        head_tag: Any = soup.find("head")
 
         meta_tag = head_tag.find("meta", attrs={"property": "og:image"})
         img_url = meta_tag.get("content")
