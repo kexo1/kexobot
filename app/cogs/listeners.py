@@ -59,6 +59,17 @@ class Listeners(commands.Cog):
     def __init__(self, bot: "KexoBotClient"):
         self._bot = bot
 
+    async def _reconnect_once(self) -> None:
+        """Run ``connect_node()`` once, dropping overlapping callers."""
+        
+        if self._bot.reconnecting:
+            return
+        self._bot.reconnecting = True
+        try:
+            await self._bot.connect_node()
+        finally:
+            self._bot.reconnecting = False
+
     async def _handle_track_error_probe(
         self,
         player: sonolink.Player,
@@ -114,7 +125,7 @@ class Listeners(commands.Cog):
                 f"[Sonolink] Node got disconnected, connecting new node. ({node.uri})"
             )
             self._bot.state.change_node_score(node.uri, -1)
-            await self._bot.connect_node()
+            await self._reconnect_once()
 
     @commands.Cog.listener()
     async def on_sonolink_track_start(
@@ -174,7 +185,7 @@ class Listeners(commands.Cog):
             return
 
         if self._bot.state.get_online_nodes() == 0:
-            await self._bot.connect_node()
+            await self._reconnect_once()
             return
 
         await send(

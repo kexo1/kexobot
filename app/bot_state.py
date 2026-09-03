@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ import sonolink
 from sonolink.models import AutoPlaySettings, CacheSettings, InactivitySettings
 
 from app.config.colors import COLOR_GREEN, COLOR_RED
+from app.config.music import LAVALINK_URL
 from app.data.bot_data import NodeCacheEntry
 from app.player_types import KexoPlayer
 
@@ -35,6 +37,12 @@ class _HasID(Protocol):
     id: int
 
 
+def _drain_task_exception(task: asyncio.Task[Any]) -> None:
+    """Consume a finished task's exception so asyncio stops warning about it."""
+    with contextlib.suppress(BaseException):
+        task.exception()
+
+
 @dataclass(slots=True)
 class BotState:
     bot: _BotProtocol
@@ -55,7 +63,7 @@ class BotState:
         Score -1 = health check failed
         Score -1 = node closed
         Score -5 = track exception or stuck
-        Score set to -1 = failed voice connection attempt
+        Score -20 = failed voice connection attempt
         """
         assert self.bot.cached_lavalink_servers is not None, (
             "BotState requires bot.cached_lavalink_servers to be set"
@@ -129,15 +137,26 @@ class BotState:
                 if node.is_connected:
                     continue
 
-                try:
-                    await node.close()
-                except RuntimeError:
-                    pass
-                finally:
-                    self.bot.sonolink_client.remove_node(node.id)
-                    logging.info(
-                        f"[Sonolink] Closed and removed unused node: {node.uri}"
-                    )
+                # Only nodes still mid-handshake need an explicit close; already
+                # disconnected probe nodes would just raise "not connected yet".
+                if node.is_connecting:
+                    try:
+                        await node.close()
+                    except RuntimeError:
+                        pass
+
+                self._remove_node(node)
+                logging.info(f"[Sonolink] Closed and removed unused node: {node.uri}")
+
+    def _remove_node(self, node: sonolink.Node) -> None:
+        """Remove ``node`` from the sonolink client"""
+
+        client = self.bot.sonolink_client
+        client.remove_node(node.id)
+        node_tasks: dict[str, asyncio.Task[Any]] = getattr(client, "_node_tasks", {})
+        task = node_tasks.get(node.id)
+        if task is not None:
+            task.add_done_callback(_drain_task_exception)
 
     async def node_attempt_connection(self, node: sonolink.Node) -> bool:
         """Attempt to connect to a lavalink node.
@@ -294,10 +313,10 @@ class BotState:
         assert self.bot.sonolink_client is not None, (
             "BotState requires bot.sonolink_client to be set"
         )
-        return self.bot.sonolink_client.create_node(
+        node = self.bot.sonolink_client.create_node(
             uri=uri,
             password=password,
-            retries=1,
+            retries=3,
             resume_timeout=60,
             inactivity_settings=InactivitySettings(
                 timeout=600,
@@ -305,6 +324,9 @@ class BotState:
             ),
             cache_settings=CacheSettings(enabled=True, max_items=100),
         )
+        # Disable auto-reconnect unless it's main node
+        node.auto_reconnect = uri == LAVALINK_URL
+        return node
 
     async def switch_node(
         self,

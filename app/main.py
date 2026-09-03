@@ -81,6 +81,7 @@ class KexoBotClient(commands.Bot):
     reddit_agent: asyncpraw.Reddit
     humor_api_tokens: dict[str, dict[str, bool]]
     node_is_switching: dict[int, bool]
+    reconnecting: bool = False
     session: httpx.AsyncClient
     state: BotState
     connect_node: Callable[..., Awaitable[sonolink.Node | None]]
@@ -206,6 +207,7 @@ class KexoBot:
 
         bot.humor_api_tokens = {}
         bot.node_is_switching = {}
+        bot.reconnecting = False
         bot.track_exceptions = {}
 
     async def initialize(self) -> None:
