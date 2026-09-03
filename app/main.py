@@ -316,7 +316,7 @@ class KexoBot:
 
         elif self._main_loop_counter == 1:
             self._main_loop_counter = 2
-            await self._content_monitor.alienware_arena()
+            # await self._content_monitor.alienware_arena()
 
         elif self._main_loop_counter == 2:
             self._main_loop_counter = 3

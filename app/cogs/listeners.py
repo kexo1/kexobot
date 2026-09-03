@@ -61,7 +61,7 @@ class Listeners(commands.Cog):
 
     async def _reconnect_once(self) -> None:
         """Run ``connect_node()`` once, dropping overlapping callers."""
-        
+
         if self._bot.reconnecting:
             return
         self._bot.reconnecting = True

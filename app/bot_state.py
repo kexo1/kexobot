@@ -145,12 +145,12 @@ class BotState:
                     except RuntimeError:
                         pass
 
-                self._remove_node(node)
+                self.remove_node(node)
                 logging.info(f"[Sonolink] Closed and removed unused node: {node.uri}")
 
-    def _remove_node(self, node: sonolink.Node) -> None:
-        """Remove ``node`` from the sonolink client"""
-
+    def remove_node(self, node: sonolink.Node) -> None:
+        """Remove ``node`` from the sonolink client and drain its close task."""
+        
         client = self.bot.sonolink_client
         client.remove_node(node.id)
         node_tasks: dict[str, asyncio.Task[Any]] = getattr(client, "_node_tasks", {})
@@ -316,16 +316,14 @@ class BotState:
         node = self.bot.sonolink_client.create_node(
             uri=uri,
             password=password,
-            retries=3,
-            resume_timeout=60,
+            resume_timeout=10,
             inactivity_settings=InactivitySettings(
                 timeout=600,
                 mode=sonolink.InactivityMode.ALL_BOTS,
             ),
             cache_settings=CacheSettings(enabled=True, max_items=100),
         )
-        # Disable auto-reconnect unless it's main node
-        node.auto_reconnect = uri == LAVALINK_URL
+        node.auto_reconnect = False
         return node
 
     async def switch_node(
@@ -356,12 +354,10 @@ class BotState:
         """
         # Ensure guild and guild id exist
         guild_obj = cast(_HasID | None, getattr(player, "guild", None))
+
         assert guild_obj is not None, "Player must have a guild"
-        assert getattr(guild_obj, "id", None) is not None, "Guild must have an id"
+
         guild_id: int = guild_obj.id
-        assert self.bot.node_is_switching is not None, (
-            "BotState requires bot.node_is_switching to be set"
-        )
         switching_map = self.bot.node_is_switching
         if switching_map.get(guild_id):
             return

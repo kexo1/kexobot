@@ -870,7 +870,7 @@ class MusicCommands(commands.Cog):
                     self._bot.sonolink_client.search_track(
                         search, source=cast("str", source)
                     ),
-                    timeout=10,
+                    timeout=20,
                 )
                 if not tracks.is_error() and not tracks.is_empty() and tracks.result:
                     return tracks
