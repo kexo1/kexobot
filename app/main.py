@@ -68,6 +68,7 @@ class KexoBotClient(commands.Bot):
     node: sonolink.Node | None = None
     sonolink_client: sonolink.Client
     close_nodes_lock: asyncio.Lock
+    connect_node_lock: asyncio.Lock
     user_data_manager: BaseDataManager[UserData]
     guild_data_manager: BaseDataManager[GuildData]
     temp_user_data_manager: TempUserDataManager
@@ -189,6 +190,7 @@ class KexoBot:
         bot.node = None
         bot.cached_lavalink_servers = {}
         bot.close_nodes_lock = asyncio.Lock()
+        bot.connect_node_lock = asyncio.Lock()
 
         bot.bot_config = self._bot_config
         bot.sonolink_client = sonolink.Client(bot)
@@ -386,55 +388,66 @@ class KexoBot:
         sonolink.Node | None
             The lavalink node that was connected to.
         """
-        node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
-        node = None
+        async with bot.connect_node_lock:
+            node_candidates = copy.deepcopy(bot.cached_lavalink_servers)
+            node = None
 
-        for exclude_node in exclude_nodes or []:
-            node_candidates.pop(exclude_node, None)
+            for exclude_node in exclude_nodes or []:
+                node_candidates.pop(exclude_node, None)
 
-        is_connected = False
+            is_connected = False
 
-        while node_candidates:
-            best_score = max(item["score"] for item in node_candidates.values())
+            while node_candidates:
+                best_score = max(item["score"] for item in node_candidates.values())
 
-            # Filter nodes with the best score
-            top_nodes = {
-                k: v for k, v in node_candidates.items() if v["score"] == best_score
-            }
-
-            if len(top_nodes) > 1:
-                # Tiebreaker: pick the node with the lowest ping among top-scoring nodes
-                best_ping = min(v["ping"] for v in top_nodes.values())
+                # Filter nodes with the best score
                 top_nodes = {
-                    k: v for k, v in top_nodes.items() if v["ping"] == best_ping
+                    k: v for k, v in node_candidates.items() if v["score"] == best_score
                 }
 
-            best_node = next(iter(top_nodes.items()))
+                if len(top_nodes) > 1:
+                    # Tiebreaker: pick the node with the lowest ping among top-scoring nodes
+                    best_ping = min(v["ping"] for v in top_nodes.values())
+                    top_nodes = {
+                        k: v for k, v in top_nodes.items() if v["ping"] == best_ping
+                    }
 
-            node_uri, node_info = best_node
-            existing_node = next(
-                (n for n in bot.sonolink_client.nodes if n.uri == node_uri),
-                None,
-            )
-            if existing_node and existing_node.is_connected:
-                is_connected = await bot.state.node_health_check(existing_node)
-                node = existing_node
-            elif not existing_node:
-                node = bot.state.build_node(node_uri, node_info["password"])
-                is_connected = await bot.state.node_attempt_connection(node)
+                best_node = next(iter(top_nodes.items()))
 
-            if is_connected:
-                break
+                node_uri, node_info = best_node
+                existing_node = next(
+                    (n for n in bot.sonolink_client.nodes if n.uri == node_uri),
+                    None,
+                )
 
-            node_candidates.pop(node_uri, None)
+                # A node object stuck mid-connect (or otherwise disconnected)
+                if existing_node and not existing_node.is_connected:
+                    await bot.state.close_and_remove_node(existing_node)
+                    existing_node = None
 
-        await self._upload_cached_lavalink_servers()
+                if existing_node:
+                    is_connected = await bot.state.node_health_check(existing_node)
+                    node = existing_node
+                    if not is_connected:
+                        await bot.state.close_and_remove_node(existing_node)
+                else:
+                    node = bot.state.build_node(node_uri, node_info["password"])
+                    is_connected = await bot.state.node_attempt_connection(node)
+                    if not is_connected:
+                        await bot.state.close_and_remove_node(node)
 
-        if not is_connected:
-            logging.critical("[Lavalink] No lavalink servers available.")
-            return None
+                if is_connected:
+                    break
 
-        assert node is not None, "Node must be assigned after loop"
+                node_candidates.pop(node_uri, None)
+
+            await self._upload_cached_lavalink_servers()
+
+            if not is_connected:
+                logging.critical("[Lavalink] No lavalink servers available.")
+                return None
+
+            assert node is not None, "Node must be assigned after loop"
         bot.node = node
         return node
 

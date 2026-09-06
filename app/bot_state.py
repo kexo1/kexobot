@@ -12,7 +12,6 @@ import sonolink
 from sonolink.models import AutoPlaySettings, CacheSettings, InactivitySettings
 
 from app.config.colors import COLOR_GREEN, COLOR_RED
-from app.config.music import LAVALINK_URL
 from app.data.bot_data import NodeCacheEntry
 from app.player_types import KexoPlayer
 
@@ -29,6 +28,7 @@ class _BotProtocol(Protocol):
     cached_lavalink_servers: dict[str, NodeCacheEntry]
     track_exceptions: dict[int, tuple[sonolink.models.Playable | None, asyncio.Event]]
     close_nodes_lock: asyncio.Lock
+    connect_node_lock: asyncio.Lock
     node_is_switching: dict[int, bool]
     connect_node: Callable[..., Awaitable[sonolink.Node | None]]
 
@@ -139,24 +139,34 @@ class BotState:
 
                 # Only nodes still mid-handshake need an explicit close; already
                 # disconnected probe nodes would just raise "not connected yet".
-                if node.is_connecting:
-                    try:
-                        await node.close()
-                    except RuntimeError:
-                        pass
-
-                self.remove_node(node)
+                await self.close_and_remove_node(node)
                 logging.info(f"[Sonolink] Closed and removed unused node: {node.uri}")
 
     def remove_node(self, node: sonolink.Node) -> None:
         """Remove ``node`` from the sonolink client and drain its close task."""
-        
+
         client = self.bot.sonolink_client
         client.remove_node(node.id)
         node_tasks: dict[str, asyncio.Task[Any]] = getattr(client, "_node_tasks", {})
         task = node_tasks.get(node.id)
         if task is not None:
             task.add_done_callback(_drain_task_exception)
+
+    async def close_and_remove_node(self, node: sonolink.Node) -> None:
+        """Close and unregister a node that failed to connect or is unhealthy.
+
+        Without this, a node left mid-handshake or connected-but-unhealthy
+        lingers in the sonolink client: it can later fire a delayed close
+        event out of nowhere, and worse, it permanently blocks its own URI
+        from ever being retried since it's neither a fresh candidate nor a
+        usable existing one.
+        """
+        if node.is_connected or node.is_connecting:
+            try:
+                await node.close()
+            except RuntimeError:
+                pass
+        self.remove_node(node)
 
     async def node_attempt_connection(self, node: sonolink.Node) -> bool:
         """Attempt to connect to a lavalink node.
