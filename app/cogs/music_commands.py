@@ -948,7 +948,8 @@ class MusicCommands(commands.Cog):
         last_error: Exception | None = None
         failed_uris = set()
         node = self._bot.node
-
+        
+        """
         for attempt in range(4):
             if attempt == 0:
                 if node is None or not await self._bot.state.node_health_check(node):
@@ -962,26 +963,27 @@ class MusicCommands(commands.Cog):
             if not node:
                 await send(ctx, code="NODE_NOT_FOUND", ephemeral=False)
                 return False
+        """
+        assert node is not None, "No available Sonolink nodes to connect to."
+        try:
+            player_cls = self._build_player_class(node, autoplay_mode)
+            await channel.connect(cls=player_cls, timeout=10)
+            return True
 
-            try:
-                player_cls = self._build_player_class(node, autoplay_mode)
-                await channel.connect(cls=player_cls, timeout=10)
-                return True
+        except (discord.Forbidden, discord.ClientException):
+            await send(ctx, code="NO_PERMISSIONS", ephemeral=False)
+            return False
 
-            except (discord.Forbidden, discord.ClientException):
-                await send(ctx, code="NO_PERMISSIONS", ephemeral=False)
-                return False
-
-            except Exception as e:
-                last_error = e
-                failed_uris.add(node.uri)
-                self._bot.state.change_node_score(node.uri, -20)
-                logging.warning(
-                    "[Sonolink] Voice connect attempt %s failed for node %s: %s",
-                    attempt + 1,
-                    node.uri,
-                    e,
-                )
+        except Exception as e:
+            last_error = e
+            failed_uris.add(node.uri)
+            self._bot.state.change_node_score(node.uri, -20)
+            logging.warning(
+                "[Sonolink] Voice connect attempt %s failed for node %s: %s",
+                attempt + 1,
+                node.uri,
+                e,
+            )
 
         await send(
             ctx,
