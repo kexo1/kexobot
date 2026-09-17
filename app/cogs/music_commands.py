@@ -948,23 +948,9 @@ class MusicCommands(commands.Cog):
         last_error: Exception | None = None
         failed_uris = set()
         node = self._bot.node
-        
-        """
-        for attempt in range(4):
-            if attempt == 0:
-                if node is None or not await self._bot.state.node_health_check(node):
-                    if node is not None:
-                        failed_uris.add(node.uri)
-                    continue
-            else:
-                node = await self._bot.connect_node(
-                    exclude_nodes=list(failed_uris),
-                )
-            if not node:
-                await send(ctx, code="NODE_NOT_FOUND", ephemeral=False)
-                return False
-        """
+
         assert node is not None, "No available Sonolink nodes to connect to."
+
         try:
             player_cls = self._build_player_class(node, autoplay_mode)
             await channel.connect(cls=player_cls, timeout=10)
@@ -979,8 +965,7 @@ class MusicCommands(commands.Cog):
             failed_uris.add(node.uri)
             self._bot.state.change_node_score(node.uri, -20)
             logging.warning(
-                "[Sonolink] Voice connect attempt %s failed for node %s: %s",
-                attempt + 1,
+                "[Sonolink] Voice connect failed for node %s: %s",
                 node.uri,
                 e,
             )

@@ -60,7 +60,6 @@ class BotState:
         Notes
         -----
         Score +1 = successful track load
-        Score -1 = health check failed
         Score -1 = node closed
         Score -5 = track exception or stuck
         Score -20 = failed voice connection attempt
@@ -72,28 +71,6 @@ class BotState:
         if not node_entry:
             return
         node_entry["score"] += delta
-
-    async def node_health_check(self, node: sonolink.Node) -> bool:
-        """Check the health of a lavalink node by attempting to fetch its info.
-
-        Parameters
-        ----------
-        node: :class:`sonolink.Node`
-            The lavalink node to check.
-
-        Returns
-        -------
-        bool
-            True if the node is healthy and responsive, False otherwise.
-        """
-        try:
-            await asyncio.wait_for(node.fetch_info(), timeout=3)
-            return True
-        except Exception:
-            logging.info("[Sonolink] Node health check failed (%s)", node.uri)
-
-        self.change_node_score(node.uri, -1)
-        return False
 
     def get_online_nodes(self) -> int:
         """Get the number of online lavalink nodes,
@@ -183,11 +160,9 @@ class BotState:
         """
         try:
             logging.info(f"[Sonolink] Attempting to connect to node: {node.uri}")
-            await asyncio.wait_for(node.connect(), timeout=3)
             # Some fucking nodes secretly don't respond,
             # I've played these games before!!!
-            if not await self.node_health_check(node):
-                return False
+            await asyncio.wait_for(node.connect(), timeout=3)
             return True
 
         except Exception:

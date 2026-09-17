@@ -37,6 +37,7 @@ from app.config.music import (
     AudioSourceSupport,
 )
 from app.config.reddit import SHITPOST_SUBREDDITS_ALL
+
 # from app.config.sfd import SFD_TIMEZONE_CHOICE
 from app.data import BaseDataManager, UserData
 from app.player_types import get_player, member_of
@@ -233,6 +234,7 @@ class CommandCog(commands.Cog):
         if node is None:
             await send(ctx, code="NO_NODE_INFO")
             return
+
         try:
             node_info = await node.fetch_info()
         except Exception:

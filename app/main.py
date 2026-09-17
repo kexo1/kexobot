@@ -425,11 +425,6 @@ class KexoBot:
                     await bot.state.close_and_remove_node(existing_node)
                     existing_node = None
 
-                if existing_node:
-                    is_connected = await bot.state.node_health_check(existing_node)
-                    node = existing_node
-                    if not is_connected:
-                        await bot.state.close_and_remove_node(existing_node)
                 else:
                     node = bot.state.build_node(node_uri, node_info["password"])
                     is_connected = await bot.state.node_attempt_connection(node)
