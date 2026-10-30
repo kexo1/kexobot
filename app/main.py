@@ -15,6 +15,7 @@ import cloudscraper
 import discord
 import httpx
 import sonolink
+from asyncpraw.models.reddit.subreddit.subreddit import Subreddit
 from discord import app_commands
 from discord.ext import commands, tasks
 from pymongo import AsyncMongoClient
@@ -62,6 +63,8 @@ from app.data import (
 from app.data.bot_data import NodeCacheEntry
 from app.response_handler import make_embed, send
 from app.utils import get_url_response_time, make_http_request
+
+MAX_NODES = 2
 
 
 class KexoBotClient(commands.Bot):
@@ -397,24 +400,13 @@ class KexoBot:
 
             is_connected = False
 
-            while node_candidates:
-                best_score = max(item["score"] for item in node_candidates.values())
+            prioritized_nodes = sorted(
+                node_candidates.items(),
+                key=lambda item: item[1]["score"],
+                reverse=True,
+            )[:MAX_NODES]
 
-                # Filter nodes with the best score
-                top_nodes = {
-                    k: v for k, v in node_candidates.items() if v["score"] == best_score
-                }
-
-                if len(top_nodes) > 1:
-                    # Tiebreaker: pick the node with the lowest ping among top-scoring nodes
-                    best_ping = min(v["ping"] for v in top_nodes.values())
-                    top_nodes = {
-                        k: v for k, v in top_nodes.items() if v["ping"] == best_ping
-                    }
-
-                best_node = next(iter(top_nodes.items()))
-
-                node_uri, node_info = best_node
+            for node_uri, node_info in prioritized_nodes:
                 existing_node = next(
                     (n for n in bot.sonolink_client.nodes if n.uri == node_uri),
                     None,
@@ -433,8 +425,6 @@ class KexoBot:
 
                 if is_connected:
                     break
-
-                node_candidates.pop(node_uri, None)
 
             await self._upload_cached_lavalink_servers()
 
@@ -472,13 +462,13 @@ class KexoBot:
         """Refreshes subreddit icons on Sunday."""
         subreddit_icons: dict[str, str] = {}
         for subreddit_name in SHITPOST_SUBREDDITS_ALL:
-            subreddit = await bot.reddit_agent.subreddit(subreddit_name)
+            subreddit: Subreddit = await bot.reddit_agent.subreddit(subreddit_name)
             assert subreddit is not None, "Subreddit must be resolved"
 
             try:
                 await subreddit.load()
             except asyncprawcore.exceptions.NotFound:
-                pass
+                continue
 
             icon_img = cast(str, subreddit.icon_img)
             if not icon_img:
@@ -656,6 +646,10 @@ async def on_application_command_error(
             color=COLOR_RED,
         )
         await send(ctx, embed=embed, ephemeral=True)
+        return
+
+    if isinstance(error, commands.CommandInvokeError):
+        logging.error(f"[Command Error] {error.original}")
         return
 
     raise error

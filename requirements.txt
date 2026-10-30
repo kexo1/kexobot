@@ -10,9 +10,8 @@ fake-useragent
 beautifulsoup4
 deep_translator
 unidecode
-# mplcyberpunk is outdated
-matplotlib==3.10.9
-mplcyberpunk
+matplotlib
+komorebi_mpl
 tzdata
 psutil
 python-dotenv

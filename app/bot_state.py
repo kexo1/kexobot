@@ -88,10 +88,7 @@ class BotState:
 
         Returns the count of cached lavalink nodes.
         """
-        assert self.bot.cached_lavalink_servers is not None, (
-            "BotState requires bot.cached_lavalink_servers to be set"
-        )
-        return len(self.bot.cached_lavalink_servers)
+        return len(self.bot.sonolink_client.nodes) if self.bot.sonolink_client else 0
 
     async def close_unused_nodes(self) -> None:
         """Clear unused lavalink nodes.
@@ -425,7 +422,7 @@ class BotState:
             "BotState requires bot.connect_node to be set"
         )
         try:
-            for attempt in range(10):
+            for attempt in range(min(3, self.get_available_nodes())):
                 node: sonolink.Node | None = await self.bot.connect_node(
                     exclude_nodes=list(excluded_nodes)
                 )

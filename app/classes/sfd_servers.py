@@ -2,14 +2,12 @@ import datetime
 import gc
 import os
 from datetime import timedelta
-from zoneinfo import ZoneInfo
-
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 import httpx
 import matplotlib
 from bs4 import BeautifulSoup
-
 from pymongo.asynchronous.collection import AsyncCollection
 
 from app.config.mongo import DB_SFD_ACTIVITY
@@ -17,10 +15,10 @@ from app.config.sfd import API_SFD_SERVER, SFD_HEADERS, SFD_REQUEST, TIMEZONES
 from app.utils import average, is_older_than, make_http_request
 
 matplotlib.use("agg")
+import komorebi_mpl as kmpl
 import matplotlib.pyplot as plt
-import mplcyberpunk
 
-plt.style.use("cyberpunk")
+plt.style.use("night_wave")
 
 
 def generate_lines_and_effects(
@@ -31,8 +29,6 @@ def generate_lines_and_effects(
     plt.plot(x_positions, servers, color="magenta", label="Servers")
     plt.legend(loc="upper center", fontsize=12, bbox_to_anchor=(0.5, 1.05), ncol=2)
 
-    mplcyberpunk.add_glow_effects()
-    mplcyberpunk.add_gradient_fill(alpha_gradientglow=0.5)
     plt.tight_layout()
     plt.grid(True)
 
