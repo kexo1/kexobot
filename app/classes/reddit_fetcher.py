@@ -24,6 +24,7 @@ from app.config.reddit import (
     REDDIT_FREEGAMEFINDINGS_EMBEDS,
     REDDIT_FREEGAMEFINDINGS_MAX_RESULTS,
     REDDIT_TO_REMOVE,
+    FreeGameEmbed,
 )
 from app.data.bot_data import BotConfigManager
 from app.utils import strip_text
@@ -89,7 +90,10 @@ class RedditFetcher:
 
     async def crackwatch(self) -> None:
         """Method to fetch game repacks from r/CrackWatch subreddit."""
-        crackwatch_cache = await self._config_manager.get("crackwatch_cache", DB_CACHE)
+        crackwatch_cache: list[str] = await self._config_manager.get(
+            "crackwatch_cache",
+            DB_CACHE,
+        )
         crackwatch_cache_copy = crackwatch_cache.copy()
         to_filter = await self._config_manager.get("crackwatch_exceptions", DB_LISTS)
 
@@ -113,7 +117,7 @@ class RedditFetcher:
                 if not submission_text:
                     continue
 
-                description_list = []
+                description_list: list[str] = []
 
                 submission_text = strip_text(submission_text, REDDIT_TO_REMOVE).split(
                     "\n"
@@ -195,7 +199,7 @@ class RedditFetcher:
 
     async def freegamefindings(self) -> None:
         """Method to fetch free games from r/FreeGameFindings subreddit."""
-        freegamefindings_cache = await self._config_manager.get(
+        freegamefindings_cache: list[str] = await self._config_manager.get(
             "freegamefindings_cache", DB_CACHE
         )
         freegamefindings_cache_copy = freegamefindings_cache.copy()
@@ -230,9 +234,7 @@ class RedditFetcher:
             RequestException,
             ResponseException,
         ) as e:
-            logger.warning(
-                f"[FreeGameFindings] - Error while fetching subreddit:\n{e}"
-            )
+            logger.warning(f"[FreeGameFindings] - Error while fetching subreddit:\n{e}")
         finally:
             await self._config_manager.save("freegamefindings_cache", DB_CACHE)
 
@@ -250,7 +252,11 @@ class RedditFetcher:
         ):
             return False
 
-        if submission.url in cache:
+        submission_url = submission.url
+        if not isinstance(submission_url, str):
+            return False
+
+        if submission_url in cache:
             return False
 
         submission_title_lower = submission.title.lower()
@@ -258,20 +264,23 @@ class RedditFetcher:
         if "(game)" not in submission_title_lower:
             return False
 
-        url_obj = urlparse(submission.url)
+        url_obj = urlparse(submission_url)
         if url_obj.scheme not in {"http", "https"}:
             return False
 
-        if any(token in submission.url for token in to_filter):
+        if any(token in submission_url for token in to_filter):
             return False
 
         # Allow Epic Games giveaways, but only mobile games
-        return not ("epic games" in submission_title_lower and "mobile" not in submission_title_lower)
+        return not (
+            "epic games" in submission_title_lower
+            and "mobile" not in submission_title_lower
+        )
 
     async def _process_submission(
         self, submission: asyncpraw.models.Submission
     ) -> None:
-        freegame_embeds: dict = REDDIT_FREEGAMEFINDINGS_EMBEDS
+        freegame_embeds = REDDIT_FREEGAMEFINDINGS_EMBEDS
 
         if "fanatical" in submission.url:
             await self._create_embed(freegame_embeds["Fanatical"], submission.url)
@@ -283,9 +292,9 @@ class RedditFetcher:
             default_freegame_embed["title"] = title_stripped
             await self._create_embed(default_freegame_embed, submission.url)
 
-    async def _alienwarearena(self, url) -> None:
+    async def _alienwarearena(self, url: str) -> None:
         # There might be an occurence where giveaway is not showing in alienwarearena.com
-        alienwarearena_cache = await self._config_manager.get(
+        alienwarearena_cache: list[str] = await self._config_manager.get(
             "alienwarearena_cache", DB_CACHE
         )
         reddit_path = url[29:]
@@ -295,7 +304,7 @@ class RedditFetcher:
 
         await self._create_embed(REDDIT_FREEGAMEFINDINGS_EMBEDS["AlienwareArena"], url)
 
-    async def _create_embed(self, embed_dict: dict, url: str) -> None:
+    async def _create_embed(self, embed_dict: FreeGameEmbed, url: str) -> None:
         url_obj = urlparse(url)
         embed = discord.Embed(
             title=embed_dict["title"],

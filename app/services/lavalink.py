@@ -74,7 +74,9 @@ class LavalinkNodeService:
                 logger.critical("[Lavalink] No lavalink servers available.")
                 return None
 
-            assert node is not None, "Node must be assigned after loop"
+            if node is None:
+                logger.error("[Lavalink] Connection succeeded without selecting a node.")
+                return None
 
         self._bot.node = node
         return node

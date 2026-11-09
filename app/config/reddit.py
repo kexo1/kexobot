@@ -1,6 +1,7 @@
 """Reddit API credentials and subreddit configuration."""
 
 import os
+from typing import TypedDict
 
 ############################# Reddit Configuration ############################
 ENV_REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
@@ -42,7 +43,13 @@ REDDIT_CRACKWATCH_MAX_RESULTS = 5
 CRACKWATCH_HIGHLIGHT_KEYWORDS = ["denuvo removed", "voices38"]
 
 ############################# Default Embeds ############################
-REDDIT_FREEGAMEFINDINGS_EMBEDS = {
+class FreeGameEmbed(TypedDict):
+    title: str
+    description: str
+    icon: str
+
+
+REDDIT_FREEGAMEFINDINGS_EMBEDS: dict[str, FreeGameEmbed] = {
     "Default": {
         "title": "",
         "description": "",

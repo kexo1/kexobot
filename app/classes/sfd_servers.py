@@ -27,6 +27,14 @@ class SFDServerInfo(TypedDict):
     players: list[str]
 
 
+class SFDActivityData(TypedDict):
+    players_day: list[int]
+    servers_day: list[int]
+    players_week: list[int]
+    servers_week: list[int]
+    last_update_week: datetime.datetime
+
+
 def generate_lines_and_effects(
     x_positions: list[int], players: list[int], servers: list[int]
 ) -> None:
@@ -187,7 +195,7 @@ class SFDServers:
             seconds=seconds,
         )
 
-        hours = []
+        hours: list[str] = []
         # Generate 28 labels (one for each 6-hour period, going backwards)
         for i in range(27, -1, -1):
             time = last_update - timedelta(hours=i * 6)
@@ -263,8 +271,8 @@ class SFDServers:
         recent_players = players_day[-60 * update_count :]
         recent_servers = servers_day[-60 * update_count :]
 
-        new_players_averages = []
-        new_servers_averages = []
+        new_players_averages: list[int] = []
+        new_servers_averages: list[int] = []
 
         for group in range(10 * update_count):
             start_index = group * 6
@@ -371,8 +379,8 @@ class SFDServers:
             players += server.players
         return players, len(servers)
 
-    async def _load_sfd_activity_data(self) -> dict:
-        return cast(dict, await self._bot_config.find_one(DB_SFD_ACTIVITY))
+    async def _load_sfd_activity_data(self) -> SFDActivityData:
+        return cast(SFDActivityData, await self._bot_config.find_one(DB_SFD_ACTIVITY))
 
     async def _parse_servers(self, search: str | None = None) -> list[SFDServer] | None:
         response = await self._load_sfd_servers()
@@ -383,7 +391,7 @@ class SFDServers:
         # bs4 navigation from here is untyped: the parser assumes the SOAP structure.
         servers_element = cast(Any, soup.find("GetGameServersResult")).find("Servers")
 
-        servers = []
+        servers: list[SFDServer] = []
         if not servers_element:
             return None
 

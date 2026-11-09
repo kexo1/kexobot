@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import logging
 import re
-from typing import Any
+from typing import Any, TypedDict, cast
 
 import cloudscraper
 import discord
@@ -30,7 +30,17 @@ from app.utils import make_http_request, strip_text
 logger = logging.getLogger(__name__)
 
 
-def get_onlinefix_messages(chat_log: str) -> list:
+class GameInfo(TypedDict):
+    title: str
+    version: str
+    url: str
+    cache_key: str
+    image: str
+    timestamp: str
+    carts: set[str]
+
+
+def get_onlinefix_messages(chat_log: str) -> list[Tag]:
     soup = BeautifulSoup(chat_log, "html.parser")
     chat_element = soup.find("ul", id="lc_chat")
 
@@ -38,7 +48,10 @@ def get_onlinefix_messages(chat_log: str) -> list:
         logger.warning("[Online-Fix] Chat element not found")
         return []
 
-    return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
+    return cast(
+        list[Tag],
+        chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto"),
+    )
 
 
 def apply_build_token(
@@ -126,17 +139,20 @@ class ContentMonitor:
 
     async def game3rb(self) -> None:
         """Check for selected games from Game3rb."""
-        game3rb_cache = await self._config_manager.get("game3rb_cache", DB_CACHE)
+        game3rb_cache: list[str] = await self._config_manager.get(
+            "game3rb_cache",
+            DB_CACHE,
+        )
         game3rb_cache_copy = game3rb_cache.copy()
 
-        game_list = await self._config_manager.get("games", DB_LISTS)
-        game_list = "\n".join(game_list)
+        game_list_entries: list[str] = await self._config_manager.get("games", DB_LISTS)
+        game_list = "\n".join(game_list_entries)
 
         source = await make_http_request(self._session, SITE_URL_GAME3RB)
         if not source:
             return
 
-        game_info = []
+        game_info: list[GameInfo] = []
 
         soup = BeautifulSoup(source.text, "html.parser")
         # bs4 navigation from here is untyped: the scraper assumes the page structure.
@@ -156,6 +172,9 @@ class ContentMonitor:
 
             full_title = line.get("title")
             game_url = line.get("href")
+            if not isinstance(full_title, str) or not isinstance(game_url, str):
+                article = article.find_next("article")
+                continue
 
             title_parts: list[str] = strip_text(full_title, GAME3RB_TO_REMOVE).split()
             version = ""
@@ -174,20 +193,28 @@ class ContentMonitor:
                     continue
 
             game_title = " ".join(title_parts)
-            carts = set()
+            carts: set[str] = set()
             if game_title.lower() not in game_list.lower():
                 article = article.find_next("article")
                 continue
 
-            for cart in article.find_all(id="cart"):
+            for cart in cast(list[Tag], article.find_all(id="cart")):
                 if not cart:
                     break
-                carts.add(cart.text)
+                carts.add(cart.get_text())
 
             cache_key = f"{game_url}|{version}" if version else game_url
 
             # Check if this URL+version combo is already cached
             if cache_key in game3rb_cache_copy:
+                article = article.find_next("article")
+                continue
+
+            image_element = article.find("img", {"class": "entry-image"})
+            time_element = article.find("time")
+            image_url = image_element.get("src") if image_element else None
+            timestamp = time_element.get("datetime") if time_element else None
+            if not isinstance(image_url, str) or not isinstance(timestamp, str):
                 article = article.find_next("article")
                 continue
 
@@ -197,8 +224,8 @@ class ContentMonitor:
                     "version": version,
                     "url": game_url,
                     "cache_key": cache_key,
-                    "image": article.find("img", {"class": "entry-image"})["src"],
-                    "timestamp": article.find("time")["datetime"],
+                    "image": image_url,
+                    "timestamp": timestamp,
                     "carts": carts,
                 }
             )
@@ -211,7 +238,7 @@ class ContentMonitor:
             game3rb_cache.pop(0)
             game3rb_cache.append(game["cache_key"])
 
-            description = []
+            description: list[str] = []
             source = await make_http_request(
                 self._session,
                 game["url"],
@@ -223,10 +250,14 @@ class ContentMonitor:
 
             torrent_url = soup.find("a", {"class": "torrent"})
             if torrent_url:
-                description.append(f"[Torrent link]({torrent_url['href']})")
+                href = torrent_url.get("href")
+                if isinstance(href, str):
+                    description.append(f"[Torrent link]({href})")
             direct_url = soup.find("a", {"class": "direct"})
             if direct_url:
-                description.append(f"[Direct link]({direct_url['href']})")
+                href = direct_url.get("href")
+                if isinstance(href, str):
+                    description.append(f"[Direct link]({href})")
 
             if "Fix already included" in str(
                 soup
@@ -235,13 +266,18 @@ class ContentMonitor:
             else:
                 crack_url = soup.find("a", {"class": "online"})
                 if crack_url:
-                    description.append(f"[Crack link]({crack_url['href']})")
+                    href = crack_url.get("href")
+                    if isinstance(href, str):
+                        description.append(f"[Crack link]({href})")
                 else:
                     crack_url = soup.find("a", {"class": "crack"})
                     if crack_url:
-                        description.append(f"[Crack link]({crack_url['href']})")
+                        href = crack_url.get("href")
+                        if isinstance(href, str):
+                            description.append(f"[Crack link]({href})")
 
-            game_update_url, game_update_name = [], []
+            game_update_url: list[str] = []
+            game_update_name: list[str] = []
             update_pattern = (
                 r">Update (.*?)</strong>.*?<a\s+"
                 r'id="download-link"\s+class="update"\s+href="(.*?)"'
@@ -286,11 +322,14 @@ class ContentMonitor:
 
         if not chat_log:
             return
-        chat_messages = get_onlinefix_messages(chat_log.text)
+        chat_messages: list[Tag] = get_onlinefix_messages(chat_log.text)
         await self._process_onlinefix_messages(chat_messages, onlinefix_cache, games)
 
     async def _send_alienware_arena_embed(
-        self, json_data: dict, alienwarearena_cache: list, to_filter: list
+        self,
+        json_data: dict[str, Any],
+        alienwarearena_cache: list[str],
+        to_filter: list[str],
     ) -> None:
         alienwarearena_cache_copy = alienwarearena_cache.copy()
 
@@ -347,7 +386,9 @@ class ContentMonitor:
             "div", class_="edited-block right"
         )
         description: str = description_element.text if description_element else ""
-        description = GoogleTranslator(source="ru").translate(text=description)
+        description = GoogleTranslator(source="ru").translate(  # pyright: ignore[reportUnknownMemberType]
+            text=description
+        )
         description = description.replace(". ", "\n")
 
         pattern = re.compile(r"version\s*(\d+(\.\d+)*)")
@@ -369,21 +410,33 @@ class ContentMonitor:
         await self._game_updates_channel.send(embed=embed)
 
     async def _process_onlinefix_messages(
-        self, messages: list, onlinefix_cache: list, games: list
+        self,
+        messages: list[Tag],
+        onlinefix_cache: list[str],
+        games: list[str],
     ) -> None:
         limit = ONLINEFIX_MAX_RESULTS
-        to_upload = []
+        to_upload: list[str] = []
         for message in messages:
             message_text = message.find("div", class_="lc_chat_li_text")
+            if not isinstance(message_text, Tag):
+                continue
             message_id = message_text.get("id")
-            message_text = message_text.text
-
-            if "@0xdeadc0de обновил: " not in message_text:
+            message_text_content = message_text.get_text()
+            if not isinstance(message_id, str):
                 continue
 
-            url = message.find_all("a")[1].get("href")
+            if "@0xdeadc0de обновил: " not in message_text_content:
+                continue
 
-            game_title = message.find_all("a")[1].text.replace(" по сети", "")
+            links = cast(list[Tag], message.find_all("a"))
+            if len(links) < 2:
+                continue
+            url = links[1].get("href")
+            game_title = links[1].get_text().replace(" по сети", "")
+            if not isinstance(url, str):
+                continue
+
             if game_title not in games:
                 continue
 
@@ -401,17 +454,20 @@ class ContentMonitor:
             await self._config_manager.save("onlinefix_cache", DB_CACHE)
 
     async def _load_alienware_cache(self) -> tuple[list[str], list[str]]:
-        alienwarearena_cache = await self._config_manager.get(
+        alienwarearena_cache: list[str] = await self._config_manager.get(
             "alienwarearena_cache", DB_CACHE
         )
-        to_filter = await self._config_manager.get(
+        to_filter: list[str] = await self._config_manager.get(
             "alienwarearena_exceptions", DB_LISTS
         )
         return alienwarearena_cache, to_filter
 
     async def _load_onlinefix_cache(self) -> tuple[list[str], list[str]]:
-        onlinefix_cache = await self._config_manager.get("onlinefix_cache", DB_CACHE)
-        games = await self._config_manager.get("games", DB_LISTS)
+        onlinefix_cache: list[str] = await self._config_manager.get(
+            "onlinefix_cache",
+            DB_CACHE,
+        )
+        games: list[str] = await self._config_manager.get("games", DB_LISTS)
         # Remove quotes due to online-fix.me not using quotes
         games = "\n".join(games).replace("'", "").split("\n")
         return onlinefix_cache, games

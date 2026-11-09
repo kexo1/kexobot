@@ -17,6 +17,7 @@ from app.player_types import KexoPlayer
 
 logger = logging.getLogger(__name__)
 
+
 @runtime_checkable
 class _BotProtocol(Protocol):
     """Minimal bot interface required by BotState operations.
@@ -65,9 +66,6 @@ class BotState:
         Score -5 = track exception or stuck
         Score -20 = failed voice connection attempt
         """
-        assert self.bot.cached_lavalink_servers is not None, (
-            "BotState requires bot.cached_lavalink_servers to be set"
-        )
         node_entry = self.bot.cached_lavalink_servers.get(node_uri)
         if not node_entry:
             return
@@ -77,9 +75,6 @@ class BotState:
         """Get the number of online lavalink nodes,
         returns ``int`` of online nodes.
         """
-        assert self.bot.sonolink_client is not None, (
-            "BotState requires bot.sonolink_client to be set"
-        )
         return len(
             [node for node in self.bot.sonolink_client.nodes if node.is_connected]
         )
@@ -97,12 +92,6 @@ class BotState:
         This function will check if there are any lavalink nodes
         that are not being used and will close them.
         """
-        assert self.bot.sonolink_client is not None, (
-            "BotState requires bot.sonolink_client to be set"
-        )
-        assert self.bot.close_nodes_lock is not None, (
-            "BotState requires bot.close_nodes_lock to be set"
-        )
         async with self.bot.close_nodes_lock:
             nodes: list[sonolink.Node] = list(self.bot.sonolink_client.nodes)
             for node in nodes:
@@ -182,9 +171,6 @@ class BotState:
         int | None
             Node score if node is cached, otherwise ``None``.
         """
-        assert self.bot.cached_lavalink_servers is not None, (
-            "BotState requires bot.cached_lavalink_servers to be set"
-        )
         node_entry = self.bot.cached_lavalink_servers.get(node_uri)
         if not node_entry:
             return None
@@ -200,9 +186,6 @@ class BotState:
         ping: int
             The new ping value in milliseconds.
         """
-        assert self.bot.cached_lavalink_servers is not None, (
-            "BotState requires bot.cached_lavalink_servers to be set"
-        )
         node_entry = self.bot.cached_lavalink_servers.get(node_uri)
         if not node_entry:
             return
@@ -221,9 +204,6 @@ class BotState:
         int | None
             Node ping in ms if node is cached, otherwise ``None``.
         """
-        assert self.bot.cached_lavalink_servers is not None, (
-            "BotState requires bot.cached_lavalink_servers to be set"
-        )
         node_entry = self.bot.cached_lavalink_servers.get(node_uri)
         if not node_entry:
             return None
@@ -246,9 +226,6 @@ class BotState:
         failed_event: :class:`asyncio.Event`
             Event set by listeners when track fails on new node.
         """
-        assert self.bot.track_exceptions is not None, (
-            "BotState requires bot.track_exceptions to be set"
-        )
         self.bot.track_exceptions[guild_id] = (track, failed_event)
 
     def get_track_exception_probe(
@@ -266,16 +243,10 @@ class BotState:
         tuple[sonolink.models.Playable | None, asyncio.Event] | None
             Probe tuple ``(track, event)`` if present, else ``None``.
         """
-        assert self.bot.track_exceptions is not None, (
-            "BotState requires bot.track_exceptions to be set"
-        )
         return self.bot.track_exceptions.get(guild_id)
 
     def clear_track_exception_probe(self, guild_id: int) -> None:
         """Remove stored track exception probe for guild."""
-        assert self.bot.track_exceptions is not None, (
-            "BotState requires bot.track_exceptions to be set"
-        )
         self.bot.track_exceptions.pop(guild_id, None)
 
     def build_node(self, uri: str, password: str) -> sonolink.Node:
@@ -293,9 +264,6 @@ class BotState:
         :class:`sonolink.Node`
             The created Lavalink node instance.
         """
-        assert self.bot.sonolink_client is not None, (
-            "BotState requires bot.sonolink_client to be set"
-        )
         node = self.bot.sonolink_client.create_node(
             uri=uri,
             password=password,
@@ -338,7 +306,8 @@ class BotState:
         # Ensure guild and guild id exist
         guild_obj = cast(_HasID | None, getattr(player, "guild", None))
 
-        assert guild_obj is not None, "Player must have a guild"
+        if guild_obj is None:
+            raise RuntimeError("Cannot switch nodes for a player without a guild")
 
         guild_id: int = guild_obj.id
         switching_map = self.bot.node_is_switching
@@ -434,9 +403,6 @@ class BotState:
             finally:
                 self.clear_track_exception_probe(guild_id)
 
-        assert self.bot.connect_node is not None, (
-            "BotState requires bot.connect_node to be set"
-        )
         try:
             for attempt in range(min(3, self.get_available_nodes())):
                 node: sonolink.Node | None = await self.bot.connect_node(

@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeGuard, cast
 
 import httpx
 
@@ -9,6 +9,14 @@ from app.config.scraping import API_LAVALIST
 from app.utils import get_url_response_time, make_http_request
 
 logger = logging.getLogger(__name__)
+
+
+def _is_json_object(value: object) -> TypeGuard[dict[str, object]]:
+    if not isinstance(value, dict):
+        return False
+    fields: dict[object, object] = cast(dict[object, object], value)
+    return all(isinstance(key, str) for key in fields)
+
 
 if TYPE_CHECKING:
     from app.client import KexoBotClient
@@ -41,13 +49,16 @@ class LavalinkServerManager:
         self._cached_lavalink_servers = self._bot.cached_lavalink_servers
         self._fresh_nodes: set[str] = set()
 
-    async def _fetch_and_parse(self, api_url: str) -> list | None:
-        json_data: list | None = await make_http_request(
-            self._session, api_url, get_json=True
-        )
-        if json_data:
-            await self._parse_lavalink_servers(json_data)
-        return json_data
+    async def _fetch_and_parse(self, api_url: str) -> list[dict[str, Any]] | None:
+        json_data = await make_http_request(self._session, api_url, get_json=True)
+        if not isinstance(json_data, list):
+            return None
+
+        records = cast(list[object], json_data)
+        servers = [item for item in records if _is_json_object(item)]
+        if servers:
+            await self._parse_lavalink_servers(servers)
+        return servers
 
     async def fetch(self) -> None:
         """Get new Lavalink servers from Lavainfo GitHub and Lavalist.
@@ -60,22 +71,36 @@ class LavalinkServerManager:
         if json_data_first:
             self._clear_removed_nodes()
             await self._bot.config_manager.save("lavalink_servers", DB_CACHE)
-            logger.info(
-                "[Lavalink] Lavalink servers list got updated, updating cache."
-            )
+            logger.info("[Lavalink] Lavalink servers list got updated, updating cache.")
 
-    async def _parse_lavalink_servers(self, json_data: list) -> None:
+    async def _parse_lavalink_servers(
+        self,
+        json_data: list[dict[str, Any]],
+    ) -> None:
         for server in json_data:
+            host = server.get("host")
+            port = server.get("port")
+            password = server.get("password")
             if (
-                (server.get("restVersion") not in (None, "v4"))
-                or (server.get("version") not in (None, "v4"))
-                or not server.get("host")
-                or "nodelink" in server.get("host", "")
+                not isinstance(host, str)
+                or not isinstance(port, int)
+                or not isinstance(password, str)
+            ):
+                continue
+
+            rest_version = server.get("restVersion")
+            version = server.get("version")
+            if (
+                (rest_version is not None and rest_version != "v4")
+                or (version is not None and version != "v4")
+                or "nodelink" in host
             ):
                 continue
 
             uri = get_full_node_url(
-                server["host"], server["port"], server.get("secure", False)
+                host,
+                port,
+                server.get("secure") is True,
             )
             self._fresh_nodes.add(uri)
 
@@ -84,7 +109,7 @@ class LavalinkServerManager:
 
             ping = await get_url_response_time(self._session, uri)
             self._cached_lavalink_servers[uri] = {
-                "password": server["password"],
+                "password": password,
                 "score": 0,
                 "ping": ping,
             }

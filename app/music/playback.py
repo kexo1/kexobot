@@ -296,7 +296,9 @@ class MusicPlaybackService:
         failed_uris: set[str] = set()
         node = self._bot.node
 
-        assert node is not None, "No available Sonolink nodes to connect to."
+        if node is None:
+            await send(ctx, code="NODE_NOT_FOUND", ephemeral=False)
+            return False
 
         try:
             player_cls = self._build_player_class(node, autoplay_mode)

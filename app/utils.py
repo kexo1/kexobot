@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Literal, cast, overload
 
@@ -29,7 +30,7 @@ def load_text_file(name: str) -> list[str]:
         return f.read().splitlines()
 
 
-def average(numbers: list[float | int]) -> float:
+def average(numbers: Sequence[float | int]) -> float:
     """Calculate the average of a list of numbers.
 
     Parameters
@@ -328,9 +329,7 @@ async def make_http_request(
             httpx.HTTPError,
         ) as e:
             if attempt == retries - 1:
-                logger.warning(
-                    "[Httpx] Request failed (%s): %s", type(e).__name__, url
-                )
+                logger.warning("[Httpx] Request failed (%s): %s", type(e).__name__, url)
                 return None
             await asyncio.sleep(1 * (attempt + 1))
         except json.decoder.JSONDecodeError:

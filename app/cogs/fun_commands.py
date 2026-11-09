@@ -272,9 +272,7 @@ class FunCommands(commands.Cog):
             await send(ctx, "REDDIT_CANT_LOAD_MULTIREDDIT")
             return
 
-        multireddit = cast(
-            asyncpraw.models.Multireddit, temp_user_reddit.multireddit
-        )
+        multireddit = cast(asyncpraw.models.Multireddit, temp_user_reddit.multireddit)
         limit = temp_user_reddit.search_limit
 
         try:
@@ -323,7 +321,9 @@ class FunCommands(commands.Cog):
         if len(temp_user_reddit.viewed_posts) >= len(user_reddit.subreddits):
             temp_user_reddit.search_limit = min(50, temp_user_reddit.search_limit + 1)
 
-    async def _load_user_data(self, user_id: int) -> tuple[UserRedditData, TempUserRedditData]:
+    async def _load_user_data(
+        self, user_id: int
+    ) -> tuple[UserRedditData, TempUserRedditData]:
         """Load user and temp user data, ensuring multireddit exists."""
         user = await self._user_mgr.get(user_id)
         temp = self._temp_user_mgr.get(user_id)

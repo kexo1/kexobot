@@ -5,7 +5,7 @@ import logging
 import socket
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 import asyncpraw
@@ -64,6 +64,15 @@ from app.utils import make_http_request
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
+
+
+def _require_initialized(value: T | None, resource: str) -> T:
+    if value is None:
+        raise RuntimeError(f"{resource} has not been initialized")
+    return value
+
+
 intents = discord.Intents.default()
 intents.message_content = False
 intents.members = False
@@ -91,7 +100,7 @@ class KexoBot:
         self._main_loop_counter: int = 0
         self._is_shutdown = False
 
-        self._mongo_client = AsyncMongoClient(ENV_API_DB)
+        self._mongo_client: AsyncMongoClient[Any] = AsyncMongoClient(ENV_API_DB)
         db = cast(Any, self._mongo_client["KexoBOTDatabase"])  # pyright: ignore[reportAny]
         self._bot_config: AsyncCollection[Any] = cast(
             AsyncCollection[Any], db["BotConfig"]
@@ -151,10 +160,11 @@ class KexoBot:
             logger.warning(
                 "[Sonolink] Setup hook connect failed, refreshing node cache."
             )
-            assert self._lavalink_server_manager is not None, (
-                "Lavalink server manager must be initialized"
+            server_manager = _require_initialized(
+                self._lavalink_server_manager,
+                "Lavalink server manager",
             )
-            await self._lavalink_server_manager.fetch()
+            await server_manager.fetch()
             node = await self._lavalink_node_service.connect_node()
 
         if not node:
@@ -218,42 +228,44 @@ class KexoBot:
 
     def _define_classes(self) -> None:
         """Define classes for the bot."""
-        if self._reddit_agent is None:
-            raise RuntimeError("Reddit client is not initialized")
-
-        assert self.cloudscraper_session is not None, (
-            "Cloudscraper session must be initialized"
+        reddit_agent = _require_initialized(self._reddit_agent, "Reddit client")
+        cloudscraper_session = _require_initialized(
+            self.cloudscraper_session,
+            "Cloudscraper session",
         )
-        assert self.session is not None, "HTTP session must be initialized"
-        assert self._channel_game_updates is not None, (
-            "Game updates channel must be fetched"
+        session = _require_initialized(self.session, "HTTP session")
+        game_updates_channel = _require_initialized(
+            self._channel_game_updates,
+            "Game updates channel",
         )
-        assert self._channel_free_stuff is not None, (
-            "Free stuff channel must be fetched"
+        free_stuff_channel = _require_initialized(
+            self._channel_free_stuff,
+            "Free stuff channel",
         )
-        assert self._channel_game_cracks is not None, (
-            "Game cracks channel must be fetched"
+        game_cracks_channel = _require_initialized(
+            self._channel_game_cracks,
+            "Game cracks channel",
         )
-        assert self._user_kexo is not None, "User Kexo must be fetched"
+        user_kexo = _require_initialized(self._user_kexo, "Kexo user")
 
         self._content_monitor = ContentMonitor(
             self.bot.config_manager,
-            self.session,
-            self.cloudscraper_session,
-            self._channel_game_updates,
-            self._channel_free_stuff,
-            self._user_kexo,
+            session,
+            cloudscraper_session,
+            game_updates_channel,
+            free_stuff_channel,
+            user_kexo,
         )
 
         self._reddit_fetcher = RedditFetcher(
             self.bot.config_manager,
-            self.session,
-            self._reddit_agent,
-            self._channel_free_stuff,
-            self._channel_game_cracks,
+            session,
+            reddit_agent,
+            free_stuff_channel,
+            game_cracks_channel,
         )
-        self._sfd_servers = SFDServers(self._bot_config, self.session)
-        self._lavalink_server_manager = LavalinkServerManager(self.bot, self.session)
+        self._sfd_servers = SFDServers(self._bot_config, session)
+        self._lavalink_server_manager = LavalinkServerManager(self.bot, session)
 
     async def main_loop(self) -> None:
         """Main loop for the bot.
@@ -261,14 +273,17 @@ class KexoBot:
         fetch data from different sources.
         It runs the classes in a round-robin fashion.
         """
-        assert self._reddit_fetcher is not None, "Reddit fetcher must be initialized"
-        assert self._content_monitor is not None, "Content monitor must be initialized"
-        assert self._sfd_servers is not None, "SFD servers must be initialized"
+        reddit_fetcher = _require_initialized(self._reddit_fetcher, "Reddit fetcher")
+        content_monitor = _require_initialized(
+            self._content_monitor,
+            "Content monitor",
+        )
+        _require_initialized(self._sfd_servers, "SFD servers")
         # now = datetime.now(ZoneInfo("Europe/Bratislava"))
 
         if self._main_loop_counter == 0:
             self._main_loop_counter = 1
-            await self._reddit_fetcher.freegamefindings()
+            await reddit_fetcher.freegamefindings()
 
         elif self._main_loop_counter == 1:
             self._main_loop_counter = 2
@@ -276,15 +291,15 @@ class KexoBot:
 
         elif self._main_loop_counter == 2:
             self._main_loop_counter = 3
-            await self._content_monitor.game3rb()
+            await content_monitor.game3rb()
 
         elif self._main_loop_counter == 3:
             self._main_loop_counter = 4
-            await self._content_monitor.online_fix()
+            await content_monitor.online_fix()
 
         elif self._main_loop_counter == 4:
             self._main_loop_counter = 0
-            await self._reddit_fetcher.crackwatch()
+            await reddit_fetcher.crackwatch()
 
         # if now.minute % 6 == 0 and self._hostname != LOCAL_MACHINE_NAME:
         #    await self._sfd_servers.update_stats(now)
@@ -296,8 +311,9 @@ class KexoBot:
         It runs the classes in a round-robin fashion.
         It also updates the reddit cache and fetches lavalink servers.
         """
-        assert self._lavalink_server_manager is not None, (
-            "Lavalink server manager must be initialized"
+        server_manager = _require_initialized(
+            self._lavalink_server_manager,
+            "Lavalink server manager",
         )
 
         now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -314,25 +330,40 @@ class KexoBot:
         if now.hour == 0:
             self._load_humor_api_tokens()
             await self._lavalink_node_service.upload_cached_servers()
-            assert self.session is not None, "HTTP session must be initialized"
-            await self._lavalink_node_service.test_all_node_pings(self.session)
-            await self._lavalink_server_manager.fetch()
+            await self._lavalink_node_service.test_all_node_pings(
+                _require_initialized(self.session, "HTTP session")
+            )
+            await server_manager.fetch()
 
         if now.hour == 4:
-            assert self.session is not None, "HTTP session must be initialized"
             await self.wordnik_presence()
 
     async def wordnik_presence(self) -> None:
         """Fetches the word of the day from Wordnik API."""
-        assert self.session is not None, "HTTP session must be initialized"
-        json_data = await make_http_request(self.session, API_WORDNIK, get_json=True)
+        session = _require_initialized(self.session, "HTTP session")
+        json_data = await make_http_request(session, API_WORDNIK, get_json=True)
         if not json_data:
             logger.warning("[API] Wordnik API returned no data.")
             return
 
-        assert isinstance(json_data, dict)
-        word = cast(str, json_data["word"])
-        definition = cast(str, json_data["definitions"][0]["text"])
+        if not isinstance(json_data, dict):
+            logger.warning("[API] Wordnik API returned data in an unexpected format.")
+            return
+        response = cast(dict[str, object], json_data)
+        word = response.get("word")
+        definitions = response.get("definitions")
+        if not isinstance(word, str) or not isinstance(definitions, list):
+            logger.warning("[API] Wordnik API response is missing word definitions.")
+            return
+        definition_items = cast(list[object], definitions)
+        if not definition_items or not isinstance(definition_items[0], dict):
+            logger.warning("[API] Wordnik API response is missing word definitions.")
+            return
+        definition_data = cast(dict[str, object], definition_items[0])
+        definition = definition_data.get("text")
+        if not isinstance(definition, str):
+            logger.warning("[API] Wordnik API response is missing word definitions.")
+            return
         definition = definition[:-1]
         presence = f"{word}: {definition}"
 
@@ -349,7 +380,6 @@ class KexoBot:
         subreddit_icons: dict[str, str] = {}
         for subreddit_name in SHITPOST_SUBREDDITS_ALL:
             subreddit: Subreddit = await self.bot.reddit_agent.subreddit(subreddit_name)
-            assert subreddit is not None, "Subreddit must be resolved"
 
             try:
                 await subreddit.load()
@@ -435,7 +465,8 @@ def create_bot() -> KexoBotClient:
 
 def run_bot() -> None:
     """Run the bot with proper shutdown handling."""
-    assert ENV_DISCORD_TOKEN is not None, "DISCORD_TOKEN environment variable not set"
+    if ENV_DISCORD_TOKEN is None:
+        raise RuntimeError("DISCORD_TOKEN environment variable not set")
     discord_token: str = ENV_DISCORD_TOKEN
     bot = create_bot()
     bot.run(discord_token)
