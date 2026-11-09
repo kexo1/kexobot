@@ -217,7 +217,7 @@ class MusicPlaybackService:
                     self._bot.sonolink_client.search_track(
                         search, source=cast("str", source)
                     ),
-                    timeout=20,
+                    timeout=30,
                 )
                 if not tracks.is_error() and not tracks.is_empty() and tracks.result:
                     return tracks
@@ -228,7 +228,7 @@ class MusicPlaybackService:
                         self._bot.sonolink_client.search_track(
                             search, source="spsearch"
                         ),
-                        timeout=5,
+                        timeout=30,
                     )
                     if (
                         not tracks.is_error()
