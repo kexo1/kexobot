@@ -2,10 +2,11 @@ import datetime
 import gc
 import os
 from datetime import timedelta
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 import httpx
+import komorebi_mpl  # noqa: F401 - registers the "night_wave" Matplotlib style
 import matplotlib
 from bs4 import BeautifulSoup
 from pymongo.asynchronous.collection import AsyncCollection
@@ -15,10 +16,15 @@ from app.config.sfd import API_SFD_SERVER, SFD_HEADERS, SFD_REQUEST, TIMEZONES
 from app.utils import average, is_older_than, make_http_request
 
 matplotlib.use("agg")
-import komorebi_mpl as kmpl
 import matplotlib.pyplot as plt
 
 plt.style.use("night_wave")
+
+
+class SFDServerInfo(TypedDict):
+    server_name: list[str]
+    maps: list[str]
+    players: list[str]
 
 
 def generate_lines_and_effects(
@@ -64,18 +70,18 @@ class SFDServer:
 
     def __init__(
         self,
-        address_ipv4,
-        port,
-        server_name,
-        game_mode,
-        map_name,
-        players,
-        max_players,
-        bots,
-        has_password,
-        description,
-        version,
-    ):
+        address_ipv4: str,
+        port: int,
+        server_name: str,
+        game_mode: int,
+        map_name: str,
+        players: int,
+        max_players: int,
+        bots: int,
+        has_password: bool,
+        description: str,
+        version: str,
+    ) -> None:
         self.address_ipv4 = address_ipv4
         self.port = port
         self.server_name = server_name
@@ -295,7 +301,7 @@ class SFDServers:
 
     async def get_servers_info(
         self,
-    ) -> tuple[dict[str, list[str]], int] | tuple[None, None]:
+    ) -> tuple[SFDServerInfo, int] | tuple[None, None]:
         """Method to get the server information.
 
         Returns:
@@ -307,7 +313,7 @@ class SFDServers:
         if not servers:
             return None, None
 
-        servers_dict: dict[str, list[str]] = {
+        servers_dict: SFDServerInfo = {
             "server_name": [],
             "maps": [],
             "players": [],
@@ -389,13 +395,13 @@ class SFDServers:
             server_name = (
                 server_element.find("GameName").text
                 if server_element.find("GameName")
-                else None
+                else ""
             )
 
             address_ipv4 = (
                 server_element.find("AddressIPv4").text
                 if server_element.find("AddressIPv4")
-                else None
+                else ""
             )
             port = (
                 int(server_element.find("Port").text)
@@ -411,7 +417,7 @@ class SFDServers:
             map_name = (
                 server_element.find("MapName").text
                 if server_element.find("MapName")
-                else None
+                else ""
             )
             players = (
                 int(server_element.find("Players").text)
@@ -432,12 +438,12 @@ class SFDServers:
             description = (
                 server_element.find("Description").text
                 if server_element.find("Description")
-                else None
+                else ""
             )
             version = (
                 server_element.find("Version").text
                 if server_element.find("Version")
-                else None
+                else ""
             )
 
             server = SFDServer(

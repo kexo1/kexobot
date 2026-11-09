@@ -27,13 +27,15 @@ from app.config.scraping import (
 from app.data.bot_data import BotConfigManager
 from app.utils import make_http_request, strip_text
 
+logger = logging.getLogger(__name__)
+
 
 def get_onlinefix_messages(chat_log: str) -> list:
     soup = BeautifulSoup(chat_log, "html.parser")
     chat_element = soup.find("ul", id="lc_chat")
 
     if not isinstance(chat_element, Tag):
-        logging.warning("[Online-Fix] Chat element not found")
+        logger.warning("[Online-Fix] Chat element not found")
         return []
 
     return chat_element.find_all("li", class_="lc_chat_li lc_chat_li_foto")
@@ -67,7 +69,7 @@ def apply_build_token(
             break
 
     if not removed:
-        logging.warning(
+        logger.warning(
             "[Game3rb] Broken name - %s",
             full_title,
         )
@@ -215,7 +217,7 @@ class ContentMonitor:
                 game["url"],
             )
             if not source:
-                logging.warning(f"[Game3rb] Broken link - {game['url']}")
+                logger.warning("[Game3rb] Broken link - %s", game["url"])
                 continue
             soup = BeautifulSoup(source.text, "html.parser")
 
@@ -279,7 +281,7 @@ class ContentMonitor:
                 SITE_URL_ONLINEFIX,
             )
         except requests.exceptions.RequestException as exc:
-            logging.warning(f"[Online-Fix] Request failed: {exc}")
+            logger.warning("[Online-Fix] Request failed: %s", exc)
             return
 
         if not chat_log:
@@ -338,7 +340,7 @@ class ContentMonitor:
         img_url = meta_tag.get("content")
         article_description = soup.find("article")
         if not isinstance(article_description, Tag):
-            logging.warning("[Online-Fix] Article tag not found")
+            logger.warning("[Online-Fix] Article tag not found")
             return
 
         description_element = article_description.find(
@@ -357,7 +359,7 @@ class ContentMonitor:
             url=url,
             description=description,
             color=discord.Color.blue(),
-            timestamp=datetime.datetime.now(datetime.timezone.utc),
+            timestamp=datetime.datetime.now(datetime.UTC),
         )
         embed.set_footer(
             text="online-fix.me",

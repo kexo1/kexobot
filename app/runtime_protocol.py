@@ -1,0 +1,9 @@
+from typing import Protocol
+
+
+class BotRuntime(Protocol):
+    async def setup(self) -> None: ...
+
+    async def shutdown(self) -> None: ...
+
+    async def save_all_data(self) -> None: ...

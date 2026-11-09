@@ -18,7 +18,7 @@ from app.utils import (
 )
 
 if TYPE_CHECKING:
-    from app.main import KexoBotClient
+    from app.client import KexoBotClient
 
 
 def get_queue_status(queue_mode: sonolink.QueueMode) -> tuple[str, str]:
@@ -51,7 +51,7 @@ def get_queue_embeds(
         f"{requester_label}`\n\n ***__Next:__***\n"
     )
 
-    pages = []
+    pages: list[discord.Embed] = []
     current_description = header
 
     for pos, track in enumerate(player.queue):

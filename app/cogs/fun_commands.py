@@ -1,7 +1,7 @@
 import logging
 import random
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 import asyncpraw.models
 import asyncpraw.reddit
@@ -22,7 +22,9 @@ from app.response_handler import defer_interaction, make_embed, send
 from app.utils import load_text_file, make_http_request
 
 if TYPE_CHECKING:
-    from app.main import KexoBotClient
+    from app.client import KexoBotClient
+
+logger = logging.getLogger(__name__)
 
 
 async def send_multiple_images(
@@ -48,10 +50,7 @@ def is_valid_submission(
     if submission.permalink in temp_user_reddit.viewed_posts:
         return False
 
-    if submission.over_18 and not user_reddit.nsfw_posts:
-        return False
-
-    return True
+    return not (submission.over_18 and not user_reddit.nsfw_posts)
 
 
 class FunCommands(commands.Cog):
@@ -338,7 +337,7 @@ class FunCommands(commands.Cog):
         temp = self._temp_user_mgr.get(user_id)
         temp.reddit.viewed_posts.add(submission_url)
         temp.reddit.last_used = datetime.now()
-        logging.info(f"User {user_id} viewed posts: {temp.reddit.viewed_posts}")
+        logger.info("User %s viewed posts: %s", user_id, temp.reddit.viewed_posts)
 
     async def _create_reddit_embed(
         self, submission: asyncpraw.reddit.Submission
@@ -357,7 +356,7 @@ class FunCommands(commands.Cog):
         embed.timestamp = datetime.fromtimestamp(submission.created_utc)
         return embed
 
-    async def _get_jokes(self) -> Optional[set[str]]:
+    async def _get_jokes(self) -> set[str] | None:
         fetched_jokes: set[str] = set()
         jokes = await self._get_humor_api_jokes()
         fetched_jokes.update(jokes)
@@ -367,7 +366,7 @@ class FunCommands(commands.Cog):
 
         return fetched_jokes
 
-    async def _get_dad_jokes(self) -> Optional[set[str]]:
+    async def _get_dad_jokes(self) -> set[str] | None:
         fetched_jokes: set[str] = set()
         response = await make_http_request(
             self._session,
@@ -391,7 +390,7 @@ class FunCommands(commands.Cog):
             fetched_jokes.add(joke)
         return fetched_jokes
 
-    async def _get_yo_mama_jokes(self) -> Optional[set[str]]:
+    async def _get_yo_mama_jokes(self) -> set[str] | None:
         token = self._load_humor_api_token()
         fetched_jokes: set[str] = set()
         if not token or self._bot.humor_api_tokens[token]["exhausted"]:
@@ -485,7 +484,7 @@ class FunCommands(commands.Cog):
 
         return fetched_jokes
 
-    def _load_humor_api_token(self) -> Optional[str]:
+    def _load_humor_api_token(self) -> str | None:
         for token in self._bot.humor_api_tokens:
             if self._bot.humor_api_tokens[token].get("exhausted"):
                 continue
@@ -493,8 +492,8 @@ class FunCommands(commands.Cog):
         return None
 
     def _is_token_exhausted(
-        self, response: Optional[httpx.Response], token: Optional[str]
-    ) -> Optional[str]:
+        self, response: httpx.Response | None, token: str | None
+    ) -> str | None:
         if not token:
             return None
 

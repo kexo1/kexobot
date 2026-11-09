@@ -1,0 +1,20 @@
+[tool.basedpyright]
+typeCheckingMode = "standard"
+
+reportMissingTypeStubs = false
+# Keep incomplete framework/dependency typing visible without making it a hard failure.
+reportUnknownMemberType = "warning"
+reportUnknownArgumentType = "warning"
+reportUnknownVariableType = "warning"
+reportUnknownParameterType = "warning"
+reportAny = false
+reportExplicitAny = false
+reportUnusedCallResult = false
+
+reportOptionalMemberAccess = "error"
+reportOptionalSubscript = "error"
+reportPossiblyUnboundVariable = "error"
+reportArgumentType = "error"
+reportReturnType = "error"
+reportAssignmentType = "error"
+reportRedeclaration = "error"

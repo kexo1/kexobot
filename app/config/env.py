@@ -5,7 +5,7 @@ import os
 import socket
 
 from dotenv import load_dotenv
-from fake_useragent import UserAgent
+from fake_useragent import FakeUserAgentError, UserAgent
 
 ############################ Switching between DEV and PROD ############################
 LOCAL_MACHINE_NAME = "mato"
@@ -48,7 +48,10 @@ ENV_API_DB = (
 ############################# User Agent Configuration ############################
 try:
     USER_AGENT = UserAgent(min_version=120.0).random
-except Exception:
+except FakeUserAgentError as exc:
+    logging.getLogger(__name__).warning(
+        "Failed to get a random User-Agent; using the static default: %s", exc
+    )
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 
 ############################## Joke APIs Configuration ############################

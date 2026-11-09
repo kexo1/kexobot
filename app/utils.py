@@ -14,6 +14,8 @@ from app.config.colors import COLOR_GREEN
 from app.config.discord import ICON_YOUTUBE
 from app.config.music import MUSIC_TO_REMOVE
 
+logger = logging.getLogger(__name__)
+
 
 def load_text_file(name: str) -> list[str]:
     """Load a text file and return its content as lines.
@@ -326,11 +328,13 @@ async def make_http_request(
             httpx.HTTPError,
         ) as e:
             if attempt == retries - 1:
-                logging.warning(f"[Httpx] Request failed ({type(e).__name__}): {url}")
+                logger.warning(
+                    "[Httpx] Request failed (%s): %s", type(e).__name__, url
+                )
                 return None
             await asyncio.sleep(1 * (attempt + 1))
         except json.decoder.JSONDecodeError:
-            logging.warning("[Httpx] Failed to decode JSON: %s", url)
+            logger.warning("[Httpx] Failed to decode JSON: %s", url)
     return None
 
 

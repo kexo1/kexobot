@@ -2,7 +2,6 @@ import copy
 import logging
 import re
 from datetime import datetime
-from typing import Optional
 from urllib.parse import urlparse
 
 import asyncpraw
@@ -29,9 +28,11 @@ from app.config.reddit import (
 from app.data.bot_data import BotConfigManager
 from app.utils import strip_text
 
+logger = logging.getLogger(__name__)
 
-def get_image_from_line(line: str) -> Optional[str]:
-    match = re.search(r"\((https?://[^)\s]+?\.(?:png|jpe?g))\)", line, re.I)
+
+def get_image_from_line(line: str) -> str | None:
+    match = re.search(r"\((https?://[^)\s]+?\.(?:png|jpe?g))\)", line, re.IGNORECASE)
     if not match:
         return None
     return match.group(1)
@@ -160,7 +161,7 @@ class RedditFetcher:
 
         except discord.errors.HTTPException as e:
             # Only .send() inside the loop raises this, so `submission` is bound.
-            logging.warning(
+            logger.warning(
                 f"[CrackWatch] - Error when sending message ({submission.permalink}):\n{e}"  # pyright: ignore[reportPossiblyUnboundVariable]
             )
         except (
@@ -168,7 +169,7 @@ class RedditFetcher:
             RequestException,
             ResponseException,
         ) as e:
-            logging.warning(f"[CrackWatch] - Error when accessing crackwatch:\n{e}")
+            logger.warning("[CrackWatch] - Error when accessing crackwatch:\n%s", e)
         finally:
             await self._config_manager.save("crackwatch_cache", DB_CACHE)
 
@@ -190,10 +191,7 @@ class RedditFetcher:
             return False
 
         title_lower = submission.title.lower()
-        if any(token.lower() in title_lower for token in to_filter):
-            return False
-
-        return True
+        return not any(token.lower() in title_lower for token in to_filter)
 
     async def freegamefindings(self) -> None:
         """Method to fetch free games from r/FreeGameFindings subreddit."""
@@ -224,7 +222,7 @@ class RedditFetcher:
                 await self._process_submission(submission)
 
         except discord.errors.HTTPException as e:
-            logging.warning(
+            logger.warning(
                 f"[FreeGameFindings] - Error when sending message ({submission.permalink}):\n{e}"  # pyright: ignore[reportPossiblyUnboundVariable]
             )
         except (
@@ -232,7 +230,7 @@ class RedditFetcher:
             RequestException,
             ResponseException,
         ) as e:
-            logging.warning(
+            logger.warning(
                 f"[FreeGameFindings] - Error while fetching subreddit:\n{e}"
             )
         finally:
@@ -268,13 +266,7 @@ class RedditFetcher:
             return False
 
         # Allow Epic Games giveaways, but only mobile games
-        if (
-            "epic games" in submission_title_lower
-            and "mobile" not in submission_title_lower
-        ):
-            return False
-
-        return True
+        return not ("epic games" in submission_title_lower and "mobile" not in submission_title_lower)
 
     async def _process_submission(
         self, submission: asyncpraw.models.Submission

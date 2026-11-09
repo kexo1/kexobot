@@ -15,13 +15,14 @@ from app.config.colors import COLOR_GREEN, COLOR_RED
 from app.data.bot_data import NodeCacheEntry
 from app.player_types import KexoPlayer
 
+logger = logging.getLogger(__name__)
 
 @runtime_checkable
 class _BotProtocol(Protocol):
     """Minimal bot interface required by BotState operations.
 
     Defined as a Protocol to avoid importing ``KexoBotClient`` from
-    ``app.main``, which would create a cyclic import chain.
+    ``app.client``, which would create a cyclic import chain.
     """
 
     sonolink_client: sonolink.Client
@@ -114,7 +115,7 @@ class BotState:
                 # Only nodes still mid-handshake need an explicit close; already
                 # disconnected probe nodes would just raise "not connected yet".
                 await self.close_and_remove_node(node)
-                logging.info(f"[Sonolink] Closed and removed unused node: {node.uri}")
+                logger.info("[Sonolink] Closed and removed unused node: %s", node.uri)
 
     def remove_node(self, node: sonolink.Node) -> None:
         """Remove ``node`` from the sonolink client and drain its close task."""
@@ -156,14 +157,14 @@ class BotState:
             True if the node is connected, False otherwise.
         """
         try:
-            logging.info(f"[Sonolink] Attempting to connect to node: {node.uri}")
+            logger.info("[Sonolink] Attempting to connect to node: %s", node.uri)
             # Some fucking nodes secretly don't respond,
             # I've played these games before!!!
             await asyncio.wait_for(node.connect(), timeout=3)
             return True
 
-        except Exception:
-            logging.info(f"[Sonolink] Node failed to connect: ({node.uri})")
+        except Exception as exc:  # noqa: BLE001 - any node failure must trigger failover
+            logger.warning("[Sonolink] Node failed to connect (%s): %s", node.uri, exc)
 
         self.change_node_score(node.uri, -1)
         return False
@@ -379,7 +380,12 @@ class BotState:
                 if callable(check_inactivity):
                     check_inactivity()
                 return True
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 - node handoff failures are recoverable
+                logger.warning(
+                    "[Sonolink] Failed to move player to %s: %s",
+                    target_node.uri,
+                    exc,
+                )
                 self.change_node_score(target_node.uri, -5)
                 return False
 
@@ -387,7 +393,12 @@ class BotState:
             """Move player and test the search callback once."""
             try:
                 await player.move_to(target_node)
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 - node handoff failures are recoverable
+                logger.warning(
+                    "[Sonolink] Failed to move player to %s: %s",
+                    target_node.uri,
+                    exc,
+                )
                 self.change_node_score(target_node.uri, -5)
                 return False
 
@@ -397,7 +408,12 @@ class BotState:
             try:
                 await asyncio.wait_for(search_callback(), timeout=5)
                 return True
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 - failed probes mark node unhealthy
+                logger.warning(
+                    "[Sonolink] Playback probe failed on %s: %s",
+                    target_node.uri,
+                    exc,
+                )
                 self.change_node_score(target_node.uri, -5)
                 return False
 
@@ -413,7 +429,7 @@ class BotState:
                 await asyncio.wait_for(track_failed_event.wait(), timeout=3)
                 self.change_node_score(target_node.uri, -5)
                 return True
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return False
             finally:
                 self.clear_track_exception_probe(guild_id)
@@ -441,7 +457,7 @@ class BotState:
                 if not is_working:
                     continue
 
-                logging.info(f"[Sonolink] {attempt + 1}. Node switched ({node.uri})")
+                logger.info("[Sonolink] %s. Node switched (%s)", attempt + 1, node.uri)
                 if send_success_message:
                     embed = discord.Embed(
                         title="",

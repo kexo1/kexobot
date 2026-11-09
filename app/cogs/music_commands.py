@@ -1,9 +1,5 @@
-import asyncio
 import datetime
-import logging
-import random
-import re
-from typing import TYPE_CHECKING, Optional, Union, cast
+from typing import TYPE_CHECKING, cast
 
 import discord
 import sonolink
@@ -12,19 +8,13 @@ from discord.app_commands import Range
 from discord.ext import commands
 from sonolink import models as sl_models
 from sonolink.gateway.errors import QueueEmpty
-from sonolink.models import AutoPlaySettings, HistorySettings
+from sonolink.models import AutoPlaySettings
 
-from app.config.colors import COLOR_BLUE, COLOR_RED, COLOR_YELLOW
+from app.config.colors import COLOR_BLUE, COLOR_RED
 from app.config.discord import ICON_YOUTUBE
-from app.config.music import (
-    API_RADIOGARDEN_LISTEN,
-    API_RADIOGARDEN_PAGE,
-    API_RADIOGARDEN_PLACES,
-    API_RADIOGARDEN_SEARCH,
-    MUSIC_SOURCES,
-)
 from app.decorators import is_joined, is_playing, is_queue_empty
-from app.player_types import caller_voice_channel, get_player, guild_of, member_of
+from app.music.playback import MusicPlaybackService
+from app.player_types import caller_voice_channel, get_player, guild_of
 from app.response_handler import defer_interaction, make_embed, send
 from app.utils import (
     EmbedPaginator,
@@ -32,119 +22,10 @@ from app.utils import (
     fix_audio_title,
     get_track_requester_avatar,
     get_track_requester_name,
-    make_http_request,
-    make_now_playing_embed,
 )
 
 if TYPE_CHECKING:
-    from app.main import KexoBotClient
-
-
-def get_search_prefix(query: str) -> str | None:
-    """Get the search prefix for a given query."""
-    for pattern, prefix in MUSIC_SOURCES:
-        if pattern.search(query):
-            return prefix
-    return None
-
-
-def set_track_requester(
-    track: sl_models.Playable,
-    user: discord.abc.User,
-) -> None:
-    track.extras.requester_name = user.name
-    avatar = getattr(getattr(user, "display_avatar", None), "url", None)
-    if avatar:
-        track.extras.requester_avatar = avatar
-
-
-def _parse_radiomap_stream_url(url: str) -> str:
-    channel_id = url.rstrip("/").split("/")[-1]
-    return f"{API_RADIOGARDEN_LISTEN}{channel_id}/channel.mp3"
-
-
-async def fetch_first_track(
-    ctx: discord.Interaction,
-    tracks: Union[
-        sl_models.SearchResult,
-        sl_models.Playlist,
-        sl_models.Playable,
-        list[sl_models.Playable],
-    ],
-) -> Optional[sl_models.Playable]:
-    player = get_player(ctx)
-
-    # Unwrap SearchResult
-    resolved = tracks.result if isinstance(tracks, sl_models.SearchResult) else tracks
-
-    # Handle Playlist
-    if isinstance(resolved, sl_models.Playlist):
-        return await _handle_playlist(ctx, player, resolved)
-
-    # Handle single Playable
-    if isinstance(resolved, sl_models.Playable):
-        set_track_requester(resolved, ctx.user)
-        return resolved
-
-    if not resolved:
-        return None
-
-    first_track = resolved[0]
-    set_track_requester(first_track, ctx.user)
-    return first_track
-
-
-async def _handle_playlist(
-    ctx: discord.Interaction,
-    player: sonolink.Player,
-    playlist: sl_models.Playlist,
-) -> sl_models.Playable:
-    for track in playlist:
-        set_track_requester(track, ctx.user)
-
-    first_track = playlist.tracks.pop(0)
-    song_count = player.queue.put(playlist)
-
-    embed = discord.Embed(
-        title="",
-        description=f"Added the playlist **`{playlist.name}`** ({song_count} songs) to the queue.",
-        color=COLOR_BLUE,
-    )
-
-    await send(ctx, embed=embed)
-    return first_track
-
-
-async def should_move_to_channel(ctx: discord.Interaction) -> bool:
-    player = get_player(ctx)
-    target_channel = caller_voice_channel(ctx)
-    if player and player.channel.id == target_channel.id:
-        return True
-
-    if player.current:
-        await send(
-            ctx,
-            embed=make_embed(
-                ":x: I am playing in a different voice channel, wait till the song finishes."
-            ),
-        )
-        return False
-
-    await player.guild.change_voice_state(channel=target_channel)
-    await send(
-        ctx,
-        embed=make_embed(f":wheelchair: Moving to <#{target_channel.id}>"),
-        ephemeral=False,
-    )
-    return True
-
-
-def make_added_to_queue_embed(track: sl_models.Playable) -> discord.Embed:
-    return discord.Embed(
-        title="",
-        description=f"**Added to queue:\n [{fix_audio_title(track)}]({track.uri})**",
-        color=COLOR_BLUE,
-    )
+    from app.client import KexoBotClient
 
 
 class MusicCommands(commands.Cog):
@@ -152,12 +33,10 @@ class MusicCommands(commands.Cog):
     This class contains commands for:
     - Playing music
     - Searching for music
-    - Playing radio stations
     - Skipping songs
     - Pausing and resuming songs
     - Leaving voice channels
     - Changing autoplay mode
-    - Getting random radio stations
 
     Parameters:
     bot: :class:`KexoBotClient`
@@ -166,71 +45,9 @@ class MusicCommands(commands.Cog):
 
     def __init__(self, bot: "KexoBotClient"):
         self._bot = bot
-        self._session = self._bot.session
-        self._radiomap_cache: list[str] = []
+        self._playback = MusicPlaybackService(bot)
 
     music = app_commands.Group(name="music", description="All music commands")
-    radio = app_commands.Group(name="radio", description="All radio commands")
-
-    async def _execute_play(
-        self,
-        ctx: discord.Interaction,
-        search: str,
-        play_next: bool = False,
-    ) -> None:
-        """Shared play flow used by /music play and radio commands."""
-        await defer_interaction(ctx)
-
-        if self._bot.node_is_switching.get(guild_of(ctx).id, False):
-            await send(
-                ctx,
-                embed=make_embed(
-                    ":hourglass_flowing_sand: Please wait until the bot finishes switching nodes.",
-                    color=COLOR_YELLOW,
-                ),
-            )
-            return
-
-        if not self._bot.node:
-            await send(ctx, code="NODE_NOT_FOUND", ephemeral=False)
-            return
-
-        if not get_player(ctx):
-            joined: bool = await self._join_channel(ctx)
-
-            if not joined:
-                return
-
-            await self._prepare_sonolink(ctx)
-
-        is_moved: bool = await should_move_to_channel(ctx)
-        if not is_moved:
-            return
-
-        player = get_player(ctx)
-
-        tracks = await self._search_tracks(ctx, search)
-        if not tracks:
-            return
-
-        track = await fetch_first_track(ctx, tracks)
-        if not track:
-            return
-
-        player.temp_current = track  # To be used in case of switching nodes
-
-        if player.current:
-            if play_next:
-                player.queue.put_at(0, track)
-            else:
-                player.queue.put(track)
-
-            await send(ctx, embed=make_added_to_queue_embed(track))
-            return
-
-        player._now_playing_sent = True  # Prevent listener from duplicating
-        await send(ctx, embed=make_now_playing_embed(track))
-        await self._play_track(ctx, track)
 
     @music.command(name="play", description="Plays song.")
     @app_commands.describe(
@@ -258,144 +75,7 @@ class MusicCommands(commands.Cog):
         play_next: :class:`bool`
             If True, the song will be played next in the queue.
         """
-        await self._execute_play(ctx, search, play_next)
-
-    @radio.command(name="random", description="Gets random radio from RadioMap.")
-    @app_commands.describe(
-        play_next="If enabled, inserts the station at the top of queue.",
-    )
-    @app_commands.checks.cooldown(1, 4, key=lambda i: i.user.id)
-    @app_commands.guild_only()
-    async def radio_random(
-        self, ctx: discord.Interaction, play_next: bool = False
-    ) -> None:
-        """Gets a random radio station from RadioMap and plays it.
-
-        Parameters:
-        -----------
-        ctx: :class:`discord.Interaction`
-            The context of the command.
-        play_next: bool
-            If True, the radio station will be played next in the queue.
-        """
-        await defer_interaction(ctx)
-
-        place_ids = await self._get_radiomap_data()
-        if not place_ids:
-            await send(ctx, code="RADIOMAP_ERROR")
-            return
-
-        place_id = random.choice(place_ids)
-
-        response = await make_http_request(
-            self._session,
-            f"{API_RADIOGARDEN_PAGE}{place_id}/channels",
-            headers={"accept": "application/json"},
-        )
-        if not response:
-            await send(ctx, code="RADIOMAP_ERROR")
-            return
-
-        try:
-            data = response.json()
-            station_id = data["data"]["content"][0]["items"][0]["page"]["url"].split(
-                "/"
-            )[-1]
-        except (KeyError, IndexError, ValueError):
-            await send(ctx, code="RADIOMAP_ERROR")
-            return
-        response = await make_http_request(
-            self._session,
-            f"{API_RADIOGARDEN_LISTEN}{station_id}/channel.mp3",
-            headers={"accept": "application/json"},
-        )
-        if not response:
-            await send(ctx, code="RADIOMAP_ERROR")
-            return
-
-        response_text = response.text
-        url_match = re.search(
-            r'(?:href="|Redirecting to )(https?://[^"\s]+)', response_text
-        )
-        if not url_match:
-            await send(ctx, code="RADIOMAP_ERROR")
-            return
-
-        station = url_match.group(1)
-        if station.endswith("."):
-            station = station[:-1]
-
-        await self._execute_play(ctx, station, play_next)
-
-    @radio.command(name="play", description="Search and play radio from RadioGarden")
-    @app_commands.describe(
-        station="Radio station name to search for.",
-        country="Optional country filter (exact RadioGarden country name).",
-        play_next="If enabled, inserts the station at the top of queue.",
-    )
-    @app_commands.checks.cooldown(1, 4, key=lambda i: i.user.id)
-    @app_commands.guild_only()
-    async def play_radio(
-        self,
-        ctx: discord.Interaction,
-        station: str,
-        country: str = "",
-        play_next: bool = False,
-    ) -> None:
-        """Search and play a radio station from RadioGarden.
-
-        Parameters:
-        -----------
-        ctx: :class:`discord.Interaction`
-            The context of the command.
-        station: str
-            The name of the radio station to search for.
-        country: str
-            The country to narrow down the search.
-        play_next: bool
-            If True, the radio station will be played next in the queue.
-        """
-        encoded_station = discord.utils.escape_markdown(station)
-        response = await make_http_request(
-            self._session,
-            f"{API_RADIOGARDEN_SEARCH}{encoded_station}",
-            headers={"accept": "application/json"},
-        )
-        if not response:
-            await send(ctx, code="RADIOMAP_ERROR")
-            return
-
-        try:
-            data = response.json()
-            if not data["hits"]["hits"]:
-                await send(ctx, code="RADIOMAP_NO_STATION_FOUND", search=station)
-                return
-
-            for station_data in data["hits"]["hits"]:
-                station_source = station_data["_source"]["page"]
-                if (
-                    country
-                    and country.lower()
-                    not in station_source["country"]["title"].lower()
-                ):
-                    continue
-                stream_url = _parse_radiomap_stream_url(station_source["url"])
-                redirect_response = await make_http_request(
-                    self._session,
-                    stream_url,
-                )
-                if not redirect_response:
-                    continue
-                stream_url = redirect_response.headers.get("Location", stream_url)
-                if not stream_url:
-                    continue
-
-                await self._execute_play(ctx, stream_url, play_next)
-                return
-
-            await send(ctx, code="RADIOMAP_NO_STATION_FOUND", search=station)
-        except (KeyError, ValueError):
-            await send(ctx, code="RADIOMAP_ERROR")
+        await self._playback.execute_play(ctx, search, play_next)
 
     @music.command(name="skip", description="Skip playing song.")
     @app_commands.guild_only()
@@ -682,7 +362,7 @@ class MusicCommands(commands.Cog):
     async def change_volume(
         self,
         ctx: discord.Interaction,
-        volume: Optional[Range[int, 0, 200]] = None,
+        volume: Range[int, 0, 200] | None = None,
     ) -> None:
         player = get_player(ctx)
 
@@ -710,7 +390,7 @@ class MusicCommands(commands.Cog):
     async def speed(
         self,
         ctx: discord.Interaction,
-        multiplier: Optional[Range[int, 1, 4]] = 1,
+        multiplier: Range[int, 1, 4] | None = 1,
     ) -> None:
         player = get_player(ctx)
         filters = sl_models.Filters(timescale=sl_models.Timescale(speed=multiplier))
@@ -837,214 +517,6 @@ class MusicCommands(commands.Cog):
             ephemeral=False,
         )
 
-    async def _search_tracks(
-        self, ctx: discord.Interaction, search: str
-    ) -> Optional[
-        Union[
-            sl_models.SearchResult,
-            sl_models.Playlist,
-            sl_models.Playable,
-            list[sl_models.Playable],
-        ]
-    ]:
-        source = get_search_prefix(search)
-        # If it's not a URL with a recognizable prefix, default to YouTube search
-        if source is None:
-            if search.startswith("http://") or search.startswith("https://"):
-                source = None
-            else:
-                source = "ytsearch"
-
-        # Prefer youtube over spotify, but if youtube fails, try spotify
-        if source == "spsearch":
-            spotify_search = True
-            source = "ytsearch"
-        else:
-            spotify_search = False
-
-        player = get_player(ctx)
-
-        for i in range(2):
-            try:
-                tracks: sl_models.SearchResult = await asyncio.wait_for(
-                    self._bot.sonolink_client.search_track(
-                        search, source=cast("str", source)
-                    ),
-                    timeout=20,
-                )
-                if not tracks.is_error() and not tracks.is_empty() and tracks.result:
-                    return tracks
-
-                if spotify_search:
-                    # Keep one lightweight fallback without switching nodes.
-                    tracks = await asyncio.wait_for(
-                        self._bot.sonolink_client.search_track(
-                            search, source="spsearch"
-                        ),
-                        timeout=5,
-                    )
-                    if (
-                        not tracks.is_error()
-                        and not tracks.is_empty()
-                        and tracks.result
-                    ):
-                        return tracks
-
-            except asyncio.TimeoutError:
-                if i == 0:
-                    await send(
-                        ctx,
-                        embed=make_embed(
-                            ":warning: Node timed out finding tracks, switching to another node.",
-                            color=COLOR_YELLOW,
-                        ),
-                        ephemeral=False,
-                    )
-                await self._bot.state.switch_node(
-                    player=player,
-                    search_callback=lambda: self._bot.sonolink_client.search_track(
-                        search, source=cast("str", source)
-                    ),
-                    send_failure_message=False,
-                )
-                continue
-
-            except Exception as e:
-                await send(
-                    ctx,
-                    embed=make_embed(
-                        ":x: Failed to load tracks. You likely entered a wrong link or "
-                        "this Lavalink server lacks necessary plugins.\n"
-                        "Try using command `/node reconnect`",
-                        color=COLOR_RED,
-                    ),
-                    ephemeral=False,
-                )
-                logging.error("[sonolink] Error searching for tracks: %s", e)
-                return None
-
-        await send(
-            ctx,
-            code="NO_TRACKS_FOUND",
-            ephemeral=False,
-            search=search,
-        )
-        return None
-
-    async def _join_channel(self, ctx: discord.Interaction) -> bool:
-        member = member_of(ctx)
-        if not member.voice or not member.voice.channel:
-            await send(ctx, code="NO_VOICE_CHANNEL")
-            return False
-
-        channel = member.voice.channel
-        guild = await self._bot.guild_data_manager.get(guild_of(ctx).id)
-        autoplay_mode = (
-            sonolink.AutoPlayMode.PARTIAL
-            if guild.music.autoplay_mode == 1
-            else sonolink.AutoPlayMode.ENABLED
-        )
-
-        last_error: Exception | None = None
-        failed_uris = set()
-        node = self._bot.node
-
-        assert node is not None, "No available Sonolink nodes to connect to."
-
-        try:
-            player_cls = self._build_player_class(node, autoplay_mode)
-            await channel.connect(cls=player_cls, timeout=10)
-            return True
-
-        except (discord.Forbidden, discord.ClientException):
-            await send(ctx, code="NO_PERMISSIONS", ephemeral=False)
-            return False
-
-        except Exception as e:
-            last_error = e
-            failed_uris.add(node.uri)
-            self._bot.state.change_node_score(node.uri, -20)
-            logging.warning(
-                "[Sonolink] Voice connect failed for node %s: %s",
-                node.uri,
-                e,
-            )
-
-        await send(
-            ctx,
-            embed=make_embed(
-                ":x: Failed to connect to voice channel, try again later.",
-                color=COLOR_RED,
-            ),
-            ephemeral=False,
-        )
-        if last_error:
-            logging.error(
-                "[Sonolink] Error connecting to voice channel: %s",
-                last_error,
-            )
-
-        return False
-
-    def _build_player_class(
-        self,
-        node: sonolink.Node,
-        autoplay_mode: sonolink.AutoPlayMode = sonolink.AutoPlayMode.PARTIAL,
-    ):
-        return node.create_player(
-            autoplay_settings=AutoPlaySettings(
-                mode=autoplay_mode,
-                discovery_count=10,
-            ),
-            history_settings=HistorySettings(
-                enabled=True,
-                max_items=16,
-            ),
-        )
-
-    async def _play_track(
-        self, ctx: discord.Interaction, track: sl_models.Playable
-    ) -> bool:
-        player = get_player(ctx)
-        for i in range(3):
-            try:
-                await player.play(track)
-                break
-            except Exception as e:
-                logging.error(
-                    f"[sonolink] {i + 1}. Error playing track, retrying: %s", e
-                )
-
-        set_track_requester(track, ctx.user)
-        return True
-
-    async def _prepare_sonolink(self, ctx: discord.Interaction) -> None:
-        player = get_player(ctx)
-        player.text_channel = cast("discord.abc.MessageableChannel", ctx.channel)
-
-        guild = await self._bot.guild_data_manager.get(guild_of(ctx).id)
-        volume = guild.music.volume
-        try:
-            await player.set_volume(volume)
-        except Exception as e:
-            if "Session not found" not in str(e):
-                raise
-
-            await self._bot.state.switch_node(
-                player=player,
-                send_success_message=False,
-                send_failure_message=False,
-            )
-            await player.set_volume(volume)
-
-        await send(
-            ctx,
-            embed=make_embed(
-                f"Joined <#{player.channel.id}>, text channel set to <#{player.text_channel.id}>."
-            ),
-            ephemeral=False,
-        )
-
     def _build_queue_embeds(
         self, ctx: discord.Interaction, player: sonolink.Player
     ) -> list[discord.Embed]:
@@ -1145,7 +617,7 @@ class MusicCommands(commands.Cog):
         embed = discord.Embed(
             title="Now playing",
             colour=discord.Colour.blue(),
-            timestamp=datetime.datetime.now(datetime.timezone.utc),
+            timestamp=datetime.datetime.now(datetime.UTC),
         )
         embed.set_author(name="Playback Information")
 
@@ -1185,35 +657,9 @@ class MusicCommands(commands.Cog):
         )
         return embed
 
-    async def _get_radiomap_data(self) -> list[str]:
-        """Get radio map data with caching."""
-        if self._radiomap_cache:
-            return self._radiomap_cache
-
-        response = await make_http_request(
-            self._session,
-            API_RADIOGARDEN_PLACES,
-            headers={"accept": "application/json"},
-        )
-        if not response:
-            return self._radiomap_cache
-
-        data = response.json()
-        if "data" in data and "list" in data["data"]:
-            place_ids = [
-                item["url"].split("/")[-1]
-                for item in data["data"]["list"]
-                if "url" in item
-            ]
-            self._radiomap_cache = place_ids
-            return place_ids
-        return []
-
 
 async def setup(bot: "KexoBotClient") -> None:
     """Setup function for the MusicCommands cog."""
     cog = MusicCommands(bot)
     await bot.add_cog(cog)
-    # Add command groups
     bot.tree.add_command(cog.music, override=True)
-    bot.tree.add_command(cog.radio, override=True)

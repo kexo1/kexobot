@@ -7,6 +7,8 @@ from typing import Any, Generic, Protocol, TypeVar, cast
 
 from pymongo.asynchronous.collection import AsyncCollection
 
+logger = logging.getLogger(__name__)
+
 
 class _DataModel(Protocol):
     """Structural type for the dataclasses this manager persists."""
@@ -67,7 +69,7 @@ class BaseDataManager(Generic[T]):
             instance: T = self._data_class(**cast(dict[str, Any], raw))
         else:
             instance = self._data_class()
-            logging.info(
+            logger.info(
                 "[MongoDB] Creating new %s for ID: %s",
                 self._data_class.__name__,
                 _id,

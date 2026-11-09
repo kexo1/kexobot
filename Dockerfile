@@ -1,6 +1,6 @@
 # ---- Builder Stage ----
 # This stage installs dependencies, including from git
-FROM python:3.13.14-alpine AS builder
+FROM python:3.15.2-alpine AS builder
 
 # Install build-time dependencies
 RUN apk add --no-cache \
@@ -22,7 +22,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
 # RUN pip install "git+https://github.com/sonolink/sonolink@fix/issue-54-attempt" --no-cache-dir
 
-FROM python:3.13.14-alpine
+FROM python:3.15.2-alpine
 
 # Create a non-root user for security
 RUN addgroup -g 1001 -S botuser && \
@@ -51,4 +51,4 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONOPTIMIZE=1
 
 # Command to run the application
-CMD ["python", "app/main.py"]
+CMD ["python", "-m", "app.main"]

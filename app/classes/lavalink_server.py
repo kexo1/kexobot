@@ -8,8 +8,10 @@ from app.config.music import LAVALINK_URL
 from app.config.scraping import API_LAVALIST
 from app.utils import get_url_response_time, make_http_request
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
-    from app.main import KexoBotClient
+    from app.client import KexoBotClient
 
 
 def get_full_node_url(host: str, port: int, secure: bool = False) -> str:
@@ -58,7 +60,7 @@ class LavalinkServerManager:
         if json_data_first:
             self._clear_removed_nodes()
             await self._bot.config_manager.save("lavalink_servers", DB_CACHE)
-            logging.info(
+            logger.info(
                 "[Lavalink] Lavalink servers list got updated, updating cache."
             )
 

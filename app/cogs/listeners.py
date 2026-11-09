@@ -24,8 +24,10 @@ from app.response_handler import make_embed, send
 from app.utils import make_now_playing_embed
 
 if TYPE_CHECKING:
-    from app.main import KexoBotClient
+    from app.client import KexoBotClient
     from app.player_types import KexoPlayer
+
+logger = logging.getLogger(__name__)
 
 
 def is_bot_node_connected(bot: "KexoBotClient") -> bool:
@@ -105,7 +107,7 @@ class Listeners(commands.Cog):
         payload: :class:`NodeReadyEventPayload`
             The payload containing information about the node that is ready.
         """
-        logging.info(f"[Sonolink] A node is ready ({payload.node.uri})")
+        logger.info("[Sonolink] A node is ready (%s)", payload.node.uri)
         if self._bot.state.get_online_nodes() > 1 and is_bot_node_connected(self._bot):
             await self._bot.state.close_unused_nodes()
 
@@ -121,7 +123,7 @@ class Listeners(commands.Cog):
             The node that was closed.
         """
         if self._bot.state.get_online_nodes() == 0 and is_bot_node_connected(self._bot):
-            logging.warning(
+            logger.warning(
                 f"[Sonolink] Node got disconnected, connecting new node. ({node.uri})"
             )
             self._bot.state.change_node_score(node.uri, -1)
@@ -281,7 +283,7 @@ class Listeners(commands.Cog):
             )
 
         if payload.extra_data:
-            logging.info(
+            logger.info(
                 f"[Sonolink] Player disconnected for guild {player.guild.id}, trigger: {payload.trigger}, extra_data: {payload.extra_data}"
             )
 

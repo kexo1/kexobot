@@ -12,6 +12,8 @@ import asyncprawcore.exceptions
 
 from app.data.models import TempUserData, UserData
 
+logger = logging.getLogger(__name__)
+
 
 @runtime_checkable
 class _RedditAgent(Protocol):
@@ -45,7 +47,7 @@ class TempUserDataManager:
 
     def __init__(self, bot: object | None = None) -> None:
         self._cache: dict[int, TempUserData] = {}
-        self._bot: "_BotLike | None" = cast("_BotLike | None", bot)
+        self._bot: _BotLike | None = cast("_BotLike | None", bot)
 
     def get(self, user_id: int) -> TempUserData:
         """Get temporary user data, creating defaults if missing."""
@@ -67,7 +69,7 @@ class TempUserDataManager:
             or self._bot.reddit_agent is None
             or self._bot.user_data_manager is None
         ):
-            logging.error(
+            logger.error(
                 "[TempUserData] Bot or services not available when ensuring multireddit for %s",
                 user_id,
             )
@@ -92,7 +94,7 @@ class TempUserDataManager:
                 await multireddit.load()
                 break
             except asyncprawcore.exceptions.NotFound:
-                logging.warning(
+                logger.warning(
                     "[Reddit] Multireddit for user %s not found. "
                     + "Attempting to create it... (Attempt %s/3)",
                     user_id,
@@ -100,7 +102,7 @@ class TempUserDataManager:
                 )
                 await asyncio.sleep(attempt + 1)
         else:
-            logging.error(
+            logger.error(
                 "[Reddit] Failed to load multireddit for user %s after 3 attempts.",
                 user_id,
             )
